@@ -1,16 +1,18 @@
 use super::message::{Message, Response, ProtocolError};
-use crate::parser::Parser;
-use crate::executor::Executor;
+use crate::parser::{Parser, Statement};
+use crate::catalog::Catalog;
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 pub struct Connection<S: Read + Write> {
     stream: S,
     authenticated: bool,
+    catalog: Arc<Catalog>,
 }
 
 impl<S: Read + Write> Connection<S> {
-    pub fn new(stream: S) -> Self {
-        Self { stream, authenticated: false }
+    pub fn new(stream: S, catalog: Arc<Catalog>) -> Self {
+        Self { stream, authenticated: false, catalog }
     }
 
     pub fn handle_startup(&mut self) -> Result<(), ProtocolError> {
@@ -38,8 +40,17 @@ impl<S: Read + Write> Connection<S> {
                 match parser.parse() {
                     Ok(stmt) => {
                         log::debug!("Parsed statement: {:?}", stmt);
-                        Response::CommandComplete { tag: "SELECT 0".to_string() }.write(&mut self.stream)?;
-                        Response::ReadyForQuery.write(&mut self.stream)?;
+                        match self.execute_statement(stmt) {
+                            Ok(tag) => {
+                                Response::CommandComplete { tag }.write(&mut self.stream)?;
+                                Response::ReadyForQuery.write(&mut self.stream)?;
+                            }
+                            Err(e) => {
+                                log::warn!("Execution error: {}", e);
+                                Response::ErrorResponse { message: format!("Execution error: {}", e) }.write(&mut self.stream)?;
+                                Response::ReadyForQuery.write(&mut self.stream)?;
+                            }
+                        }
                     }
                     Err(e) => {
                         log::warn!("Parse error: {}", e);
@@ -56,6 +67,30 @@ impl<S: Read + Write> Connection<S> {
         }
         self.stream.flush()?;
         Ok(())
+    }
+    
+    fn execute_statement(&self, stmt: Statement) -> Result<String, String> {
+        match stmt {
+            Statement::CreateTable(create) => {
+                self.catalog.create_table(create.table.clone(), create.columns)?;
+                Ok(format!("CREATE TABLE"))
+            }
+            Statement::DropTable(drop) => {
+                self.catalog.drop_table(&drop.table, drop.if_exists)?;
+                Ok(format!("DROP TABLE"))
+            }
+            Statement::Describe(desc) => {
+                if let Some(schema) = self.catalog.get_table(&desc.table) {
+                    let cols: Vec<String> = schema.columns.iter()
+                        .map(|c| format!("{}: {:?}", c.name, c.data_type))
+                        .collect();
+                    Ok(format!("DESCRIBE\n{}", cols.join("\n")))
+                } else {
+                    Err(format!("Table '{}' does not exist", desc.table))
+                }
+            }
+            _ => Ok("SELECT 0".to_string()),
+        }
     }
 
     pub fn run(&mut self) -> Result<(), ProtocolError> {
@@ -127,8 +162,11 @@ mod tests {
 
     #[test]
     fn test_connection_creation() {
+        use crate::catalog::Catalog;
+        use std::sync::Arc;
         let stream = Cursor::new(Vec::new());
-        let conn = Connection::new(stream);
+        let catalog = Arc::new(Catalog::new());
+        let conn = Connection::new(stream, catalog);
         assert!(!conn.authenticated);
     }
 }
