@@ -12,3 +12,4 @@ mod wal_test;
 mod buffer_pool_disk_test;
 mod wal_disk_test;
 mod statistics_test;
+mod optimizer_test;

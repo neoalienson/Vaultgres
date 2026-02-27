@@ -18,6 +18,7 @@ pub mod executor;
 pub mod protocol;
 pub mod config;
 pub mod statistics;
+pub mod optimizer;
 
 pub use storage::{BufferPool, Page, PageId, StorageError};
 pub use transaction::{TransactionManager, Transaction, TransactionId};

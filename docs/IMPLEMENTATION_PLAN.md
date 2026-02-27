@@ -161,7 +161,7 @@ impl Analyzer {
 **Duration**: Complete
 **Status**: ✅ Basic statistics collection implemented
 
-### 2.3 Cost-Based Optimizer (Week 6-8)
+### 2.3 Cost-Based Optimizer (Week 6-8) ✅ COMPLETE
 ```rust
 // src/optimizer/cost.rs
 struct CostModel {
@@ -179,15 +179,16 @@ impl CostModel {
 ```
 
 **Tasks**:
-- [ ] Cost estimation for scans
-- [ ] Cost estimation for joins
-- [ ] Selectivity estimation
-- [ ] Cardinality estimation
-- [ ] Index selection logic
+- [x] Cost estimation for scans
+- [x] Cost estimation for joins
+- [x] Selectivity estimation
+- [x] Cardinality estimation
+- [x] Index selection logic
 
-**Files**: `src/optimizer/{cost.rs, selectivity.rs, cardinality.rs}`
-**Tests**: `tests/optimizer_cost_test.rs`
-**Duration**: 3 weeks
+**Files**: `src/optimizer/{cost.rs, selectivity.rs, error.rs, mod.rs}`
+**Tests**: `tests/integration/optimizer_test.rs` (10 tests)
+**Duration**: Complete
+**Status**: ✅ Cost model with scan and join estimation
 
 ### 2.4 Join Ordering (Week 9-10)
 ```rust
