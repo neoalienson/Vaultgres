@@ -86,6 +86,25 @@ impl Page {
     pub fn data_mut(&mut self) -> &mut [u8] {
         &mut self.data
     }
+    
+    /// Creates page from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut data = [0u8; PAGE_SIZE];
+        data.copy_from_slice(bytes);
+        Self { data }
+    }
+    
+    /// Converts page to bytes
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.data.to_vec()
+    }
+    
+    /// Sets page data (for testing)
+    pub fn set_data(&mut self, new_data: Vec<u8>) {
+        let start = PageHeader::SIZE;
+        let len = new_data.len().min(PAGE_SIZE - start);
+        self.data[start..start + len].copy_from_slice(&new_data[..len]);
+    }
 }
 
 #[cfg(test)]

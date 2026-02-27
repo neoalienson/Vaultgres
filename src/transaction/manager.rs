@@ -49,6 +49,8 @@ impl TransactionManager {
         
         let snapshot = self.get_snapshot();
         
+        log::debug!("Transaction {} started", xid);
+        
         Transaction {
             xid,
             snapshot,
@@ -70,6 +72,7 @@ impl TransactionManager {
         }
         
         *entry = TransactionState::Committed;
+        log::debug!("Transaction {} committed", xid);
         Ok(())
     }
     
@@ -79,6 +82,7 @@ impl TransactionManager {
             .ok_or(TransactionError::NotFound(xid))?;
         
         *entry = TransactionState::Aborted;
+        log::debug!("Transaction {} aborted", xid);
         Ok(())
     }
     

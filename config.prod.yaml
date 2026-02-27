@@ -1,0 +1,30 @@
+# RustGres Production Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 5432
+  max_connections: 200
+
+storage:
+  data_dir: "/var/lib/rustgres/data"
+  wal_dir: "/var/lib/rustgres/wal"
+  buffer_pool_size: 10000
+  page_size: 8192
+
+logging:
+  level: "warn"
+  scope: "*"
+  file: "/var/log/rustgres/rustgres.log"
+
+transaction:
+  timeout: 600
+  mvcc_enabled: true
+
+wal:
+  segment_size: 64
+  compression: true
+  sync_on_commit: true
+
+performance:
+  worker_threads: 8
+  query_cache: true

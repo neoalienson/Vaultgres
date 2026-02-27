@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum WALError {
     #[error("WAL write failed: {0}")]
     WriteFailed(String),
@@ -13,6 +13,9 @@ pub enum WALError {
     
     #[error("recovery failed: {0}")]
     RecoveryFailed(String),
+    
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, WALError>;

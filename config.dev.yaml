@@ -1,0 +1,29 @@
+# RustGres Development Configuration
+
+server:
+  host: "127.0.0.1"
+  port: 5433
+  max_connections: 50
+
+storage:
+  data_dir: "./data"
+  wal_dir: "./wal"
+  buffer_pool_size: 500
+  page_size: 8192
+
+logging:
+  level: "debug"
+  scope: "*"
+
+transaction:
+  timeout: 300
+  mvcc_enabled: true
+
+wal:
+  segment_size: 16
+  compression: false
+  sync_on_commit: true
+
+performance:
+  worker_threads: 2
+  query_cache: false

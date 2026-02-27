@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum StorageError {
     #[error("page {0} not found")]
     PageNotFound(u32),
@@ -9,7 +9,7 @@ pub enum StorageError {
     BufferPoolFull,
     
     #[error("I/O error: {0}")]
-    Io(String),
+    Io(#[from] std::io::Error),
     
     #[error("invalid page data")]
     InvalidPageData,

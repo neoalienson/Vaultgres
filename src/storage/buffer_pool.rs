@@ -69,11 +69,13 @@ impl BufferPool {
                 let frame = &self.frames[frame_id];
                 frame.write().pin_count += 1;
                 self.update_lru(frame_id);
+                log::trace!("Buffer pool hit: page {}", page_id.0);
                 return Ok(());
             }
         }
         
         // Page not in pool, need to load it
+        log::debug!("Buffer pool miss: loading page {}", page_id.0);
         let frame_id = self.get_free_frame()?;
         
         // Load page (for now, just create new page)
@@ -123,17 +125,19 @@ impl BufferPool {
         }
         
         // Need to evict a page using LRU
+        log::debug!("Buffer pool full, evicting page");
         let mut lru_list = self.lru_list.write();
         
         while let Some(frame_id) = lru_list.pop_front() {
             let frame = self.frames[frame_id].read();
             if frame.pin_count == 0 {
+                let page_id = frame.page.id();
                 drop(frame);
                 
                 // Remove from page table
-                let page_id = self.frames[frame_id].read().page.id();
                 self.page_table.write().remove(&page_id);
                 
+                log::trace!("Evicted page {}", page_id.0);
                 return Ok(frame_id);
             }
             // Page is pinned, put it back

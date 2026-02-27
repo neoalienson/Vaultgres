@@ -21,7 +21,8 @@ impl<S: Read + Write> Connection<S> {
         let mut data = vec![0u8; len - 4];
         self.stream.read_exact(&mut data)?;
         
-        let _msg = Message::parse(0, &data)?;
+        let msg = Message::parse(0, &data)?;
+        log::debug!("Startup message: {:?}", msg);
         self.authenticated = true;
         
         Response::AuthenticationOk.write(&mut self.stream)?;
@@ -31,20 +32,24 @@ impl<S: Read + Write> Connection<S> {
     }
 
     pub fn handle_query(&mut self, sql: &str) -> Result<(), ProtocolError> {
+        log::info!("Query: {}", sql);
         match Parser::new(sql) {
             Ok(mut parser) => {
                 match parser.parse() {
-                    Ok(_stmt) => {
+                    Ok(stmt) => {
+                        log::debug!("Parsed statement: {:?}", stmt);
                         Response::CommandComplete { tag: "SELECT 0".to_string() }.write(&mut self.stream)?;
                         Response::ReadyForQuery.write(&mut self.stream)?;
                     }
                     Err(e) => {
+                        log::warn!("Parse error: {}", e);
                         Response::ErrorResponse { message: format!("Parse error: {}", e) }.write(&mut self.stream)?;
                         Response::ReadyForQuery.write(&mut self.stream)?;
                     }
                 }
             }
             Err(e) => {
+                log::warn!("Lexer error: {}", e);
                 Response::ErrorResponse { message: format!("Lexer error: {}", e) }.write(&mut self.stream)?;
                 Response::ReadyForQuery.write(&mut self.stream)?;
             }
@@ -63,6 +68,7 @@ impl<S: Read + Write> Connection<S> {
             
             if len == 8 && code == 80877103 {
                 // Reject SSL with 'N'
+                log::debug!("SSL negotiation rejected");
                 self.stream.write_all(b"N")?;
                 self.stream.flush()?;
             } else {
@@ -74,7 +80,8 @@ impl<S: Read + Write> Connection<S> {
                 let mut full_data = ssl_buf[4..8].to_vec();
                 full_data.extend_from_slice(&data);
                 
-                let _msg = Message::parse(0, &full_data)?;
+                let msg = Message::parse(0, &full_data)?;
+                log::debug!("Startup message: {:?}", msg);
                 self.authenticated = true;
                 
                 Response::AuthenticationOk.write(&mut self.stream)?;

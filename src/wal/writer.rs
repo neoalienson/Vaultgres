@@ -101,6 +101,8 @@ impl WALWriter {
         let mut buffer = self.buffer.lock().unwrap();
         buffer.push(record);
         
+        log::trace!("WAL write: LSN={}, XID={}, type={:?}", lsn, xid, record_type);
+        
         Ok(lsn)
     }
     
@@ -114,11 +116,14 @@ impl WALWriter {
         
         // Simulate disk write
         let last_lsn = buffer.last().map(|r| r.lsn).unwrap_or(0);
+        let count = buffer.len();
         
         buffer.clear();
         
         let mut flushed_lsn = self.flushed_lsn.lock().unwrap();
         *flushed_lsn = last_lsn;
+        
+        log::debug!("WAL flushed: {} records, LSN up to {}", count, last_lsn);
         
         Ok(last_lsn)
     }

@@ -22,7 +22,9 @@ pub mod page;
 pub mod buffer_pool;
 pub mod btree;
 pub mod heap;
+pub mod disk;
 
 pub use error::{StorageError, Result};
 pub use page::{Page, PageId, PAGE_SIZE};
 pub use buffer_pool::BufferPool;
+pub use disk::DiskManager;

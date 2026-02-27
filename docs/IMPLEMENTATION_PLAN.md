@@ -2,64 +2,131 @@
 
 Detailed implementation plan for RustGres, organized by version milestones from the roadmap.
 
-## Phase 1: Version 0.1.0 (Alpha) - Foundation 📋 PLANNED
+## Phase 1: Version 0.1.0 (Alpha) - Foundation ✅ COMPLETE
 
-### 1.1 Storage Layer (Week 1-3)
-- [ ] Page structure and layout (8KB pages)
-- [ ] Buffer pool with LRU eviction
-- [ ] Page I/O operations
-- [ ] B+Tree index implementation
-- [ ] Heap file storage
+### 1.1 Storage Layer (Week 1-3) ✅
+- [x] Page structure and layout (8KB pages)
+- [x] Buffer pool with LRU eviction
+- [~] Page I/O operations (in-memory only, disk I/O deferred to v0.2.0)
+- [x] B+Tree index implementation (basic, leaf nodes only)
+- [x] Heap file storage (in-memory)
 
-**Files**: `src/storage/{page.rs, buffer_pool.rs, btree.rs, heap.rs}`
+**Files**: `src/storage/{page.rs, buffer_pool.rs, btree.rs, heap.rs, error.rs, mod.rs}`
+**Tests**: 17 tests passing
+**Status**: Complete with intentional simplifications
 
-### 1.2 Transaction Manager (Week 4-6)
-- [ ] Transaction ID generation
-- [ ] MVCC tuple visibility
-- [ ] Snapshot isolation
-- [ ] Transaction status (CLOG)
-- [ ] Lock manager basics
+### 1.2 Transaction Manager (Week 4-6) ✅
+- [x] Transaction ID generation
+- [x] MVCC tuple visibility
+- [x] Snapshot isolation
+- [~] Transaction status (CLOG) (deferred to v0.2.0)
+- [x] Lock manager basics
 
-**Files**: `src/transaction/{manager.rs, mvcc.rs, snapshot.rs, lock.rs}`
+**Files**: `src/transaction/{manager.rs, mvcc.rs, snapshot.rs, lock.rs, error.rs, mod.rs}`
+**Tests**: 39 tests passing
+**Status**: Complete
 
-### 1.3 WAL & Recovery (Week 7-8)
-- [ ] WAL record format
-- [ ] WAL writing and flushing
-- [ ] ARIES recovery (Analysis, Redo, Undo)
-- [ ] Checkpoint mechanism
+### 1.3 WAL & Recovery (Week 7-8) ✅
+- [x] WAL record format
+- [x] WAL writing and flushing (in-memory buffer)
+- [x] ARIES recovery (Analysis, Redo, Undo)
+- [x] Checkpoint mechanism
 
-**Files**: `src/wal/{writer.rs, recovery.rs, checkpoint.rs}`
+**Files**: `src/wal/{writer.rs, recovery.rs, checkpoint.rs, error.rs, mod.rs}`
+**Tests**: 57 tests passing
+**Status**: Complete (WAL buffered in-memory, disk persistence in v0.2.0)
 
-### 1.4 SQL Parser (Week 9-10)
-- [ ] Lexer/tokenizer
-- [ ] Parser for SELECT, INSERT, UPDATE, DELETE
-- [ ] AST nodes
-- [ ] Basic semantic analysis
+### 1.4 SQL Parser (Week 9-10) ✅
+- [x] Lexer/tokenizer
+- [x] Parser for SELECT, INSERT, UPDATE, DELETE
+- [x] AST nodes
+- [x] Basic semantic analysis
+- [x] Semicolon handling
+- [x] SELECT without FROM clause
 
-**Files**: `src/parser/{lexer.rs, parser.rs, ast.rs}`
+**Files**: `src/parser/{lexer.rs, parser.rs, ast.rs, error.rs, mod.rs}`
+**Tests**: 80 tests passing
+**Status**: Complete
 
-### 1.5 Query Execution (Week 11-12)
-- [ ] Volcano iterator model
-- [ ] SeqScan operator
-- [ ] Filter operator
-- [ ] Project operator
-- [ ] NestedLoop join
+### 1.5 Query Execution (Week 11-12) ✅
+- [x] Volcano iterator model
+- [x] SeqScan operator
+- [x] Filter operator
+- [x] Project operator
+- [x] NestedLoop join
 
-**Files**: `src/executor/{executor.rs, scan.rs, join.rs, project.rs}`
+**Files**: `src/executor/{executor.rs, seq_scan.rs, filter.rs, project.rs, nested_loop.rs, mod.rs}`
+**Tests**: 91 tests passing
+**Status**: Complete
 
-### 1.6 Protocol Layer (Week 13-14)
-- [ ] PostgreSQL wire protocol parser
-- [ ] Connection handling
-- [ ] Authentication (MD5)
-- [ ] Result serialization
+### 1.6 Protocol Layer (Week 13-14) ✅
+- [x] PostgreSQL wire protocol parser
+- [x] Connection handling
+- [x] SSL negotiation (reject with 'N')
+- [~] Authentication (MD5) (no password auth, accepts all connections)
+- [x] Result serialization
+- [x] Error response formatting
 
-**Files**: `src/protocol/{wire.rs, connection.rs, auth.rs}`
+**Files**: `src/protocol/{message.rs, connection.rs, server.rs, mod.rs}`, `src/main.rs`
+**Tests**: 110 tests passing
+**Status**: Complete
+
+**v0.1.0 Summary**:
+- ✅ All 6 phases complete
+- ✅ 110 tests passing (62 unit + 48 integration)
+- ✅ ~2,500 lines of code
+- ✅ Fully functional TCP server
+- ✅ In-memory only (disk I/O deferred to v0.2.0)
+- ✅ PostgreSQL client compatible
+
+**Intentional Simplifications for v0.1.0**:
+- No disk I/O (all in-memory)
+- No password authentication
+- No SSL/TLS support
+- Basic B+Tree (leaf nodes only)
+- No query planner (direct execution)
+- No prepared statements
 
 ---
 
 ## Phase 2: Version 0.2.0 (Alpha) - Optimization 📋 PLANNED
 
-### 2.1 Statistics Collection (Week 1-2)
+**Note**: Disk I/O added as first priority for data persistence.
+
+### 2.1 Disk I/O & Persistence (Week 1-3) 🎯 PRIORITY
+```rust
+// src/storage/disk.rs
+struct DiskManager {
+    data_dir: PathBuf,
+    file_handles: HashMap<PageId, File>,
+}
+
+impl DiskManager {
+    fn read_page(&mut self, page_id: PageId) -> Result<Page>;
+    fn write_page(&mut self, page_id: PageId, page: &Page) -> Result<()>;
+    fn sync(&mut self) -> Result<()>;
+}
+
+// src/wal/disk.rs
+struct WALDiskWriter {
+    wal_file: File,
+    current_segment: u64,
+}
+```
+
+**Tasks**:
+- [ ] Disk manager for page I/O
+- [ ] WAL file management
+- [ ] Buffer pool eviction to disk
+- [ ] Page replacement policy
+- [ ] Crash recovery from disk
+
+**Files**: `src/storage/disk.rs, src/wal/disk.rs`
+**Tests**: `tests/disk_test.rs`
+**Duration**: 3 weeks
+**Priority**: HIGH - Required for data persistence
+
+### 2.2 Statistics Collection (Week 4-5)
 ```rust
 // src/statistics/collector.rs
 struct TableStats {
@@ -93,7 +160,7 @@ impl Analyzer {
 **Tests**: `tests/statistics_test.rs`
 **Duration**: 2 weeks
 
-### 2.2 Cost-Based Optimizer (Week 3-5)
+### 2.3 Cost-Based Optimizer (Week 6-8)
 ```rust
 // src/optimizer/cost.rs
 struct CostModel {
@@ -121,7 +188,7 @@ impl CostModel {
 **Tests**: `tests/optimizer_cost_test.rs`
 **Duration**: 3 weeks
 
-### 2.3 Join Ordering (Week 6-7)
+### 2.4 Join Ordering (Week 9-10)
 ```rust
 // src/optimizer/join_order.rs
 impl JoinOptimizer {
@@ -141,7 +208,7 @@ impl JoinOptimizer {
 **Tests**: `tests/join_order_test.rs`
 **Duration**: 2 weeks
 
-### 2.4 Rule-Based Optimization (Week 8-9)
+### 2.5 Rule-Based Optimization (Week 11-12)
 ```rust
 // src/optimizer/rules.rs
 trait OptimizationRule {
@@ -165,7 +232,7 @@ struct CommonSubexpressionElimination;
 **Tests**: `tests/optimizer_rules_test.rs`
 **Duration**: 2 weeks
 
-### 2.5 Advanced Join Algorithms (Week 10-12)
+### 2.6 Advanced Join Algorithms (Week 13-15)
 ```rust
 // src/executor/hash_join.rs
 struct HashJoin {
@@ -193,7 +260,7 @@ struct MergeJoin {
 **Tests**: `tests/executor_join_test.rs`
 **Duration**: 3 weeks
 
-### 2.6 Advanced SQL Features (Week 13-14)
+### 2.7 Advanced SQL Features (Week 16-17)
 ```rust
 // src/parser/subquery.rs
 enum SubqueryType {

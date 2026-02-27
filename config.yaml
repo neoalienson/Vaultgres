@@ -1,0 +1,65 @@
+# RustGres Configuration File
+
+# Server settings
+server:
+  # Host address to bind to
+  host: "127.0.0.1"
+  
+  # Port to listen on
+  port: 5433
+  
+  # Maximum number of concurrent connections
+  max_connections: 100
+
+# Storage settings
+storage:
+  # Directory for data files
+  data_dir: "./data"
+  
+  # Directory for WAL files
+  wal_dir: "./wal"
+  
+  # Buffer pool size (number of pages)
+  buffer_pool_size: 1000
+  
+  # Page size in bytes (default: 8192)
+  page_size: 8192
+
+# Logging settings
+logging:
+  # Log level: error, warn, info, debug, trace
+  level: "info"
+  
+  # Log scope: "*" for all modules, or comma-separated list
+  # Examples: "protocol", "parser,executor", "*"
+  scope: "*"
+  
+  # Log to file (optional, if not set logs to stderr)
+  # file: "./logs/rustgres.log"
+
+# Transaction settings
+transaction:
+  # Transaction timeout in seconds
+  timeout: 300
+  
+  # Enable MVCC
+  mvcc_enabled: true
+
+# WAL settings
+wal:
+  # WAL segment size in MB
+  segment_size: 16
+  
+  # Enable WAL compression
+  compression: false
+  
+  # Sync WAL to disk on commit
+  sync_on_commit: true
+
+# Performance settings
+performance:
+  # Number of worker threads
+  worker_threads: 4
+  
+  # Enable query caching
+  query_cache: false

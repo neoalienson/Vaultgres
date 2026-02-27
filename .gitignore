@@ -17,12 +17,19 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Database files
 *.db
 *.sqlite
 data/
+wal/
+test_data/
+test_wal/
 
 # Backup files
 *.bak
 *.tmp
+
+# Config overrides
+config.local.yaml
