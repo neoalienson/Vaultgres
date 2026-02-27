@@ -190,7 +190,7 @@ impl CostModel {
 **Duration**: Complete
 **Status**: ✅ Cost model with scan and join estimation
 
-### 2.4 Join Ordering (Week 9-10)
+### 2.4 Join Ordering (Week 9-10) ✅ COMPLETE
 ```rust
 // src/optimizer/join_order.rs
 impl JoinOptimizer {
@@ -201,14 +201,15 @@ impl JoinOptimizer {
 ```
 
 **Tasks**:
-- [ ] Dynamic programming for ≤12 tables
-- [ ] Greedy algorithm for >12 tables
-- [ ] Join condition detection
-- [ ] Bushy vs left-deep trees
+- [x] Dynamic programming for ≤12 tables
+- [x] Greedy algorithm for >12 tables
+- [x] Join condition detection
+- [x] Bushy vs left-deep trees
 
 **Files**: `src/optimizer/join_order.rs`
-**Tests**: `tests/join_order_test.rs`
-**Duration**: 2 weeks
+**Tests**: `tests/integration/join_order_test.rs` (7 tests)
+**Duration**: Complete
+**Status**: ✅ DP for small joins, greedy for large joins
 
 ### 2.5 Rule-Based Optimization (Week 11-12)
 ```rust
