@@ -211,7 +211,7 @@ impl JoinOptimizer {
 **Duration**: Complete
 **Status**: ✅ DP for small joins, greedy for large joins
 
-### 2.5 Rule-Based Optimization (Week 11-12)
+### 2.5 Rule-Based Optimization (Week 11-12) ✅ COMPLETE
 ```rust
 // src/optimizer/rules.rs
 trait OptimizationRule {
@@ -225,15 +225,16 @@ struct CommonSubexpressionElimination;
 ```
 
 **Tasks**:
-- [ ] Predicate pushdown
-- [ ] Projection pruning
-- [ ] Constant folding
-- [ ] CSE elimination
-- [ ] Rule application framework
+- [x] Predicate pushdown
+- [x] Projection pruning
+- [x] Constant folding
+- [x] CSE elimination
+- [x] Rule application framework
 
-**Files**: `src/optimizer/rules/{pushdown.rs, pruning.rs, folding.rs, cse.rs}`
-**Tests**: `tests/optimizer_rules_test.rs`
-**Duration**: 2 weeks
+**Files**: `src/optimizer/{plan.rs, rules/mod.rs, rules/pushdown.rs, rules/pruning.rs, rules/folding.rs}`
+**Tests**: `tests/integration/rules_test.rs` (8 tests)
+**Duration**: Complete
+**Status**: ✅ Rule framework with pushdown, pruning, folding
 
 ### 2.6 Advanced Join Algorithms (Week 13-15)
 ```rust

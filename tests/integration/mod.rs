@@ -14,3 +14,4 @@ mod wal_disk_test;
 mod statistics_test;
 mod optimizer_test;
 mod join_order_test;
+mod rules_test;
