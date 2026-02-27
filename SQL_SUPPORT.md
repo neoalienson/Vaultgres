@@ -24,8 +24,17 @@
    - Both DESCRIBE and DESC keywords supported
    - Ready for catalog integration
 
+3. **DROP TABLE**
+   ```sql
+   DROP TABLE users;
+   DROP TABLE IF EXISTS products;
+   ```
+   - Removes table from database
+   - IF EXISTS clause prevents errors if table doesn't exist
+   - Ready for catalog integration
+
 ### DML (Data Manipulation Language)
-3. **SELECT**
+4. **SELECT**
    ```sql
    SELECT * FROM users;
    SELECT id, name FROM users WHERE id = 1;
@@ -64,7 +73,7 @@
 ## Parser Capabilities
 
 ### Keywords Supported
-- DDL: CREATE, TABLE, DESCRIBE, DESC
+- DDL: CREATE, TABLE, DROP, DESCRIBE, DESC, IF, EXISTS
 - DML: SELECT, INSERT, UPDATE, DELETE
 - Clauses: FROM, WHERE, INTO, VALUES, SET
 - Data Types: INT, TEXT, VARCHAR
@@ -85,7 +94,7 @@
 
 ## Test Results
 
-### Parser Tests: ✅ 92 passing
+### Parser Tests: ✅ 94 passing
 - test_parse_select
 - test_parse_select_with_where
 - test_parse_insert
@@ -94,12 +103,16 @@
 - test_parse_create_table
 - test_parse_describe
 - test_parse_desc
+- test_parse_drop_table
+- test_parse_drop_table_if_exists
 - ... and more
 
 ### End-to-End Tests: ✅ All passing
 ```bash
 # All statements parse successfully
 CREATE TABLE users (id INT, name TEXT);     ✓
+DROP TABLE users;                           ✓
+DROP TABLE IF EXISTS users;                 ✓
 DESCRIBE users;                             ✓
 DESC users;                                 ✓
 INSERT INTO users VALUES (1, 'Alice');      ✓
@@ -153,6 +166,7 @@ DELETE FROM products WHERE id = 2;
 | Statement | Parsing | Execution | Status |
 |-----------|---------|-----------|--------|
 | CREATE TABLE | ✅ | ⏳ | Parser complete |
+| DROP TABLE | ✅ | ⏳ | Parser complete |
 | DESCRIBE | ✅ | ⏳ | Parser complete |
 | SELECT | ✅ | ✅ | Fully working |
 | INSERT | ✅ | ⏳ | Parser complete |
@@ -181,11 +195,12 @@ DELETE FROM products WHERE id = 2;
 **RustGres now supports all major SQL statement types!**
 
 The parser successfully handles:
-- ✅ DDL: CREATE TABLE, DESCRIBE
+- ✅ DDL: CREATE TABLE, DROP TABLE, DESCRIBE
 - ✅ DML: SELECT, INSERT, UPDATE, DELETE
 - ✅ Data types: INT, TEXT, VARCHAR
 - ✅ Expressions and operators
 - ✅ WHERE clauses
+- ✅ IF EXISTS clause
 - ✅ Multiple statements
 
 All statements are parsed correctly and ready for execution implementation.

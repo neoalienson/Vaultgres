@@ -6,7 +6,15 @@ pub enum Statement {
     Update(UpdateStmt),
     Delete(DeleteStmt),
     CreateTable(CreateTableStmt),
+    DropTable(DropTableStmt),
     Describe(DescribeStmt),
+}
+
+/// DROP TABLE statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct DropTableStmt {
+    pub table: String,
+    pub if_exists: bool,
 }
 
 /// DESCRIBE statement

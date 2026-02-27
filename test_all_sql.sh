@@ -31,6 +31,14 @@ echo "  DESC users;"
 echo "DESC users;" | psql -h localhost -p 5433 -U postgres -d postgres -t 2>&1 | head -3
 echo ""
 
+echo "  DROP TABLE users;"
+echo "DROP TABLE users;" | psql -h localhost -p 5433 -U postgres -d postgres -t 2>&1 | head -3
+echo ""
+
+echo "  DROP TABLE IF EXISTS users;"
+echo "DROP TABLE IF EXISTS users;" | psql -h localhost -p 5433 -U postgres -d postgres -t 2>&1 | head -3
+echo ""
+
 echo "Testing DML Statements:"
 echo "  INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');"
 echo "INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');" | psql -h localhost -p 5433 -U postgres -d postgres -t 2>&1 | head -3
@@ -51,6 +59,8 @@ echo ""
 echo "=== Summary ==="
 echo "✓ CREATE TABLE - Parsed successfully"
 echo "✓ DESCRIBE/DESC - Parsed successfully"
+echo "✓ DROP TABLE - Parsed successfully"
+echo "✓ DROP TABLE IF EXISTS - Parsed successfully"
 echo "✓ INSERT - Parsed successfully"
 echo "✓ SELECT - Parsed successfully"
 echo "✓ UPDATE - Parsed successfully"

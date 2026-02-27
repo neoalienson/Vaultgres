@@ -28,6 +28,7 @@ impl Parser {
             Token::Update => self.parse_update(),
             Token::Delete => self.parse_delete(),
             Token::Create => self.parse_create(),
+            Token::Drop => self.parse_drop(),
             Token::Describe | Token::Desc => self.parse_describe(),
             _ => Err(ParseError::UnexpectedToken(format!("{:?}", self.current_token()))),
         }?;
@@ -203,6 +204,24 @@ impl Parser {
         let table = self.expect_identifier()?;
         
         Ok(Statement::Describe(DescribeStmt { table }))
+    }
+    
+    fn parse_drop(&mut self) -> Result<Statement> {
+        self.expect(Token::Drop)?;
+        self.expect(Token::Table)?;
+        
+        // Check for IF EXISTS
+        let if_exists = if self.current_token() == &Token::If {
+            self.advance();
+            self.expect(Token::Exists)?;
+            true
+        } else {
+            false
+        };
+        
+        let table = self.expect_identifier()?;
+        
+        Ok(Statement::DropTable(DropTableStmt { table, if_exists }))
     }
     
     fn parse_select_list(&mut self) -> Result<Vec<Expr>> {
@@ -452,6 +471,34 @@ mod tests {
                 assert_eq!(s.table, "products");
             }
             _ => panic!("Expected DESCRIBE statement"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_drop_table() {
+        let mut parser = Parser::new("DROP TABLE users").unwrap();
+        let stmt = parser.parse().unwrap();
+        
+        match stmt {
+            Statement::DropTable(s) => {
+                assert_eq!(s.table, "users");
+                assert_eq!(s.if_exists, false);
+            }
+            _ => panic!("Expected DROP TABLE statement"),
+        }
+    }
+    
+    #[test]
+    fn test_parse_drop_table_if_exists() {
+        let mut parser = Parser::new("DROP TABLE IF EXISTS products").unwrap();
+        let stmt = parser.parse().unwrap();
+        
+        match stmt {
+            Statement::DropTable(s) => {
+                assert_eq!(s.table, "products");
+                assert_eq!(s.if_exists, true);
+            }
+            _ => panic!("Expected DROP TABLE statement"),
         }
     }
 }

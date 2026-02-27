@@ -20,6 +20,9 @@ pub enum Token {
     Varchar,
     Describe,
     Desc,
+    Drop,
+    If,
+    Exists,
     
     // Identifiers and literals
     Identifier(String),
@@ -132,6 +135,9 @@ impl Lexer {
             "VARCHAR" => Token::Varchar,
             "DESCRIBE" => Token::Describe,
             "DESC" => Token::Desc,
+            "DROP" => Token::Drop,
+            "IF" => Token::If,
+            "EXISTS" => Token::Exists,
             _ => Token::Identifier(ident),
         };
         
