@@ -9,3 +9,5 @@ mod protocol_test;
 mod storage_test;
 mod transaction_test;
 mod wal_test;
+mod buffer_pool_disk_test;
+mod wal_disk_test;

@@ -1,7 +1,8 @@
 use super::error::{Result, WALError};
+use super::disk::WALDiskWriter;
 use crate::transaction::TransactionId;
 use crate::storage::PageId;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Log Sequence Number
 pub type LSN = u64;
@@ -71,6 +72,7 @@ pub struct WALWriter {
     next_lsn: Mutex<LSN>,
     buffer: Mutex<Vec<WALRecord>>,
     flushed_lsn: Mutex<LSN>,
+    disk_writer: Option<Arc<WALDiskWriter>>,
 }
 
 impl WALWriter {
@@ -80,6 +82,17 @@ impl WALWriter {
             next_lsn: Mutex::new(1),
             buffer: Mutex::new(Vec::new()),
             flushed_lsn: Mutex::new(0),
+            disk_writer: None,
+        }
+    }
+    
+    /// Creates a new WAL writer with disk persistence
+    pub fn with_disk(disk_writer: Arc<WALDiskWriter>) -> Self {
+        Self {
+            next_lsn: Mutex::new(1),
+            buffer: Mutex::new(Vec::new()),
+            flushed_lsn: Mutex::new(0),
+            disk_writer: Some(disk_writer),
         }
     }
     
@@ -114,9 +127,16 @@ impl WALWriter {
             return Ok(*self.flushed_lsn.lock().unwrap());
         }
         
-        // Simulate disk write
         let last_lsn = buffer.last().map(|r| r.lsn).unwrap_or(0);
         let count = buffer.len();
+        
+        // Write to disk if available
+        if let Some(ref dw) = self.disk_writer {
+            for record in buffer.iter() {
+                dw.write(record)?;
+            }
+            dw.flush()?;
+        }
         
         buffer.clear();
         

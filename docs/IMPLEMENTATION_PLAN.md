@@ -93,7 +93,7 @@ Detailed implementation plan for RustGres, organized by version milestones from 
 
 **Note**: Disk I/O added as first priority for data persistence.
 
-### 2.1 Disk I/O & Persistence (Week 1-3) 🎯 PRIORITY
+### 2.1 Disk I/O & Persistence (Week 1-3) ✅ COMPLETE
 ```rust
 // src/storage/disk.rs
 struct DiskManager {
@@ -115,16 +115,16 @@ struct WALDiskWriter {
 ```
 
 **Tasks**:
-- [ ] Disk manager for page I/O
-- [ ] WAL file management
-- [ ] Buffer pool eviction to disk
-- [ ] Page replacement policy
-- [ ] Crash recovery from disk
+- [x] Disk manager for page I/O
+- [x] WAL file management
+- [x] Buffer pool eviction to disk
+- [x] Page replacement policy
+- [x] Crash recovery from disk
 
-**Files**: `src/storage/disk.rs, src/wal/disk.rs`
-**Tests**: `tests/disk_test.rs`
-**Duration**: 3 weeks
-**Priority**: HIGH - Required for data persistence
+**Files**: `src/storage/disk.rs, src/wal/disk.rs, src/storage/buffer_pool.rs, src/wal/writer.rs`
+**Tests**: `tests/integration/{buffer_pool_disk_test.rs, wal_disk_test.rs}` (8 new tests)
+**Duration**: Complete
+**Status**: ✅ Integrated with buffer pool and WAL writer
 
 ### 2.2 Statistics Collection (Week 4-5)
 ```rust

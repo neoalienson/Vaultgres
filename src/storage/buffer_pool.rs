@@ -1,5 +1,6 @@
 use super::error::{Result, StorageError};
 use super::page::{Page, PageId};
+use super::disk::DiskManager;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -21,6 +22,7 @@ pub struct BufferPool {
     free_list: RwLock<VecDeque<FrameId>>,
     lru_list: RwLock<VecDeque<FrameId>>,
     capacity: usize,
+    disk_manager: Option<Arc<DiskManager>>,
 }
 
 impl BufferPool {
@@ -54,7 +56,15 @@ impl BufferPool {
             free_list: RwLock::new(free_list),
             lru_list: RwLock::new(VecDeque::new()),
             capacity,
+            disk_manager: None,
         }
+    }
+    
+    /// Creates a new buffer pool with disk persistence
+    pub fn with_disk(capacity: usize, disk_manager: Arc<DiskManager>) -> Self {
+        let mut pool = Self::new(capacity);
+        pool.disk_manager = Some(disk_manager);
+        pool
     }
     
     /// Fetches a page from the buffer pool.
@@ -78,8 +88,12 @@ impl BufferPool {
         log::debug!("Buffer pool miss: loading page {}", page_id.0);
         let frame_id = self.get_free_frame()?;
         
-        // Load page (for now, just create new page)
-        let page = Page::new(page_id);
+        // Load page from disk or create new
+        let page = if let Some(ref dm) = self.disk_manager {
+            dm.read_page(page_id).unwrap_or_else(|_| Page::new(page_id))
+        } else {
+            Page::new(page_id)
+        };
         
         {
             let mut frame = self.frames[frame_id].write();
@@ -132,7 +146,17 @@ impl BufferPool {
             let frame = self.frames[frame_id].read();
             if frame.pin_count == 0 {
                 let page_id = frame.page.id();
+                let dirty = frame.dirty;
+                let page = frame.page.clone();
                 drop(frame);
+                
+                // Write dirty page to disk
+                if dirty {
+                    if let Some(ref dm) = self.disk_manager {
+                        dm.write_page(page_id, &page)?;
+                        log::trace!("Flushed dirty page {} to disk", page_id.0);
+                    }
+                }
                 
                 // Remove from page table
                 self.page_table.write().remove(&page_id);
@@ -152,6 +176,22 @@ impl BufferPool {
         let mut lru_list = self.lru_list.write();
         lru_list.retain(|&id| id != frame_id);
         lru_list.push_back(frame_id);
+    }
+    
+    /// Flushes all dirty pages to disk
+    pub fn flush_all(&self) -> Result<()> {
+        if let Some(ref dm) = self.disk_manager {
+            let page_table = self.page_table.read();
+            for &frame_id in page_table.values() {
+                let frame = self.frames[frame_id].read();
+                if frame.dirty {
+                    dm.write_page(frame.page.id(), &frame.page)?;
+                }
+            }
+            dm.sync()?;
+            log::debug!("Flushed all dirty pages to disk");
+        }
+        Ok(())
     }
 }
 
