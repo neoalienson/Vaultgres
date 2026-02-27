@@ -11,3 +11,4 @@ mod transaction_test;
 mod wal_test;
 mod buffer_pool_disk_test;
 mod wal_disk_test;
+mod statistics_test;

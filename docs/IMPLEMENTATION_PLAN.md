@@ -126,7 +126,7 @@ struct WALDiskWriter {
 **Duration**: Complete
 **Status**: ✅ Integrated with buffer pool and WAL writer
 
-### 2.2 Statistics Collection (Week 4-5)
+### 2.2 Statistics Collection (Week 4-5) ✅ COMPLETE
 ```rust
 // src/statistics/collector.rs
 struct TableStats {
@@ -150,15 +150,16 @@ impl Analyzer {
 ```
 
 **Tasks**:
-- [ ] Implement ANALYZE command
-- [ ] Sample rows for statistics
-- [ ] Build histograms (equi-depth)
-- [ ] Store statistics in catalog
-- [ ] Auto-analyze on threshold
+- [x] Implement ANALYZE command
+- [x] Sample rows for statistics
+- [x] Build histograms (equi-depth)
+- [x] Store statistics in catalog
+- [x] Auto-analyze on threshold
 
-**Files**: `src/statistics/{collector.rs, histogram.rs, catalog.rs}`
-**Tests**: `tests/statistics_test.rs`
-**Duration**: 2 weeks
+**Files**: `src/statistics/{collector.rs, histogram.rs, error.rs, mod.rs}`
+**Tests**: `tests/integration/statistics_test.rs` (9 tests)
+**Duration**: Complete
+**Status**: ✅ Basic statistics collection implemented
 
 ### 2.3 Cost-Based Optimizer (Week 6-8)
 ```rust
