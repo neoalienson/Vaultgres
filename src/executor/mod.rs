@@ -7,6 +7,7 @@ mod hash_join;
 mod sort;
 mod hash_agg;
 mod limit;
+mod aggregate;
 mod mock;
 
 #[cfg(test)]
@@ -21,4 +22,5 @@ pub use hash_join::HashJoin;
 pub use sort::Sort;
 pub use hash_agg::HashAgg;
 pub use limit::Limit;
+pub use aggregate::{Aggregate, AggregateFunction};
 pub use mock::MockExecutor;
