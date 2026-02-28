@@ -487,3 +487,69 @@ fn test_aggregate_with_filter_integration() {
     let result = agg.next().unwrap().unwrap();
     assert_eq!(result.get("count").unwrap()[0], 1);
 }
+
+
+#[test]
+fn test_limit_empty_input() {
+    struct EmptyExecutor;
+    
+    impl Executor for EmptyExecutor {
+        fn open(&mut self) -> Result<(), rustgres::executor::ExecutorError> { Ok(()) }
+        fn next(&mut self) -> Result<Option<Tuple>, rustgres::executor::ExecutorError> { Ok(None) }
+        fn close(&mut self) -> Result<(), rustgres::executor::ExecutorError> { Ok(()) }
+    }
+    
+    use rustgres::executor::Limit;
+    let mut limit = Limit::new(Box::new(EmptyExecutor), Some(10), Some(5));
+    limit.open().unwrap();
+    assert!(limit.next().unwrap().is_none());
+}
+
+#[test]
+fn test_aggregate_all_same_values() {
+    struct MockExecutor {
+        tuples: Vec<Tuple>,
+        index: usize,
+    }
+    
+    impl MockExecutor {
+        fn new() -> Self {
+            let mut tuples = Vec::new();
+            for _ in 0..5 {
+                let mut t = HashMap::new();
+                t.insert("val".to_string(), vec![42]);
+                tuples.push(t);
+            }
+            Self { tuples, index: 0 }
+        }
+    }
+    
+    impl Executor for MockExecutor {
+        fn open(&mut self) -> Result<(), rustgres::executor::ExecutorError> {
+            self.index = 0;
+            Ok(())
+        }
+        fn next(&mut self) -> Result<Option<Tuple>, rustgres::executor::ExecutorError> {
+            if self.index < self.tuples.len() {
+                let tuple = self.tuples[self.index].clone();
+                self.index += 1;
+                Ok(Some(tuple))
+            } else {
+                Ok(None)
+            }
+        }
+        fn close(&mut self) -> Result<(), rustgres::executor::ExecutorError> { Ok(()) }
+    }
+    
+    use rustgres::executor::{Aggregate, AggregateFunction};
+    
+    let mut min_agg = Aggregate::new(Box::new(MockExecutor::new()), AggregateFunction::Min, Some("val".to_string()));
+    min_agg.open().unwrap();
+    let result = min_agg.next().unwrap().unwrap();
+    assert_eq!(result.get("min").unwrap()[0], 42);
+    
+    let mut max_agg = Aggregate::new(Box::new(MockExecutor::new()), AggregateFunction::Max, Some("val".to_string()));
+    max_agg.open().unwrap();
+    let result = max_agg.next().unwrap().unwrap();
+    assert_eq!(result.get("max").unwrap()[0], 42);
+}

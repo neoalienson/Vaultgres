@@ -504,3 +504,96 @@ fn test_aggregate_functions() {
     let result = server.execute_sql("SELECT MAX(amount) FROM agg_test");
     assert!(result.is_ok(), "MAX failed: {:?}", result);
 }
+
+#[test]
+fn test_limit_edge_cases() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE t (id INT)").expect("CREATE failed");
+    server.execute_sql("INSERT INTO t VALUES (1), (2), (3)").expect("INSERT failed");
+    
+    // LIMIT 0
+    let result = server.execute_sql("SELECT * FROM t LIMIT 0");
+    assert!(result.is_ok(), "LIMIT 0 failed: {:?}", result);
+    
+    // LIMIT larger than data
+    let result = server.execute_sql("SELECT * FROM t LIMIT 100");
+    assert!(result.is_ok(), "LIMIT > data failed: {:?}", result);
+    
+    // OFFSET beyond data
+    let result = server.execute_sql("SELECT * FROM t OFFSET 10");
+    assert!(result.is_ok(), "OFFSET beyond data failed: {:?}", result);
+    
+    // LIMIT 1 OFFSET 1
+    let result = server.execute_sql("SELECT * FROM t LIMIT 1 OFFSET 1");
+    assert!(result.is_ok(), "LIMIT 1 OFFSET 1 failed: {:?}", result);
+}
+
+#[test]
+fn test_aggregate_edge_cases() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE empty_table (val INT)").expect("CREATE failed");
+    
+    // COUNT on empty table
+    let result = server.execute_sql("SELECT COUNT(*) FROM empty_table");
+    assert!(result.is_ok(), "COUNT on empty failed: {:?}", result);
+    
+    // SUM on empty table
+    let result = server.execute_sql("SELECT SUM(val) FROM empty_table");
+    assert!(result.is_ok(), "SUM on empty failed: {:?}", result);
+    
+    // Single value aggregates
+    server.execute_sql("INSERT INTO empty_table VALUES (42)").expect("INSERT failed");
+    
+    let result = server.execute_sql("SELECT MIN(val) FROM empty_table");
+    assert!(result.is_ok(), "MIN single value failed: {:?}", result);
+    
+    let result = server.execute_sql("SELECT MAX(val) FROM empty_table");
+    assert!(result.is_ok(), "MAX single value failed: {:?}", result);
+}
+
+#[test]
+fn test_limit_with_where() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE products (id INT, price INT)").expect("CREATE failed");
+    for i in 1..=10 {
+        server.execute_sql(&format!("INSERT INTO products VALUES ({}, {})", i, i * 10))
+            .expect("INSERT failed");
+    }
+    
+    let result = server.execute_sql("SELECT * FROM products WHERE price > 50 LIMIT 3");
+    assert!(result.is_ok(), "LIMIT with WHERE failed: {:?}", result);
+}
+
+#[test]
+fn test_aggregate_with_where() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE sales (id INT, amount INT)").expect("CREATE failed");
+    for i in 1..=10 {
+        server.execute_sql(&format!("INSERT INTO sales VALUES ({}, {})", i, i * 100))
+            .expect("INSERT failed");
+    }
+    
+    let result = server.execute_sql("SELECT COUNT(*) FROM sales WHERE amount > 500");
+    assert!(result.is_ok(), "COUNT with WHERE failed: {:?}", result);
+    
+    let result = server.execute_sql("SELECT SUM(amount) FROM sales WHERE amount <= 300");
+    assert!(result.is_ok(), "SUM with WHERE failed: {:?}", result);
+}
+
+#[test]
+fn test_limit_with_order_by() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE items (id INT, value INT)").expect("CREATE failed");
+    server.execute_sql("INSERT INTO items VALUES (3, 30), (1, 10), (2, 20)").expect("INSERT failed");
+    
+    let result = server.execute_sql("SELECT * FROM items ORDER BY value LIMIT 2");
+    assert!(result.is_ok(), "LIMIT with ORDER BY failed: {:?}", result);
+    
+    let result = server.execute_sql("SELECT * FROM items ORDER BY value DESC LIMIT 1");
+    assert!(result.is_ok(), "LIMIT with ORDER BY DESC failed: {:?}", result);
+}
