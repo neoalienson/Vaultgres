@@ -42,6 +42,10 @@ impl Parser {
             }
         }
         
+        if self.current_token() == &Token::Refresh {
+            return self.parse_refresh();
+        }
+        
         let stmt = match self.current_token() {
             Token::Insert => dml::parse_insert(self),
             Token::Update => dml::parse_update(self),
@@ -191,6 +195,18 @@ impl Parser {
             ctes,
             query: Box::new(query),
         }))
+    }
+    
+    fn parse_refresh(&mut self) -> Result<Statement> {
+        use crate::parser::ast::RefreshMaterializedViewStmt;
+        
+        self.expect(Token::Refresh)?;
+        self.expect(Token::Materialized)?;
+        self.expect(Token::View)?;
+        
+        let name = self.expect_identifier()?;
+        
+        Ok(Statement::RefreshMaterializedView(RefreshMaterializedViewStmt { name }))
     }
 }
 

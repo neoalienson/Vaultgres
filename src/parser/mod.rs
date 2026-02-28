@@ -20,6 +20,12 @@ mod view_tests;
 #[cfg(test)]
 mod view_edge_tests;
 
+#[cfg(test)]
+mod materialized_view_tests;
+
+#[cfg(test)]
+mod materialized_view_edge_tests;
+
 pub use error::{ParseError, Result};
 pub use lexer::{Lexer, Token};
 pub use ast::*;

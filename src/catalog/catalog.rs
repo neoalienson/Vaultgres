@@ -10,6 +10,7 @@ use std::sync::{Arc, RwLock};
 pub struct Catalog {
     tables: Arc<RwLock<HashMap<String, TableSchema>>>,
     views: Arc<RwLock<HashMap<String, SelectStmt>>>,
+    materialized_views: Arc<RwLock<HashMap<String, (SelectStmt, Vec<Vec<Value>>)>>>,
     data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
     txn_mgr: Arc<TransactionManager>,
     data_dir: Option<String>,
@@ -20,6 +21,7 @@ impl Catalog {
         Self {
             tables: Arc::new(RwLock::new(HashMap::new())),
             views: Arc::new(RwLock::new(HashMap::new())),
+            materialized_views: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: None,
@@ -30,6 +32,7 @@ impl Catalog {
         let catalog = Self {
             tables: Arc::new(RwLock::new(HashMap::new())),
             views: Arc::new(RwLock::new(HashMap::new())),
+            materialized_views: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: Some(data_dir.to_string()),
@@ -120,6 +123,42 @@ impl Catalog {
     pub fn get_view(&self, name: &str) -> Option<SelectStmt> {
         let views = self.views.read().unwrap();
         views.get(name).cloned()
+    }
+    
+    pub fn create_materialized_view(&self, name: String, query: SelectStmt) -> Result<(), String> {
+        let mut mvs = self.materialized_views.write().unwrap();
+        
+        if mvs.contains_key(&name) {
+            return Err(format!("Materialized view '{}' already exists", name));
+        }
+        
+        mvs.insert(name, (query, Vec::new()));
+        Ok(())
+    }
+    
+    pub fn refresh_materialized_view(&self, name: &str) -> Result<(), String> {
+        let mut mvs = self.materialized_views.write().unwrap();
+        
+        let (query, data) = mvs.get_mut(name)
+            .ok_or_else(|| format!("Materialized view '{}' does not exist", name))?;
+        
+        data.clear();
+        Ok(())
+    }
+    
+    pub fn drop_materialized_view(&self, name: &str, if_exists: bool) -> Result<(), String> {
+        let mut mvs = self.materialized_views.write().unwrap();
+        
+        if mvs.remove(name).is_none() && !if_exists {
+            return Err(format!("Materialized view '{}' does not exist", name));
+        }
+        
+        Ok(())
+    }
+    
+    pub fn get_materialized_view(&self, name: &str) -> Option<Vec<Vec<Value>>> {
+        let mvs = self.materialized_views.read().unwrap();
+        mvs.get(name).map(|(_, data)| data.clone())
     }
     
     pub fn list_tables(&self) -> Vec<String> {

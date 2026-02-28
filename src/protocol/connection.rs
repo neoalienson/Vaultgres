@@ -89,6 +89,18 @@ impl<S: Read + Write> Connection<S> {
                 self.catalog.drop_view(&drop.name, drop.if_exists)?;
                 Ok("DROP VIEW".to_string())
             }
+            Statement::CreateMaterializedView(create) => {
+                self.catalog.create_materialized_view(create.name.clone(), *create.query)?;
+                Ok("CREATE MATERIALIZED VIEW".to_string())
+            }
+            Statement::RefreshMaterializedView(refresh) => {
+                self.catalog.refresh_materialized_view(&refresh.name)?;
+                Ok("REFRESH MATERIALIZED VIEW".to_string())
+            }
+            Statement::DropMaterializedView(drop) => {
+                self.catalog.drop_materialized_view(&drop.name, drop.if_exists)?;
+                Ok("DROP MATERIALIZED VIEW".to_string())
+            }
             Statement::Describe(desc) => {
                 if let Some(schema) = self.catalog.get_table(&desc.table) {
                     let cols: Vec<String> = schema.columns.iter()

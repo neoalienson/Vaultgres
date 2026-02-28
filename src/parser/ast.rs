@@ -9,6 +9,9 @@ pub enum Statement {
     DropTable(DropTableStmt),
     CreateView(CreateViewStmt),
     DropView(DropViewStmt),
+    CreateMaterializedView(CreateMaterializedViewStmt),
+    RefreshMaterializedView(RefreshMaterializedViewStmt),
+    DropMaterializedView(DropMaterializedViewStmt),
     Describe(DescribeStmt),
     Union(UnionStmt),
     Intersect(IntersectStmt),
@@ -69,6 +72,26 @@ pub struct CreateViewStmt {
 /// DROP VIEW statement
 #[derive(Debug, Clone, PartialEq)]
 pub struct DropViewStmt {
+    pub name: String,
+    pub if_exists: bool,
+}
+
+/// CREATE MATERIALIZED VIEW statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateMaterializedViewStmt {
+    pub name: String,
+    pub query: Box<SelectStmt>,
+}
+
+/// REFRESH MATERIALIZED VIEW statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct RefreshMaterializedViewStmt {
+    pub name: String,
+}
+
+/// DROP MATERIALIZED VIEW statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct DropMaterializedViewStmt {
     pub name: String,
     pub if_exists: bool,
 }

@@ -70,6 +70,8 @@ pub enum Token {
     Else,
     End,
     View,
+    Materialized,
+    Refresh,
     
     // Identifiers and literals
     Identifier(String),
@@ -264,6 +266,8 @@ impl Lexer {
             "ELSE" => Token::Else,
             "END" => Token::End,
             "VIEW" => Token::View,
+            "MATERIALIZED" => Token::Materialized,
+            "REFRESH" => Token::Refresh,
             _ => Token::Identifier(ident),
         };
         
