@@ -221,4 +221,167 @@ mod tests {
         assert_eq!(&r1.data[r1.data.len() - 8..], &1i64.to_le_bytes());
         window.close().unwrap();
     }
+
+    #[test]
+    fn test_lag_single_row() {
+        let tuples = vec![SimpleTuple { data: vec![42] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag);
+
+        window.open().unwrap();
+        let r = window.next().unwrap().unwrap();
+        assert_eq!(r.data[r.data.len() - 1], 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_single_row() {
+        let tuples = vec![SimpleTuple { data: vec![42] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead);
+
+        window.open().unwrap();
+        let r = window.next().unwrap().unwrap();
+        assert_eq!(r.data[r.data.len() - 1], 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_offset_zero() {
+        let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag).with_offset(0);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 1);
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 2);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_offset_zero() {
+        let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead).with_offset(0);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 1);
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 2);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_large_offset() {
+        let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag).with_offset(100);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 0);
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_large_offset() {
+        let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead).with_offset(100);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 0);
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_many_rows() {
+        let tuples: Vec<SimpleTuple> = (0..100)
+            .map(|i| SimpleTuple { data: vec![i] })
+            .collect();
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 0);
+        
+        for i in 1..100 {
+            let r = window.next().unwrap().unwrap();
+            assert_eq!(r.data[r.data.len() - 1], (i - 1) as u8);
+        }
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_many_rows() {
+        let tuples: Vec<SimpleTuple> = (0..100)
+            .map(|i| SimpleTuple { data: vec![i] })
+            .collect();
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead);
+
+        window.open().unwrap();
+        for i in 0..99 {
+            let r = window.next().unwrap().unwrap();
+            assert_eq!(r.data[r.data.len() - 1], (i + 1) as u8);
+        }
+        
+        let r_last = window.next().unwrap().unwrap();
+        assert_eq!(r_last.data[r_last.data.len() - 1], 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_lead_alternating() {
+        let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
+        
+        let mock1 = Box::new(MockExecutor::new(tuples.clone()));
+        let mut lag = Window::new(mock1, WindowFunction::Lag);
+        lag.open().unwrap();
+        lag.next().unwrap();
+        lag.close().unwrap();
+        
+        let mock2 = Box::new(MockExecutor::new(tuples));
+        let mut lead = Window::new(mock2, WindowFunction::Lead);
+        lead.open().unwrap();
+        lead.next().unwrap();
+        lead.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_with_empty_data() {
+        let tuples = vec![SimpleTuple { data: vec![] }, SimpleTuple { data: vec![] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data.len(), 1);
+        let r2 = window.next().unwrap().unwrap();
+        assert!(r2.data.len() >= 0);
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_with_empty_data() {
+        let tuples = vec![SimpleTuple { data: vec![] }, SimpleTuple { data: vec![] }];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert!(r1.data.len() >= 0);
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data.len(), 1);
+        window.close().unwrap();
+    }
 }

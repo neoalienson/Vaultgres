@@ -5,11 +5,14 @@ pub enum WindowFunction {
     RowNumber,
     Rank,
     DenseRank,
+    Lag,
+    Lead,
 }
 
 pub struct Window {
     input: Box<dyn SimpleExecutor>,
     function: WindowFunction,
+    offset: usize,
     results: Vec<SimpleTuple>,
     position: usize,
     executed: bool,
@@ -20,10 +23,16 @@ impl Window {
         Self {
             input,
             function,
+            offset: 1,
             results: Vec::new(),
             position: 0,
             executed: false,
         }
+    }
+
+    pub fn with_offset(mut self, offset: usize) -> Self {
+        self.offset = offset;
+        self
     }
 
     fn compute_window(&mut self) -> Result<(), ExecutorError> {
@@ -53,6 +62,28 @@ impl Window {
                 for (i, tuple) in tuples.iter().enumerate() {
                     let mut data = tuple.data.clone();
                     data.extend_from_slice(&(i as i64 + 1).to_le_bytes());
+                    self.results.push(SimpleTuple { data });
+                }
+            }
+            WindowFunction::Lag => {
+                for (i, tuple) in tuples.iter().enumerate() {
+                    let mut data = tuple.data.clone();
+                    if i >= self.offset {
+                        data.extend_from_slice(&tuples[i - self.offset].data);
+                    } else {
+                        data.push(0);
+                    }
+                    self.results.push(SimpleTuple { data });
+                }
+            }
+            WindowFunction::Lead => {
+                for (i, tuple) in tuples.iter().enumerate() {
+                    let mut data = tuple.data.clone();
+                    if i + self.offset < tuples.len() {
+                        data.extend_from_slice(&tuples[i + self.offset].data);
+                    } else {
+                        data.push(0);
+                    }
                     self.results.push(SimpleTuple { data });
                 }
             }
@@ -223,6 +254,126 @@ mod tests {
             let r = window.next().unwrap().unwrap();
             assert_eq!(&r.data[r.data.len() - 8..], &(i as i64).to_le_bytes());
         }
+        assert!(window.next().unwrap().is_none());
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_basic() {
+        let tuples = vec![
+            SimpleTuple { data: vec![1] },
+            SimpleTuple { data: vec![2] },
+            SimpleTuple { data: vec![3] },
+        ];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 0);
+        
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 1);
+        
+        let r3 = window.next().unwrap().unwrap();
+        assert_eq!(r3.data[r3.data.len() - 1], 2);
+        
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_basic() {
+        let tuples = vec![
+            SimpleTuple { data: vec![1] },
+            SimpleTuple { data: vec![2] },
+            SimpleTuple { data: vec![3] },
+        ];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 2);
+        
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 3);
+        
+        let r3 = window.next().unwrap().unwrap();
+        assert_eq!(r3.data[r3.data.len() - 1], 0);
+        
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_with_offset() {
+        let tuples = vec![
+            SimpleTuple { data: vec![1] },
+            SimpleTuple { data: vec![2] },
+            SimpleTuple { data: vec![3] },
+            SimpleTuple { data: vec![4] },
+        ];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lag).with_offset(2);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 0);
+        
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 0);
+        
+        let r3 = window.next().unwrap().unwrap();
+        assert_eq!(r3.data[r3.data.len() - 1], 1);
+        
+        let r4 = window.next().unwrap().unwrap();
+        assert_eq!(r4.data[r4.data.len() - 1], 2);
+        
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_with_offset() {
+        let tuples = vec![
+            SimpleTuple { data: vec![1] },
+            SimpleTuple { data: vec![2] },
+            SimpleTuple { data: vec![3] },
+            SimpleTuple { data: vec![4] },
+        ];
+        let mock = Box::new(MockExecutor::new(tuples));
+        let mut window = Window::new(mock, WindowFunction::Lead).with_offset(2);
+
+        window.open().unwrap();
+        let r1 = window.next().unwrap().unwrap();
+        assert_eq!(r1.data[r1.data.len() - 1], 3);
+        
+        let r2 = window.next().unwrap().unwrap();
+        assert_eq!(r2.data[r2.data.len() - 1], 4);
+        
+        let r3 = window.next().unwrap().unwrap();
+        assert_eq!(r3.data[r3.data.len() - 1], 0);
+        
+        let r4 = window.next().unwrap().unwrap();
+        assert_eq!(r4.data[r4.data.len() - 1], 0);
+        
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lag_empty() {
+        let mock = Box::new(MockExecutor::new(vec![]));
+        let mut window = Window::new(mock, WindowFunction::Lag);
+
+        window.open().unwrap();
+        assert!(window.next().unwrap().is_none());
+        window.close().unwrap();
+    }
+
+    #[test]
+    fn test_lead_empty() {
+        let mock = Box::new(MockExecutor::new(vec![]));
+        let mut window = Window::new(mock, WindowFunction::Lead);
+
+        window.open().unwrap();
         assert!(window.next().unwrap().is_none());
         window.close().unwrap();
     }

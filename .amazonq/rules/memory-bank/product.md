@@ -80,10 +80,10 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - EXCEPT
 - Subqueries (scalar and IN subqueries)
 - CTEs (Common Table Expressions with WITH clause)
-- Window functions (ROW_NUMBER, RANK, DENSE_RANK)
+- Window functions (ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD)
 
 **In Progress**:
-- Advanced window functions (LAG, LEAD)
+- None
 
 **Planned Features**:
 - Parallel query execution
