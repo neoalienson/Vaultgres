@@ -79,9 +79,10 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - INTERSECT
 - EXCEPT
 - Subqueries (scalar and IN subqueries)
+- CTEs (Common Table Expressions with WITH clause)
 
 **In Progress**:
-- Advanced SQL features (CTEs, window functions)
+- Advanced SQL features (window functions)
 
 **Planned Features**:
 - Parallel query execution

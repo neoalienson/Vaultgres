@@ -11,6 +11,7 @@ pub enum Statement {
     Union(UnionStmt),
     Intersect(IntersectStmt),
     Except(ExceptStmt),
+    With(WithStmt),
 }
 
 /// UNION statement
@@ -33,6 +34,20 @@ pub struct IntersectStmt {
 pub struct ExceptStmt {
     pub left: Box<SelectStmt>,
     pub right: Box<SelectStmt>,
+}
+
+/// WITH (CTE) statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct WithStmt {
+    pub ctes: Vec<CTE>,
+    pub query: Box<SelectStmt>,
+}
+
+/// Common Table Expression
+#[derive(Debug, Clone, PartialEq)]
+pub struct CTE {
+    pub name: String,
+    pub query: Box<SelectStmt>,
 }
 
 /// DROP TABLE statement

@@ -55,6 +55,8 @@ pub enum Token {
     All,
     Intersect,
     Except,
+    With,
+    As,
     
     // Identifiers and literals
     Identifier(String),
@@ -234,6 +236,8 @@ impl Lexer {
             "ALL" => Token::All,
             "INTERSECT" => Token::Intersect,
             "EXCEPT" => Token::Except,
+            "WITH" => Token::With,
+            "AS" => Token::As,
             _ => Token::Identifier(ident),
         };
         

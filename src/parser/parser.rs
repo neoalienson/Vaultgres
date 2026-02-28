@@ -27,6 +27,10 @@ impl Parser {
     
     /// Parses a SQL statement
     pub fn parse(&mut self) -> Result<Statement> {
+        if self.current_token() == &Token::With {
+            return self.parse_with();
+        }
+        
         if self.current_token() == &Token::Select {
             let select = select::parse_select(self)?;
             // Check for set operations
@@ -154,6 +158,38 @@ impl Parser {
         Ok(Statement::Except(ExceptStmt {
             left: Box::new(left_select),
             right: Box::new(right_select),
+        }))
+    }
+    
+    fn parse_with(&mut self) -> Result<Statement> {
+        use crate::parser::ast::{WithStmt, CTE};
+        
+        self.expect(Token::With)?;
+        
+        let mut ctes = Vec::new();
+        loop {
+            let name = self.expect_identifier()?;
+            self.expect(Token::As)?;
+            self.expect(Token::LeftParen)?;
+            let query = select::parse_select_stmt(self)?;
+            self.expect(Token::RightParen)?;
+            
+            ctes.push(CTE {
+                name,
+                query: Box::new(query),
+            });
+            
+            if self.current_token() != &Token::Comma {
+                break;
+            }
+            self.advance();
+        }
+        
+        let query = select::parse_select_stmt(self)?;
+        
+        Ok(Statement::With(WithStmt {
+            ctes,
+            query: Box::new(query),
         }))
     }
 }
