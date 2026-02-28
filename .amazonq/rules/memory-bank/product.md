@@ -84,6 +84,7 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - Subqueries (scalar and IN subqueries)
 - CTEs (Common Table Expressions with WITH clause)
 - Window functions (ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD)
+- CASE expressions (CASE WHEN ... THEN ... ELSE ... END)
 
 **Execution Operators:**
 - Sequential Scan
@@ -99,10 +100,11 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - Distinct
 - Union/Intersect/Except
 - Window functions
+- CASE expressions
 
 **Testing:**
-- 553 comprehensive tests (100% pass rate)
-- Unit tests: 474 tests
+- 573 comprehensive tests (100% pass rate)
+- Unit tests: 494 tests
 - Edge case tests: 79 tests
 - Test execution time: <0.12s
 
@@ -120,7 +122,6 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - No JSON/JSONB operators
 - No recursive CTEs
 - No correlated subqueries
-- No CASE expressions
 - No merge join
 
 **Planned Features**:

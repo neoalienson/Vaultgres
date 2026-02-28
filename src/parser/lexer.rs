@@ -64,6 +64,11 @@ pub enum Token {
     DenseRank,
     Lag,
     Lead,
+    Case,
+    When,
+    Then,
+    Else,
+    End,
     
     // Identifiers and literals
     Identifier(String),
@@ -252,6 +257,11 @@ impl Lexer {
             "DENSE_RANK" => Token::DenseRank,
             "LAG" => Token::Lag,
             "LEAD" => Token::Lead,
+            "CASE" => Token::Case,
+            "WHEN" => Token::When,
+            "THEN" => Token::Then,
+            "ELSE" => Token::Else,
+            "END" => Token::End,
             _ => Token::Identifier(ident),
         };
         

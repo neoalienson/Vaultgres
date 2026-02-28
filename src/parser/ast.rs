@@ -176,6 +176,10 @@ pub enum Expr {
     IsNull(Box<Expr>),
     IsNotNull(Box<Expr>),
     Subquery(Box<SelectStmt>),
+    Case {
+        conditions: Vec<(Expr, Expr)>,
+        else_expr: Option<Box<Expr>>,
+    },
 }
 
 /// Aggregate functions

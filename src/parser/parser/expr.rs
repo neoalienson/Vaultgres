@@ -121,6 +121,7 @@ fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
 
 pub fn parse_primary(parser: &mut Parser) -> Result<Expr> {
     match parser.current_token().clone() {
+        Token::Case => parse_case(parser),
         Token::Count | Token::Sum | Token::Avg | Token::Min | Token::Max => {
             parse_aggregate(parser)
         }
@@ -256,6 +257,34 @@ fn parse_window(parser: &mut Parser) -> Result<Expr> {
         arg,
         partition_by,
         order_by,
+    })
+}
+
+fn parse_case(parser: &mut Parser) -> Result<Expr> {
+    parser.expect(Token::Case)?;
+    
+    let mut conditions = Vec::new();
+    
+    while parser.current_token() == &Token::When {
+        parser.advance();
+        let condition = parse_expr(parser)?;
+        parser.expect(Token::Then)?;
+        let result = parse_expr(parser)?;
+        conditions.push((condition, result));
+    }
+    
+    let else_expr = if parser.current_token() == &Token::Else {
+        parser.advance();
+        Some(Box::new(parse_expr(parser)?))
+    } else {
+        None
+    };
+    
+    parser.expect(Token::End)?;
+    
+    Ok(Expr::Case {
+        conditions,
+        else_expr,
     })
 }
 
