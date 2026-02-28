@@ -627,3 +627,74 @@ fn test_group_by_multiple_columns_integration() {
     assert_eq!(results.len(), 4);
     group_by.close().unwrap();
 }
+
+#[test]
+fn test_having_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Having};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1, 30] },
+        SimpleTuple { data: vec![2, 10] },
+        SimpleTuple { data: vec![3, 50] },
+    ]);
+    
+    let mut having = Having::new(Box::new(input), Box::new(|t| t.data.get(1).copied().unwrap_or(0) > 20));
+    having.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = having.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 2);
+    having.close().unwrap();
+}
+
+#[test]
+fn test_having_with_group_by_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, GroupBy, Having};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1, 10] },
+        SimpleTuple { data: vec![1, 20] },
+        SimpleTuple { data: vec![2, 5] },
+        SimpleTuple { data: vec![2, 10] },
+    ]);
+    
+    let group_by = GroupBy::new(Box::new(input), vec![0], vec![1]);
+    let mut having = Having::new(Box::new(group_by), Box::new(|t| t.data.get(1).copied().unwrap_or(0) > 20));
+    having.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = having.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 1);
+    having.close().unwrap();
+}
+
+#[test]
+fn test_having_complex_pipeline_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, GroupBy, Having};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1, 10] },
+        SimpleTuple { data: vec![1, 20] },
+        SimpleTuple { data: vec![1, 30] },
+        SimpleTuple { data: vec![2, 5] },
+        SimpleTuple { data: vec![2, 10] },
+    ]);
+    
+    let group_by = GroupBy::new(Box::new(input), vec![0], vec![1]);
+    let mut having = Having::new(Box::new(group_by), Box::new(|t| t.data.get(1).copied().unwrap_or(0) >= 60));
+    having.open().unwrap();
+    
+    let result = having.next().unwrap();
+    assert!(result.is_some());
+    assert!(having.next().unwrap().is_none());
+    having.close().unwrap();
+}

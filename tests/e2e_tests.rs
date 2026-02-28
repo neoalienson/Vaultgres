@@ -699,3 +699,56 @@ fn test_group_by_edge_cases_e2e() {
         _ => panic!("Expected SELECT statement"),
     }
 }
+
+#[test]
+fn test_having_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT category, COUNT(*) FROM products GROUP BY category HAVING COUNT(*) > 5";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert!(s.group_by.is_some());
+            assert!(s.having.is_some());
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_having_with_aggregate_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT dept, SUM(salary) FROM employees GROUP BY dept HAVING SUM(salary) > 100000";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert!(s.group_by.is_some());
+            assert!(s.having.is_some());
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_having_without_group_by_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT COUNT(*) FROM orders HAVING COUNT(*) > 10";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert!(s.having.is_some());
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
