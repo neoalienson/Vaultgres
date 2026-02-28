@@ -119,116 +119,27 @@ UPDATE users SET email = 'new@example.com' WHERE id = 1;
 COMMIT;
 ```
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Client Applications                   │
-│              (psql, pgAdmin, application code)           │
-└────────────────────┬────────────────────────────────────┘
-                     │ PostgreSQL Wire Protocol
-┌────────────────────▼────────────────────────────────────┐
-│                  Protocol Layer                          │
-│         (Connection handling, authentication)            │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                   SQL Parser                             │
-│            (Lexer, Parser, AST builder)                  │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                Query Optimizer                           │
-│     (Logical optimization, cost-based planning)          │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                Execution Engine                          │
-│    (Vectorized execution, parallel processing)           │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│              Transaction Manager                         │
-│         (MVCC, snapshot isolation, 2PC)                  │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                Storage Engine                            │
-│    (Buffer pool, B+Tree, LSM, WAL, recovery)            │
-└─────────────────────────────────────────────────────────┘
-```
-
-## Performance
-
-Benchmark results vs PostgreSQL 16 (TPC-C, 100 warehouses):
-
-| Metric | PostgreSQL 16 | RustGres | Improvement |
-|--------|---------------|----------|-------------|
-| Throughput (tpmC) | 45,000 | 112,000 | 2.5x |
-| P99 Latency (ms) | 45 | 18 | 2.5x |
-| Memory Usage (GB) | 8.2 | 4.1 | 2x |
-| CPU Usage (%) | 85 | 62 | 1.4x |
-
-See [Performance Guide](docs/PERFORMANCE.md) for detailed benchmarks.
-
 ## Documentation
 
-### Getting Started
-- **[Installation Guide](docs/INSTALLATION.md)** - Build, install, and configure RustGres
-- **[Quick Start Tutorial](docs/QUICKSTART.md)** - First steps with RustGres
-- **[Configuration](docs/CONFIGURATION.md)** - Server configuration and tuning
+### For Users
+- **[Quick Start Tutorial](docs/users/QUICKSTART.md)** - First steps with RustGres
+- **[SQL Reference](docs/users/SQL.md)** - Supported SQL syntax and features
 
-### Architecture & Design
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
-- **[Storage Engine](docs/STORAGE.md)** - Buffer pool, indexes, WAL, recovery
-- **[Transaction Manager](docs/TRANSACTIONS.md)** - MVCC, isolation levels, concurrency
-- **[Query Optimizer](docs/OPTIMIZER.md)** - Cost model, statistics, plan generation
-- **[Execution Engine](docs/EXECUTION.md)** - Vectorized execution, parallelism
+### For Database Administrators
+- **[Installation Guide](docs/admins/INSTALLATION.md)** - Build, install, and configure RustGres
+- **[Configuration Guide](docs/admins/CONFIGURATION.md)** - Server configuration and tuning
+- **[Server Operations](docs/admins/SERVER.md)** - Database administration tasks
+- **[Logging](docs/admins/LOGGING.md)** - Logging configuration and best practices
 
-### Features
-- **[SQL Reference](docs/SQL.md)** - Supported SQL syntax and features
-- **[Data Types](docs/DATATYPES.md)** - Built-in and custom data types
-- **[Indexes](docs/INDEXES.md)** - Index types and usage
-- **[Replication](docs/REPLICATION.md)** - Streaming replication and failover
-- **[Backup & Recovery](docs/BACKUP.md)** - Backup strategies and PITR
-
-### Operations
-- **[Administration](docs/ADMIN.md)** - Database administration tasks
-- **[Monitoring](docs/MONITORING.md)** - Metrics, logging, performance tuning
-- **[Security](docs/SECURITY.md)** - Authentication, authorization, encryption
-- **[Performance Tuning](docs/PERFORMANCE.md)** - Optimization and benchmarking
-
-### Development
-- **[Contributing Guide](docs/CONTRIBUTING.md)** - How to contribute to RustGres
-- **[Development Setup](docs/DEVELOPMENT.md)** - Build environment and testing
-- **[API Documentation](docs/API.md)** - Internal APIs and extension development
-- **[Roadmap](docs/ROADMAP.md)** - Future features and milestones
-
-## Project Status
-
-**Current Version**: 0.1.0-alpha
-
-**Completed:**
-- ✅ Storage engine with B+Tree indexes
-- ✅ MVCC transaction manager
-- ✅ SQL parser (SELECT, INSERT, UPDATE, DELETE)
-- ✅ Basic query optimizer
-- ✅ PostgreSQL wire protocol
-- ✅ WAL and crash recovery
-
-**In Progress:**
-- 🚧 Advanced optimizer (join reordering, subquery optimization)
-- 🚧 Parallel query execution
-- 🚧 Streaming replication
-- 🚧 Full-text search
-
-**Planned:**
-- 📋 Stored procedures and triggers
-- 📋 Materialized views
-- 📋 Partitioning
-- 📋 Foreign data wrappers
-
-See [Roadmap](docs/ROADMAP.md) for detailed timeline.
+### For Developers
+- **[Architecture Overview](docs/developers/ARCHITECTURE.md)** - System design and components
+- **[Contributing Guide](docs/developers/CONTRIBUTING.md)** - How to contribute to RustGres
+- **[Coding Standards](docs/developers/STANDARDS.md)** - Development guidelines and conventions
+- **[Storage Engine](docs/developers/STORAGE.md)** - Buffer pool, indexes, WAL, recovery
+- **[Transaction Manager](docs/developers/TRANSACTIONS.md)** - MVCC, isolation levels, concurrency
+- **[Query Optimizer](docs/developers/OPTIMIZER.md)** - Cost model, statistics, plan generation
+- **[Testing Guide](docs/developers/testing/TESTING.md)** - Test organization and running instructions
+- **[Roadmap](docs/developers/ROADMAP.md)** - Future features and milestones
 
 ## Requirements
 
@@ -282,18 +193,11 @@ effective_cache_size = 4GB
 random_page_cost = 1.1
 ```
 
-See [Configuration Guide](docs/CONFIGURATION.md) for all options.
-
-## Community
-
-- **GitHub**: https://github.com/rustgres/rustgres
-- **Discord**: https://discord.gg/rustgres
-- **Forum**: https://discuss.rustgres.org
-- **Twitter**: @rustgres
+See [Configuration Guide](docs/admins/CONFIGURATION.md) for all options.
 
 ## Contributing
 
-We welcome contributions! See [Contributing Guide](docs/CONTRIBUTING.md) for:
+We welcome contributions! See [Contributing Guide](docs/developers/CONTRIBUTING.md) for:
 - Code of conduct
 - Development workflow
 - Testing requirements
