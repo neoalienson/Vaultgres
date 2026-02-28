@@ -1,0 +1,165 @@
+use crate::parser::ast::{Expr, BinaryOperator, UnaryOperator};
+use super::{Value, TableSchema};
+
+pub struct PredicateEvaluator;
+
+impl PredicateEvaluator {
+    pub fn evaluate(expr: &Expr, tuple: &[Value], schema: &TableSchema) -> Result<bool, String> {
+        match expr {
+            Expr::BinaryOp { left, op, right } => {
+                Self::evaluate_binary_op(left, op, right, tuple, schema)
+            }
+            Expr::UnaryOp { op, expr } => {
+                Self::evaluate_unary_op(op, expr, tuple, schema)
+            }
+            Expr::IsNull(expr) => {
+                let val = Self::evaluate_expr(expr, tuple, schema)?;
+                Ok(matches!(val, Value::Null))
+            }
+            Expr::IsNotNull(expr) => {
+                let val = Self::evaluate_expr(expr, tuple, schema)?;
+                Ok(!matches!(val, Value::Null))
+            }
+            _ => Err("Unsupported predicate expression".to_string()),
+        }
+    }
+
+    fn evaluate_binary_op(
+        left: &Expr,
+        op: &BinaryOperator,
+        right: &Expr,
+        tuple: &[Value],
+        schema: &TableSchema,
+    ) -> Result<bool, String> {
+        match op {
+            BinaryOperator::In => {
+                let left_val = Self::evaluate_expr(left, tuple, schema)?;
+                if let Expr::List(values) = right {
+                    for val_expr in values {
+                        let val = Self::evaluate_expr(val_expr, tuple, schema)?;
+                        if left_val == val {
+                            return Ok(true);
+                        }
+                    }
+                    return Ok(false);
+                }
+                Err("IN requires list of values".to_string())
+            }
+            BinaryOperator::Between => {
+                let left_val = Self::evaluate_expr(left, tuple, schema)?;
+                if let Expr::List(values) = right {
+                    if values.len() == 2 {
+                        let lower = Self::evaluate_expr(&values[0], tuple, schema)?;
+                        let upper = Self::evaluate_expr(&values[1], tuple, schema)?;
+                        return Ok(left_val >= lower && left_val <= upper);
+                    }
+                }
+                Err("BETWEEN requires two values".to_string())
+            }
+            BinaryOperator::And => {
+                let left_result = Self::evaluate(left, tuple, schema)?;
+                let right_result = Self::evaluate(right, tuple, schema)?;
+                Ok(left_result && right_result)
+            }
+            BinaryOperator::Or => {
+                let left_result = Self::evaluate(left, tuple, schema)?;
+                let right_result = Self::evaluate(right, tuple, schema)?;
+                Ok(left_result || right_result)
+            }
+            _ => {
+                let left_val = Self::evaluate_expr(left, tuple, schema)?;
+                let right_val = Self::evaluate_expr(right, tuple, schema)?;
+                Self::compare_values(&left_val, op, &right_val)
+            }
+        }
+    }
+
+    fn evaluate_unary_op(
+        op: &UnaryOperator,
+        expr: &Expr,
+        tuple: &[Value],
+        schema: &TableSchema,
+    ) -> Result<bool, String> {
+        match op {
+            UnaryOperator::Not => {
+                let result = Self::evaluate(expr, tuple, schema)?;
+                Ok(!result)
+            }
+            _ => Err("Unsupported unary operator".to_string()),
+        }
+    }
+
+    fn compare_values(left: &Value, op: &BinaryOperator, right: &Value) -> Result<bool, String> {
+        match op {
+            BinaryOperator::Equals => Ok(left == right),
+            BinaryOperator::NotEquals => Ok(left != right),
+            BinaryOperator::LessThan => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(l < r),
+                (Value::Text(l), Value::Text(r)) => Ok(l < r),
+                _ => Err("Type mismatch in comparison".to_string()),
+            },
+            BinaryOperator::LessThanOrEqual => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(l <= r),
+                (Value::Text(l), Value::Text(r)) => Ok(l <= r),
+                _ => Err("Type mismatch in comparison".to_string()),
+            },
+            BinaryOperator::GreaterThan => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(l > r),
+                (Value::Text(l), Value::Text(r)) => Ok(l > r),
+                _ => Err("Type mismatch in comparison".to_string()),
+            },
+            BinaryOperator::GreaterThanOrEqual => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(l >= r),
+                (Value::Text(l), Value::Text(r)) => Ok(l >= r),
+                _ => Err("Type mismatch in comparison".to_string()),
+            },
+            BinaryOperator::Like => match (left, right) {
+                (Value::Text(s), Value::Text(pattern)) => {
+                    Ok(s.contains(&pattern.replace('%', "")))
+                }
+                _ => Err("LIKE requires text values".to_string()),
+            },
+            _ => Err("Unsupported comparison operator".to_string()),
+        }
+    }
+
+    pub fn evaluate_expr(expr: &Expr, tuple: &[Value], schema: &TableSchema) -> Result<Value, String> {
+        match expr {
+            Expr::Column(name) => {
+                let idx = schema.columns.iter().position(|c| &c.name == name)
+                    .ok_or_else(|| format!("Column '{}' not found", name))?;
+                Ok(tuple[idx].clone())
+            }
+            Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::List(_) => Err("List not evaluable as value".to_string()),
+            _ => Err("Unsupported expression".to_string()),
+        }
+    }
+
+    pub fn evaluate_having(expr: &Expr, row: &[Value]) -> Result<bool, String> {
+        match expr {
+            Expr::BinaryOp { left, op, right } => {
+                let left_val = match **left {
+                    Expr::Number(n) => Value::Int(n),
+                    _ => row.get(0).cloned().unwrap_or(Value::Int(0)),
+                };
+                let right_val = match **right {
+                    Expr::Number(n) => Value::Int(n),
+                    _ => Value::Int(0),
+                };
+                
+                match op {
+                    BinaryOperator::GreaterThan => Ok(left_val > right_val),
+                    BinaryOperator::GreaterThanOrEqual => Ok(left_val >= right_val),
+                    BinaryOperator::LessThan => Ok(left_val < right_val),
+                    BinaryOperator::LessThanOrEqual => Ok(left_val <= right_val),
+                    BinaryOperator::Equals => Ok(left_val == right_val),
+                    BinaryOperator::NotEquals => Ok(left_val != right_val),
+                    _ => Ok(false),
+                }
+            }
+            _ => Ok(false),
+        }
+    }
+}

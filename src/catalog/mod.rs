@@ -1,6 +1,9 @@
 mod value;
 mod schema;
 mod tuple;
+mod predicate;
+mod aggregation;
+mod persistence;
 mod catalog;
 
 #[cfg(test)]
