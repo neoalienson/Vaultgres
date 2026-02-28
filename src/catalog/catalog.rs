@@ -98,7 +98,7 @@ impl Catalog {
         data.get(table).map(|rows| rows.len()).unwrap_or(0)
     }
     
-    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, group_by: Option<Vec<String>>, order_by: Option<Vec<OrderByExpr>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Vec<Value>>, String> {
+    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, group_by: Option<Vec<String>>, having: Option<Expr>, order_by: Option<Vec<OrderByExpr>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Vec<Value>>, String> {
         let schema = self.get_table(table)
             .ok_or_else(|| format!("Table '{}' does not exist", table))?;
         
@@ -141,6 +141,13 @@ impl Catalog {
         // Apply GROUP BY if specified
         if let Some(group_cols) = group_by {
             results = self.apply_group_by(results, &group_cols, &columns, &schema)?;
+            
+            // Apply HAVING if specified
+            if let Some(having_expr) = having {
+                results.retain(|row| {
+                    self.evaluate_having(&having_expr, row).unwrap_or(false)
+                });
+            }
         }
         
         // Apply ORDER BY if specified
@@ -195,6 +202,34 @@ impl Catalog {
         }
         
         Ok(result)
+    }
+    
+    
+    fn evaluate_having(&self, expr: &Expr, row: &[Value]) -> Result<bool, String> {
+        match expr {
+            Expr::BinaryOp { left, op, right } => {
+                let left_val = match **left {
+                    Expr::Number(n) => Value::Int(n),
+                    _ => row.get(0).cloned().unwrap_or(Value::Int(0)),
+                };
+                let right_val = match **right {
+                    Expr::Number(n) => Value::Int(n),
+                    _ => Value::Int(0),
+                };
+                
+                use crate::parser::ast::BinaryOperator;
+                match op {
+                    BinaryOperator::GreaterThan => Ok(left_val > right_val),
+                    BinaryOperator::GreaterThanOrEqual => Ok(left_val >= right_val),
+                    BinaryOperator::LessThan => Ok(left_val < right_val),
+                    BinaryOperator::LessThanOrEqual => Ok(left_val <= right_val),
+                    BinaryOperator::Equals => Ok(left_val == right_val),
+                    BinaryOperator::NotEquals => Ok(left_val != right_val),
+                    _ => Ok(false),
+                }
+            }
+            _ => Ok(false),
+        }
     }
     
     fn evaluate_predicate(&self, expr: &Expr, tuple: &[Value], schema: &TableSchema) -> Result<bool, String> {

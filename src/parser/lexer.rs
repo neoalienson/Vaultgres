@@ -37,6 +37,7 @@ pub enum Token {
     And,
     Or,
     Group,
+    Having,
     
     // Identifiers and literals
     Identifier(String),
@@ -198,6 +199,7 @@ impl Lexer {
             "AND" => Token::And,
             "OR" => Token::Or,
             "GROUP" => Token::Group,
+            "HAVING" => Token::Having,
             _ => Token::Identifier(ident),
         };
         

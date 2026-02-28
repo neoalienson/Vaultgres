@@ -30,6 +30,13 @@ pub fn parse_select(parser: &mut Parser) -> Result<Statement> {
         None
     };
     
+    let having = if parser.current_token() == &Token::Having {
+        parser.advance();
+        Some(super::expr::parse_expr(parser)?)
+    } else {
+        None
+    };
+    
     let order_by = if parser.current_token() == &Token::Order {
         parser.advance();
         parser.expect(Token::By)?;
@@ -69,6 +76,7 @@ pub fn parse_select(parser: &mut Parser) -> Result<Statement> {
         from,
         where_clause,
         group_by,
+        having,
         order_by,
         limit,
         offset,
