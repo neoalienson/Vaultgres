@@ -98,7 +98,7 @@ impl Catalog {
         data.get(table).map(|rows| rows.len()).unwrap_or(0)
     }
     
-    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, order_by: Option<Vec<OrderByExpr>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Vec<Value>>, String> {
+    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, group_by: Option<Vec<String>>, order_by: Option<Vec<OrderByExpr>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Vec<Value>>, String> {
         let schema = self.get_table(table)
             .ok_or_else(|| format!("Table '{}' does not exist", table))?;
         
@@ -138,6 +138,11 @@ impl Catalog {
             }
         }
         
+        // Apply GROUP BY if specified
+        if let Some(group_cols) = group_by {
+            results = self.apply_group_by(results, &group_cols, &columns, &schema)?;
+        }
+        
         // Apply ORDER BY if specified
         if let Some(order_by_exprs) = order_by {
             for order_expr in order_by_exprs.iter().rev() {
@@ -157,6 +162,39 @@ impl Catalog {
         results = results.into_iter().skip(start).take(end - start).collect();
         
         Ok(results)
+    }
+    
+    
+    fn apply_group_by(&self, rows: Vec<Vec<Value>>, group_cols: &[String], select_cols: &[String], schema: &TableSchema) -> Result<Vec<Vec<Value>>, String> {
+        use std::collections::HashMap;
+        
+        let mut groups: HashMap<Vec<Value>, Vec<Vec<Value>>> = HashMap::new();
+        
+        for row in rows {
+            let mut key = Vec::new();
+            for col_name in group_cols {
+                let idx = schema.columns.iter().position(|c| &c.name == col_name)
+                    .ok_or_else(|| format!("Column '{}' not found", col_name))?;
+                key.push(row[idx].clone());
+            }
+            groups.entry(key).or_insert_with(Vec::new).push(row);
+        }
+        
+        let mut result = Vec::new();
+        for (key, group_rows) in groups {
+            let mut row = Vec::new();
+            for col_name in select_cols {
+                if group_cols.contains(col_name) {
+                    let idx = group_cols.iter().position(|c| c == col_name).unwrap();
+                    row.push(key[idx].clone());
+                } else {
+                    row.push(Value::Int(group_rows.len() as i64));
+                }
+            }
+            result.push(row);
+        }
+        
+        Ok(result)
     }
     
     fn evaluate_predicate(&self, expr: &Expr, tuple: &[Value], schema: &TableSchema) -> Result<bool, String> {

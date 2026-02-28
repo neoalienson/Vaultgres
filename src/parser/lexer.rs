@@ -36,6 +36,7 @@ pub enum Token {
     Max,
     And,
     Or,
+    Group,
     
     // Identifiers and literals
     Identifier(String),
@@ -196,6 +197,7 @@ impl Lexer {
             "MAX" => Token::Max,
             "AND" => Token::And,
             "OR" => Token::Or,
+            "GROUP" => Token::Group,
             _ => Token::Identifier(ident),
         };
         

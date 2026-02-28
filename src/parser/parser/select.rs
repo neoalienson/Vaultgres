@@ -22,6 +22,14 @@ pub fn parse_select(parser: &mut Parser) -> Result<Statement> {
         None
     };
     
+    let group_by = if parser.current_token() == &Token::Group {
+        parser.advance();
+        parser.expect(Token::By)?;
+        Some(parse_group_by_list(parser)?)
+    } else {
+        None
+    };
+    
     let order_by = if parser.current_token() == &Token::Order {
         parser.advance();
         parser.expect(Token::By)?;
@@ -60,6 +68,7 @@ pub fn parse_select(parser: &mut Parser) -> Result<Statement> {
         columns,
         from,
         where_clause,
+        group_by,
         order_by,
         limit,
         offset,
@@ -103,4 +112,19 @@ fn parse_order_by_list(parser: &mut Parser) -> Result<Vec<OrderByExpr>> {
     }
     
     Ok(order_by)
+}
+
+fn parse_group_by_list(parser: &mut Parser) -> Result<Vec<String>> {
+    let mut columns = Vec::new();
+    
+    loop {
+        columns.push(parser.expect_identifier()?);
+        
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
+        parser.advance();
+    }
+    
+    Ok(columns)
 }

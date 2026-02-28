@@ -113,7 +113,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
         
-        let rows = catalog.select("users", vec!["*".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("users", vec!["*".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].len(), 2);
     }
@@ -129,7 +129,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.create_table("users".to_string(), columns).unwrap();
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         
-        let rows = catalog.select("users", vec!["id".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("users", vec!["id".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].len(), 1);
     }
@@ -137,7 +137,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
     #[test]
     fn test_select_nonexistent_table() {
         let catalog = Catalog::new();
-        let result = catalog.select("nonexistent", vec!["*".to_string()], None, None, None, None);
+        let result = catalog.select("nonexistent", vec!["*".to_string()], None, None, None, None, None);
         assert!(result.is_err());
     }
     
@@ -149,7 +149,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         ];
         
         catalog.create_table("empty".to_string(), columns).unwrap();
-        let rows = catalog.select("empty", vec!["*".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("empty", vec!["*".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 0);
     }
     
@@ -174,7 +174,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(2)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(2));
         assert_eq!(rows[0][1], Value::Int(200));
@@ -200,7 +200,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(2)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -224,7 +224,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(25)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -248,7 +248,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(15)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -272,7 +272,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(20)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -296,7 +296,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             right: Box::new(Expr::Number(20)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -413,7 +413,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
         
         let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: true }]);
-        let rows = catalog.select("data", vec!["*".to_string()], None, order_by, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], None, None, order_by, None, None).unwrap();
         
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0][0], Value::Int(1));
@@ -434,7 +434,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(2)]).unwrap();
         
         let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: false }]);
-        let rows = catalog.select("data", vec!["*".to_string()], None, order_by, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], None, None, order_by, None, None).unwrap();
         
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0][0], Value::Int(3));
@@ -455,7 +455,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(3)]).unwrap();
         catalog.insert("data", vec![Expr::Number(4)]).unwrap();
         
-        let rows = catalog.select("data", vec!["*".to_string()], None, None, Some(2), None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], None, None, None, Some(2), None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -472,7 +472,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(3)]).unwrap();
         catalog.insert("data", vec![Expr::Number(4)]).unwrap();
         
-        let rows = catalog.select("data", vec!["*".to_string()], None, None, None, Some(2)).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], None, None, None, None, Some(2)).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::Int(3));
     }
@@ -491,7 +491,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(4)]).unwrap();
         catalog.insert("data", vec![Expr::Number(5)]).unwrap();
         
-        let rows = catalog.select("data", vec!["*".to_string()], None, None, Some(2), Some(1)).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], None, None, None, Some(2), Some(1)).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], Value::Int(2));
         assert_eq!(rows[1][0], Value::Int(3));
@@ -510,7 +510,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(2)]).unwrap();
         catalog.insert("data", vec![Expr::Number(3)]).unwrap();
         
-        let rows = catalog.select("data", vec!["AGG:COUNT:*".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["AGG:COUNT:*".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(3));
     }
@@ -527,7 +527,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(20)]).unwrap();
         catalog.insert("data", vec![Expr::Number(30)]).unwrap();
         
-        let rows = catalog.select("data", vec!["AGG:SUM:value".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["AGG:SUM:value".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(60));
     }
@@ -544,7 +544,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(20)]).unwrap();
         catalog.insert("data", vec![Expr::Number(30)]).unwrap();
         
-        let rows = catalog.select("data", vec!["AGG:AVG:value".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["AGG:AVG:value".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(20));
     }
@@ -561,10 +561,10 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         catalog.insert("data", vec![Expr::Number(50)]).unwrap();
         catalog.insert("data", vec![Expr::Number(30)]).unwrap();
         
-        let rows = catalog.select("data", vec!["AGG:MIN:value".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["AGG:MIN:value".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows[0][0], Value::Int(10));
         
-        let rows = catalog.select("data", vec!["AGG:MAX:value".to_string()], None, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["AGG:MAX:value".to_string()], None, None, None, None, None).unwrap();
         assert_eq!(rows[0][0], Value::Int(50));
     }
 
@@ -598,7 +598,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             }),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(2));
     }
@@ -631,6 +631,26 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
             }),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None, None, None, None).unwrap();
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn test_group_by() {
+        let catalog = Catalog::new();
+        let columns = vec![
+            ColumnDef { name: "category".to_string(), data_type: DataType::Text },
+            ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ];
+        
+        catalog.create_table("data".to_string(), columns).unwrap();
+        catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(10)]).unwrap();
+        catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(20)]).unwrap();
+        catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
+        catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(40)]).unwrap();
+        
+        let group_by = Some(vec!["category".to_string()]);
+        let rows = catalog.select("data", vec!["category".to_string()], None, group_by, None, None, None).unwrap();
+        
         assert_eq!(rows.len(), 2);
     }
