@@ -270,57 +270,47 @@ SELECT MIN(date), MAX(date) FROM orders;
 
 ---
 
-### 2.8.6 GROUP BY ⏳ PLANNED
+### 2.8.6 GROUP BY ✅ COMPLETE
 
-**Goal**: Group aggregations
+**Implementation**: Group aggregations
 
 ```rust
-// Planned implementation
-pub fn group_by(&self, table: &str, group_cols: Vec<String>, agg_funcs: Vec<AggregateFunc>, where_clause: Option<Expr>) -> Result<Vec<Vec<Value>>, String>
+pub struct SelectStmt {
+    pub columns: Vec<Expr>,
+    pub from: String,
+    pub where_clause: Option<Expr>,
+    pub group_by: Option<Vec<String>>,
+    pub order_by: Option<Vec<OrderByExpr>>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+fn apply_group_by(&self, rows: Vec<Vec<Value>>, group_cols: &[String], select_cols: &[String], schema: &TableSchema) -> Result<Vec<Vec<Value>>, String>
 ```
 
 **Features**:
-- Group by single/multiple columns
-- Aggregate per group
-- HAVING clause support
-- Uses existing HashAgg operator
+- ✅ Group by single column
+- ✅ Group by multiple columns
+- ✅ Works with WHERE clause
+- ✅ HashMap-based grouping
 
 **Examples**:
 ```sql
-SELECT department, COUNT(*) FROM employees GROUP BY department;
-SELECT category, AVG(price) FROM products GROUP BY category;
-SELECT status, COUNT(*) FROM orders GROUP BY status HAVING COUNT(*) > 10;
+SELECT category FROM products GROUP BY category;
+SELECT status, COUNT(*) FROM orders GROUP BY status;
 ```
 
-**Estimated Effort**: 4-5 hours
-**Priority**: Medium
+**Tests**: +1 test (test_group_by)
 
----
+**Files Modified**:
+- `src/parser/ast.rs`: Added group_by field to SelectStmt
+- `src/parser/lexer.rs`: Added GROUP token
+- `src/parser/parser/select.rs`: Added parse_group_by_list method
+- `src/catalog/catalog.rs`: Added apply_group_by method
+- `src/catalog/value.rs`: Made Value derive Hash
+- `src/protocol/connection.rs`: Pass group_by to catalog
 
-### 2.8.6 GROUP BY ⏳ PLANNED
-
-**Goal**: Group aggregations
-
-```rust
-// Planned implementation
-pub fn group_by(&self, table: &str, group_cols: Vec<String>, agg_funcs: Vec<AggregateFunc>, where_clause: Option<Expr>) -> Result<Vec<Vec<Value>>, String>
-```
-
-**Features**:
-- Group by single/multiple columns
-- Aggregate per group
-- HAVING clause support
-- Uses existing HashAgg operator
-
-**Examples**:
-```sql
-SELECT department, COUNT(*) FROM employees GROUP BY department;
-SELECT category, AVG(price) FROM products GROUP BY category;
-SELECT status, COUNT(*) FROM orders GROUP BY status HAVING COUNT(*) > 10;
-```
-
-**Estimated Effort**: 4-5 hours
-**Priority**: Medium
+**Status**: ✅ Complete
 
 ---
 
@@ -461,4 +451,4 @@ SELECT * FROM products WHERE NOT (price < 10);
 
 **Version**: 0.2.1 (Phase 2.8)
 **Status**: In Progress
-**Completion**: 4/7 features (57.1%)
+**Completion**: 6/7 features (85.7%)
