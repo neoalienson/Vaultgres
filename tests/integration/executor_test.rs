@@ -698,3 +698,77 @@ fn test_having_complex_pipeline_integration() {
     assert!(having.next().unwrap().is_none());
     having.close().unwrap();
 }
+
+#[test]
+fn test_distinct_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Distinct};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1, 2] },
+        SimpleTuple { data: vec![1, 2] },
+        SimpleTuple { data: vec![3, 4] },
+        SimpleTuple { data: vec![1, 2] },
+    ]);
+    
+    let mut distinct = Distinct::new(Box::new(input));
+    distinct.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = distinct.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 2);
+    distinct.close().unwrap();
+}
+
+#[test]
+fn test_distinct_with_sort_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Distinct};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![3] },
+        SimpleTuple { data: vec![1] },
+        SimpleTuple { data: vec![3] },
+        SimpleTuple { data: vec![2] },
+        SimpleTuple { data: vec![1] },
+    ]);
+    
+    let mut distinct = Distinct::new(Box::new(input));
+    distinct.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = distinct.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 3);
+    distinct.close().unwrap();
+}
+
+#[test]
+fn test_distinct_with_limit_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Distinct};
+    use rustgres::executor::MockExecutor;
+    
+    let input = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1] },
+        SimpleTuple { data: vec![1] },
+        SimpleTuple { data: vec![2] },
+        SimpleTuple { data: vec![2] },
+        SimpleTuple { data: vec![3] },
+        SimpleTuple { data: vec![3] },
+    ]);
+    
+    let mut distinct = Distinct::new(Box::new(input));
+    distinct.open().unwrap();
+    
+    let t1 = distinct.next().unwrap().unwrap();
+    assert_eq!(t1.data[0], 1);
+    let t2 = distinct.next().unwrap().unwrap();
+    assert_eq!(t2.data[0], 2);
+    
+    distinct.close().unwrap();
+}

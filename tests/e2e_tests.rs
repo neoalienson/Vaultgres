@@ -752,3 +752,93 @@ fn test_having_without_group_by_e2e() {
         _ => panic!("Expected SELECT statement"),
     }
 }
+
+#[test]
+fn test_distinct_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT DISTINCT name FROM users";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert_eq!(s.distinct, true);
+            assert_eq!(s.from, "users");
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_distinct_with_multiple_columns_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT DISTINCT dept, year FROM employees";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert_eq!(s.distinct, true);
+            assert_eq!(s.columns.len(), 2);
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_distinct_with_where_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT DISTINCT status FROM orders WHERE amount > 100";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert_eq!(s.distinct, true);
+            assert!(s.where_clause.is_some());
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_distinct_with_order_by_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT DISTINCT category FROM products ORDER BY category";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert_eq!(s.distinct, true);
+            assert!(s.order_by.is_some());
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
+
+#[test]
+fn test_distinct_with_limit_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT DISTINCT id FROM data LIMIT 10";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Select(s) => {
+            assert_eq!(s.distinct, true);
+            assert_eq!(s.limit, Some(10));
+        }
+        _ => panic!("Expected SELECT statement"),
+    }
+}
