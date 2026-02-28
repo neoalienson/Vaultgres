@@ -27,8 +27,16 @@ impl Parser {
     
     /// Parses a SQL statement
     pub fn parse(&mut self) -> Result<Statement> {
+        if self.current_token() == &Token::Select {
+            let select = select::parse_select(self)?;
+            // Check for UNION
+            if self.current_token() == &Token::Union {
+                return self.parse_union(select);
+            }
+            return Ok(select);
+        }
+        
         let stmt = match self.current_token() {
-            Token::Select => select::parse_select(self),
             Token::Insert => dml::parse_insert(self),
             Token::Update => dml::parse_update(self),
             Token::Delete => dml::parse_delete(self),
@@ -44,6 +52,35 @@ impl Parser {
         }
         
         Ok(stmt)
+    }
+    
+    fn parse_union(&mut self, left: Statement) -> Result<Statement> {
+        use crate::parser::ast::{UnionStmt, SelectStmt};
+        
+        let left_select = match left {
+            Statement::Select(s) => s,
+            _ => return Err(ParseError::InvalidSyntax("UNION requires SELECT".to_string())),
+        };
+        
+        self.expect(Token::Union)?;
+        let all = if self.current_token() == &Token::All {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        
+        let right = select::parse_select(self)?;
+        let right_select = match right {
+            Statement::Select(s) => s,
+            _ => return Err(ParseError::InvalidSyntax("UNION requires SELECT".to_string())),
+        };
+        
+        Ok(Statement::Union(UnionStmt {
+            left: Box::new(left_select),
+            right: Box::new(right_select),
+            all,
+        }))
     }
     
     pub(crate) fn expect(&mut self, expected: Token) -> Result<()> {

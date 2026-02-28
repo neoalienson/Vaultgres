@@ -51,6 +51,8 @@ pub enum Token {
     Right,
     Full,
     On,
+    Union,
+    All,
     
     // Identifiers and literals
     Identifier(String),
@@ -226,6 +228,8 @@ impl Lexer {
             "RIGHT" => Token::Right,
             "FULL" => Token::Full,
             "ON" => Token::On,
+            "UNION" => Token::Union,
+            "ALL" => Token::All,
             _ => Token::Identifier(ident),
         };
         

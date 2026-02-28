@@ -931,3 +931,55 @@ fn test_full_join_integration() {
     assert_eq!(results.len(), 4);
     join.close().unwrap();
 }
+
+#[test]
+fn test_union_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Union};
+    use rustgres::executor::MockExecutor;
+    
+    let left = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1] },
+        SimpleTuple { data: vec![2] },
+    ]);
+    let right = MockExecutor::new(vec![
+        SimpleTuple { data: vec![2] },
+        SimpleTuple { data: vec![3] },
+    ]);
+    
+    let mut union = Union::new(Box::new(left), Box::new(right), false);
+    union.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = union.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 3);
+    union.close().unwrap();
+}
+
+#[test]
+fn test_union_all_integration() {
+    use rustgres::executor::{SimpleExecutor, SimpleTuple as SimpleTuple, Union};
+    use rustgres::executor::MockExecutor;
+    
+    let left = MockExecutor::new(vec![
+        SimpleTuple { data: vec![1] },
+        SimpleTuple { data: vec![2] },
+    ]);
+    let right = MockExecutor::new(vec![
+        SimpleTuple { data: vec![2] },
+        SimpleTuple { data: vec![3] },
+    ]);
+    
+    let mut union = Union::new(Box::new(left), Box::new(right), true);
+    union.open().unwrap();
+    
+    let mut results = Vec::new();
+    while let Some(tuple) = union.next().unwrap() {
+        results.push(tuple);
+    }
+    
+    assert_eq!(results.len(), 4);
+    union.close().unwrap();
+}

@@ -12,6 +12,7 @@ mod group_by;
 mod having;
 mod distinct;
 mod join;
+mod union;
 mod mock;
 
 #[cfg(test)]
@@ -28,6 +29,8 @@ mod having_edge_tests;
 mod distinct_edge_tests;
 #[cfg(test)]
 mod join_edge_tests;
+#[cfg(test)]
+mod union_edge_tests;
 
 pub use executor::{Executor, ExecutorError, Tuple, Value, SimpleTuple, SimpleExecutor};
 pub use seq_scan::SeqScan;
@@ -43,4 +46,5 @@ pub use group_by::GroupBy;
 pub use having::Having;
 pub use distinct::Distinct;
 pub use join::{Join, JoinType};
+pub use union::Union;
 pub use mock::MockExecutor;

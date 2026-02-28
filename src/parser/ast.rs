@@ -8,6 +8,15 @@ pub enum Statement {
     CreateTable(CreateTableStmt),
     DropTable(DropTableStmt),
     Describe(DescribeStmt),
+    Union(UnionStmt),
+}
+
+/// UNION statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnionStmt {
+    pub left: Box<SelectStmt>,
+    pub right: Box<SelectStmt>,
+    pub all: bool,
 }
 
 /// DROP TABLE statement

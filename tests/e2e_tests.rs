@@ -928,3 +928,37 @@ fn test_full_join_e2e() {
         _ => panic!("Expected SELECT statement"),
     }
 }
+
+#[test]
+fn test_union_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT id FROM users UNION SELECT id FROM orders";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Union(u) => {
+            assert_eq!(u.all, false);
+        }
+        _ => panic!("Expected UNION statement"),
+    }
+}
+
+#[test]
+fn test_union_all_e2e() {
+    use rustgres::parser::Parser;
+    use rustgres::parser::ast::Statement;
+    
+    let sql = "SELECT name FROM employees UNION ALL SELECT name FROM contractors";
+    let mut parser = Parser::new(sql).unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::Union(u) => {
+            assert_eq!(u.all, true);
+        }
+        _ => panic!("Expected UNION statement"),
+    }
+}
