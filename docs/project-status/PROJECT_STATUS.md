@@ -72,7 +72,7 @@ All 7 items delivered:
 2. ✅ **Additional operators** (<, >, !=, <=, >=)
 3. ✅ **ORDER BY** (ASC/DESC)
 4. ✅ **LIMIT/OFFSET**
-5. ⏳ Basic aggregates (COUNT, SUM, AVG, MIN, MAX)
+5. ✅ **Basic aggregates** (COUNT, SUM, AVG, MIN, MAX)
 6. ⏳ GROUP BY
 
 ## Architecture Components
