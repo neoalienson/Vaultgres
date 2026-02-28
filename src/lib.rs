@@ -21,6 +21,9 @@ pub mod statistics;
 pub mod optimizer;
 pub mod catalog;
 
+#[cfg(test)]
+mod config_edge_tests;
+
 pub use storage::{BufferPool, Page, PageId, StorageError};
 pub use transaction::{TransactionManager, Transaction, TransactionId};
 pub use wal::{WALWriter, WALRecord, RecoveryManager};
