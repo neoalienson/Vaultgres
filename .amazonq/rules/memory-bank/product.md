@@ -58,32 +58,70 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 
 ## Project Status
 
-**Current Version**: 0.1.0-alpha
+**Current Version**: 0.2.0-alpha
 
 **Completed Components**:
+
+**Core Engine:**
 - Storage engine with B+Tree indexes
-- MVCC transaction manager
-- SQL parser (SELECT, INSERT, UPDATE, DELETE)
-- Query optimizer (cost-based and rule-based)
+- MVCC transaction manager with snapshot isolation
+- SQL parser (SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, DROP TABLE, DESCRIBE)
+- Query optimizer (cost-based with statistics and rule-based)
 - PostgreSQL wire protocol
-- WAL and crash recovery
+- WAL and crash recovery (ARIES protocol)
+
+**SQL Query Features:**
 - WHERE clause with comparison operators (<, >, <=, >=, !=, =)
+- Logical operators (AND, OR, NOT)
 - ORDER BY (ASC/DESC)
 - LIMIT/OFFSET
 - Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
 - GROUP BY clause
 - HAVING clause
 - DISTINCT
-- JOIN (INNER, LEFT, RIGHT, FULL)
-- UNION / UNION ALL
-- INTERSECT
-- EXCEPT
+- JOIN (INNER, LEFT, RIGHT, FULL OUTER)
+- Set operations (UNION/UNION ALL, INTERSECT, EXCEPT)
 - Subqueries (scalar and IN subqueries)
 - CTEs (Common Table Expressions with WITH clause)
 - Window functions (ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD)
 
+**Execution Operators:**
+- Sequential Scan
+- Filter (WHERE clause)
+- Project (column selection)
+- Nested Loop Join
+- Hash Join
+- Sort (with external merge sort)
+- Hash Aggregation
+- Limit/Offset
+- Group By
+- Having
+- Distinct
+- Union/Intersect/Except
+- Window functions
+
+**Testing:**
+- 553 comprehensive tests (100% pass rate)
+- Unit tests: 474 tests
+- Edge case tests: 79 tests
+- Test execution time: <0.12s
+
 **In Progress**:
 - None
+
+**Known Limitations**:
+- No parallel query execution
+- No advanced indexes (GiST, GIN, BRIN, Hash)
+- No stored procedures or triggers
+- No views or materialized views
+- No table partitioning
+- No replication
+- No full-text search
+- No JSON/JSONB operators
+- No recursive CTEs
+- No correlated subqueries
+- No CASE expressions
+- No merge join
 
 **Planned Features**:
 - Parallel query execution

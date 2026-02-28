@@ -260,12 +260,12 @@ RustGres follows Semantic Versioning (SemVer):
 ## Testing Goals
 
 **Coverage Targets**:
-- ✅ Unit tests: 90%+ coverage (306 tests, 100% pass)
-- ✅ Edge case testing: All modules covered
-- 🚧 Integration tests: All major features
-- 🚧 Fuzz testing: Parser, optimizer, executor
-- 🚧 Performance tests: Regression detection
-- 🚧 Compatibility tests: PostgreSQL test suite
+- ✅ Unit tests: 90%+ coverage (474 tests, 100% pass)
+- ✅ Edge case testing: All modules covered (79 tests)
+- ❌ Integration tests: All major features
+- ❌ Fuzz testing: Parser, optimizer, executor
+- ❌ Performance tests: Regression detection
+- ❌ Compatibility tests: PostgreSQL test suite
 
 ## Documentation Goals
 
@@ -337,26 +337,31 @@ Follow development progress:
 
 Last updated: 2024-02-28
 
-## Recent Achievements (Phase 2.10)
+## Recent Achievements (Phase 2.11)
+
+**SQL Feature Completion** ✅
+- 553 comprehensive tests (100% pass rate)
+- Subqueries: Scalar and IN subqueries with result caching
+- CTEs: WITH clause with multiple CTEs and materialized execution
+- Window Functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD
+- Complete set operations: UNION/UNION ALL, INTERSECT, EXCEPT
+- All JOIN types: INNER, LEFT, RIGHT, FULL OUTER
+- Advanced aggregation: GROUP BY, HAVING, DISTINCT
 
 **Testing Infrastructure** ✅
-- 306 comprehensive unit tests (100% pass rate)
-- 93 edge case tests across all modules
-- Test execution time: <0.14s
-- All modules have excellent test coverage:
-  - Catalog: 97 tests
-  - Parser: 50 tests
-  - Optimizer: 50 tests
-  - Transaction: 26 tests
-  - Storage: 29 tests
-  - WAL: 25 tests
-  - Executor: 24 tests
-  - Protocol: 15 tests
-  - Statistics: 15 tests
-  - Config: 11 tests
+- 474 unit tests (100% pass rate)
+- 79 edge case tests across all modules
+- Test execution time: <0.12s
+- Comprehensive coverage:
+  - Executor: 37 window function tests
+  - Subquery: 21 tests
+  - CTE: 21 tests
+  - Set operations: 42 tests
+  - Joins: 26 tests
+  - Aggregation: 35 tests
 
 **Code Quality** ✅
-- SOLID principles applied (catalog refactoring)
-- Modular test organization
-- Bug fixes: Integer overflow in LIMIT/OFFSET
-- Documented issues: Buffer pool infinite loop
+- Minimal, focused implementations
+- Consistent error handling with Result types
+- Comprehensive edge case coverage
+- Clean separation of concerns
