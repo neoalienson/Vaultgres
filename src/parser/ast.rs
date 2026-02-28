@@ -1,5 +1,5 @@
 /// SQL Statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Statement {
     Select(SelectStmt),
     Insert(InsertStmt),
@@ -22,7 +22,7 @@ pub enum Statement {
 }
 
 /// UNION statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UnionStmt {
     pub left: Box<SelectStmt>,
     pub right: Box<SelectStmt>,
@@ -30,76 +30,76 @@ pub struct UnionStmt {
 }
 
 /// INTERSECT statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct IntersectStmt {
     pub left: Box<SelectStmt>,
     pub right: Box<SelectStmt>,
 }
 
 /// EXCEPT statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ExceptStmt {
     pub left: Box<SelectStmt>,
     pub right: Box<SelectStmt>,
 }
 
 /// WITH (CTE) statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WithStmt {
     pub ctes: Vec<CTE>,
     pub query: Box<SelectStmt>,
 }
 
 /// Common Table Expression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CTE {
     pub name: String,
     pub query: Box<SelectStmt>,
 }
 
 /// DROP TABLE statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DropTableStmt {
     pub table: String,
     pub if_exists: bool,
 }
 
 /// CREATE VIEW statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateViewStmt {
     pub name: String,
     pub query: Box<SelectStmt>,
 }
 
 /// DROP VIEW statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DropViewStmt {
     pub name: String,
     pub if_exists: bool,
 }
 
 /// CREATE MATERIALIZED VIEW statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateMaterializedViewStmt {
     pub name: String,
     pub query: Box<SelectStmt>,
 }
 
 /// REFRESH MATERIALIZED VIEW statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RefreshMaterializedViewStmt {
     pub name: String,
 }
 
 /// DROP MATERIALIZED VIEW statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DropMaterializedViewStmt {
     pub name: String,
     pub if_exists: bool,
 }
 
 /// CREATE TRIGGER statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateTriggerStmt {
     pub name: String,
     pub timing: TriggerTiming,
@@ -111,21 +111,21 @@ pub struct CreateTriggerStmt {
 }
 
 /// DROP TRIGGER statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DropTriggerStmt {
     pub name: String,
     pub if_exists: bool,
 }
 
 /// Trigger timing
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TriggerTiming {
     Before,
     After,
 }
 
 /// Trigger event
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TriggerEvent {
     Insert,
     Update,
@@ -133,34 +133,34 @@ pub enum TriggerEvent {
 }
 
 /// Trigger granularity
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TriggerFor {
     EachRow,
     EachStatement,
 }
 
 /// DESCRIBE statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DescribeStmt {
     pub table: String,
 }
 
 /// CREATE TABLE statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateTableStmt {
     pub table: String,
     pub columns: Vec<ColumnDef>,
 }
 
 /// Column definition
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColumnDef {
     pub name: String,
     pub data_type: DataType,
 }
 
 /// Data type
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DataType {
     Int,
     Text,
@@ -168,7 +168,7 @@ pub enum DataType {
 }
 
 /// SELECT statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SelectStmt {
     pub distinct: bool,
     pub columns: Vec<Expr>,
@@ -183,7 +183,7 @@ pub struct SelectStmt {
 }
 
 /// JOIN clause
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct JoinClause {
     pub join_type: JoinType,
     pub table: String,
@@ -191,7 +191,7 @@ pub struct JoinClause {
 }
 
 /// JOIN type
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum JoinType {
     Inner,
     Left,
@@ -200,21 +200,21 @@ pub enum JoinType {
 }
 
 /// ORDER BY expression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderByExpr {
     pub column: String,
     pub ascending: bool,
 }
 
 /// INSERT statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStmt {
     pub table: String,
     pub values: Vec<Expr>,
 }
 
 /// UPDATE statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UpdateStmt {
     pub table: String,
     pub assignments: Vec<(String, Expr)>,
@@ -222,14 +222,14 @@ pub struct UpdateStmt {
 }
 
 /// DELETE statement
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeleteStmt {
     pub table: String,
     pub where_clause: Option<Expr>,
 }
 
 /// Expression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Expr {
     Column(String),
     Number(i64),
@@ -265,7 +265,7 @@ pub enum Expr {
 }
 
 /// Aggregate functions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AggregateFunc {
     Count,
     Sum,
@@ -275,7 +275,7 @@ pub enum AggregateFunc {
 }
 
 /// Window functions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WindowFunc {
     RowNumber,
     Rank,
@@ -285,7 +285,7 @@ pub enum WindowFunc {
 }
 
 /// Binary operator
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperator {
     Equals,
     NotEquals,
@@ -301,7 +301,7 @@ pub enum BinaryOperator {
 }
 
 /// Unary operator
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UnaryOperator {
     Not,
     Minus,

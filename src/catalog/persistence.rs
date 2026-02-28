@@ -1,4 +1,4 @@
-use crate::parser::ast::{ColumnDef, DataType};
+use crate::parser::ast::{ColumnDef, DataType, SelectStmt, CreateTriggerStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use super::{Value, TableSchema, Tuple};
 use std::collections::HashMap;
@@ -47,6 +47,58 @@ impl Persistence {
         writer.flush().map_err(|e| format!("Failed to flush: {}", e))?;
         log::info!("💾 Saved {} tables to {}", tables.len(), catalog_path);
         Ok(())
+    }
+    
+    pub fn save_views(
+        data_dir: &str,
+        views: &HashMap<String, SelectStmt>,
+    ) -> Result<(), String> {
+        let path = format!("{}/views.json", data_dir);
+        let json = serde_json::to_string(views)
+            .map_err(|e| format!("Failed to serialize views: {}", e))?;
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write views: {}", e))?;
+        log::info!("💾 Saved {} views", views.len());
+        Ok(())
+    }
+    
+    pub fn load_views(
+        data_dir: &str,
+    ) -> Result<HashMap<String, SelectStmt>, String> {
+        let path = format!("{}/views.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read views: {}", e))?;
+        serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to deserialize views: {}", e))
+    }
+    
+    pub fn save_triggers(
+        data_dir: &str,
+        triggers: &HashMap<String, CreateTriggerStmt>,
+    ) -> Result<(), String> {
+        let path = format!("{}/triggers.json", data_dir);
+        let json = serde_json::to_string(triggers)
+            .map_err(|e| format!("Failed to serialize triggers: {}", e))?;
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write triggers: {}", e))?;
+        log::info!("💾 Saved {} triggers", triggers.len());
+        Ok(())
+    }
+    
+    pub fn load_triggers(
+        data_dir: &str,
+    ) -> Result<HashMap<String, CreateTriggerStmt>, String> {
+        let path = format!("{}/triggers.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read triggers: {}", e))?;
+        serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to deserialize triggers: {}", e))
     }
 
     pub fn load(

@@ -19,3 +19,4 @@ mod catalog_test;
 mod view_test;
 mod materialized_view_test;
 mod trigger_test;
+mod persistence_test;

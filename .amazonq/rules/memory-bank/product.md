@@ -107,10 +107,11 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - CASE expressions
 
 **Testing:**
-- 651 comprehensive tests (100% pass rate)
+- 657 comprehensive tests (100% pass rate)
 - Unit tests: 553 tests
 - Edge case tests: 98 tests
-- Test execution time: <0.10s
+- Integration tests: 6 new persistence tests
+- Test execution time: <0.12s
 
 **In Progress**:
 - None

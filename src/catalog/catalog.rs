@@ -49,6 +49,14 @@ impl Catalog {
         drop(tables);
         drop(data);
         
+        if let Ok(views) = Persistence::load_views(data_dir) {
+            *catalog.views.write().unwrap() = views;
+        }
+        
+        if let Ok(triggers) = Persistence::load_triggers(data_dir) {
+            *catalog.triggers.write().unwrap() = triggers;
+        }
+        
         catalog
     }
     
@@ -59,6 +67,16 @@ impl Catalog {
             
             if let Err(e) = Persistence::save(dir, &tables_clone, &data_clone) {
                 log::error!("Auto-save failed: {}", e);
+            }
+            
+            let views_clone = self.views.read().unwrap().clone();
+            if let Err(e) = Persistence::save_views(dir, &views_clone) {
+                log::error!("Views auto-save failed: {}", e);
+            }
+            
+            let triggers_clone = self.triggers.read().unwrap().clone();
+            if let Err(e) = Persistence::save_triggers(dir, &triggers_clone) {
+                log::error!("Triggers auto-save failed: {}", e);
             }
         }
     }
@@ -110,6 +128,8 @@ impl Catalog {
         }
         
         views.insert(name, query);
+        drop(views);
+        self.auto_save();
         Ok(())
     }
     
@@ -119,7 +139,8 @@ impl Catalog {
         if views.remove(name).is_none() && !if_exists {
             return Err(format!("View '{}' does not exist", name));
         }
-        
+        drop(views);
+        self.auto_save();
         Ok(())
     }
     
@@ -172,6 +193,8 @@ impl Catalog {
         }
         
         triggers.insert(trigger.name.clone(), trigger);
+        drop(triggers);
+        self.auto_save();
         Ok(())
     }
     
@@ -181,7 +204,8 @@ impl Catalog {
         if triggers.remove(name).is_none() && !if_exists {
             return Err(format!("Trigger '{}' does not exist", name));
         }
-        
+        drop(triggers);
+        self.auto_save();
         Ok(())
     }
     
