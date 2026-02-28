@@ -373,3 +373,26 @@ fn test_where_clause_comparison_operators() {
     let result = server.execute_sql("SELECT * FROM products WHERE price != 100");
     assert!(result.is_ok(), "SELECT with != failed: {:?}", result);
 }
+
+#[test]
+fn test_order_by_clause() {
+    let server = TestServer::start();
+    
+    server.execute_sql("CREATE TABLE products (id INT, name TEXT, price INT)")
+        .expect("CREATE failed");
+    
+    server.execute_sql("INSERT INTO products VALUES (3, 'Keyboard', 75)")
+        .expect("INSERT 1 failed");
+    server.execute_sql("INSERT INTO products VALUES (1, 'Mouse', 25)")
+        .expect("INSERT 2 failed");
+    server.execute_sql("INSERT INTO products VALUES (2, 'Monitor', 200)")
+        .expect("INSERT 3 failed");
+    
+    // Test ORDER BY ASC
+    let result = server.execute_sql("SELECT * FROM products ORDER BY id");
+    assert!(result.is_ok(), "SELECT with ORDER BY failed: {:?}", result);
+    
+    // Test ORDER BY DESC
+    let result = server.execute_sql("SELECT * FROM products ORDER BY price DESC");
+    assert!(result.is_ok(), "SELECT with ORDER BY DESC failed: {:?}", result);
+}

@@ -61,10 +61,19 @@ impl Parser {
             None
         };
         
+        let order_by = if self.current_token() == &Token::Order {
+            self.advance();
+            self.expect(Token::By)?;
+            Some(self.parse_order_by_list()?)
+        } else {
+            None
+        };
+        
         Ok(Statement::Select(SelectStmt {
             columns,
             from,
             where_clause,
+            order_by,
         }))
     }
     
@@ -261,6 +270,34 @@ impl Parser {
         }
         
         Ok(assignments)
+    }
+    
+    fn parse_order_by_list(&mut self) -> Result<Vec<OrderByExpr>> {
+        let mut order_by = Vec::new();
+        
+        loop {
+            let column = self.expect_identifier()?;
+            let ascending = match self.current_token() {
+                Token::Descending => {
+                    self.advance();
+                    false
+                }
+                Token::Asc => {
+                    self.advance();
+                    true
+                }
+                _ => true, // Default to ASC
+            };
+            
+            order_by.push(OrderByExpr { column, ascending });
+            
+            if self.current_token() != &Token::Comma {
+                break;
+            }
+            self.advance();
+        }
+        
+        Ok(order_by)
     }
     
     fn parse_expr(&mut self) -> Result<Expr> {

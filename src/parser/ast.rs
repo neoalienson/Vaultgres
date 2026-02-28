@@ -51,6 +51,14 @@ pub struct SelectStmt {
     pub columns: Vec<Expr>,
     pub from: String,
     pub where_clause: Option<Expr>,
+    pub order_by: Option<Vec<OrderByExpr>>,
+}
+
+/// ORDER BY expression
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderByExpr {
+    pub column: String,
+    pub ascending: bool,
 }
 
 /// INSERT statement
@@ -110,6 +118,7 @@ mod tests {
             columns: vec![Expr::Star],
             from: "users".to_string(),
             where_clause: None,
+            order_by: None,
         };
         
         assert_eq!(stmt.from, "users");

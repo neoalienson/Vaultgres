@@ -23,6 +23,10 @@ pub enum Token {
     Drop,
     If,
     Exists,
+    Order,
+    By,
+    Asc,
+    Descending,
     
     // Identifiers and literals
     Identifier(String),
@@ -170,6 +174,10 @@ impl Lexer {
             "DROP" => Token::Drop,
             "IF" => Token::If,
             "EXISTS" => Token::Exists,
+            "ORDER" => Token::Order,
+            "BY" => Token::By,
+            "ASC" => Token::Asc,
+            "DESC" => Token::Descending,
             _ => Token::Identifier(ident),
         };
         

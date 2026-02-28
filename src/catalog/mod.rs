@@ -1,4 +1,4 @@
-use crate::parser::ast::{ColumnDef, DataType, Expr};
+use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -15,7 +15,7 @@ pub struct Tuple {
     pub data: Vec<Value>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
     Int(i64),
     Text(String),
@@ -115,7 +115,7 @@ impl Catalog {
         data.get(table).map(|rows| rows.len()).unwrap_or(0)
     }
     
-    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>) -> Result<Vec<Vec<Value>>, String> {
+    pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, order_by: Option<Vec<OrderByExpr>>) -> Result<Vec<Vec<Value>>, String> {
         let schema = self.get_table(table)
             .ok_or_else(|| format!("Table '{}' does not exist", table))?;
         
@@ -147,6 +147,19 @@ impl Catalog {
                     }
                     results.push(row);
                 }
+            }
+        }
+        
+        // Apply ORDER BY if specified
+        if let Some(order_by_exprs) = order_by {
+            for order_expr in order_by_exprs.iter().rev() {
+                let col_idx = schema.columns.iter().position(|c| c.name == order_expr.column)
+                    .ok_or_else(|| format!("Column '{}' not found", order_expr.column))?;
+                
+                results.sort_by(|a, b| {
+                    let cmp = a[col_idx].cmp(&b[col_idx]);
+                    if order_expr.ascending { cmp } else { cmp.reverse() }
+                });
             }
         }
         
@@ -402,7 +415,7 @@ mod tests {
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
         
-        let rows = catalog.select("users", vec!["*".to_string()], None).unwrap();
+        let rows = catalog.select("users", vec!["*".to_string()], None, None).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].len(), 2);
     }
@@ -418,7 +431,7 @@ mod tests {
         catalog.create_table("users".to_string(), columns).unwrap();
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         
-        let rows = catalog.select("users", vec!["id".to_string()], None).unwrap();
+        let rows = catalog.select("users", vec!["id".to_string()], None, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].len(), 1);
     }
@@ -426,7 +439,7 @@ mod tests {
     #[test]
     fn test_select_nonexistent_table() {
         let catalog = Catalog::new();
-        let result = catalog.select("nonexistent", vec!["*".to_string()], None);
+        let result = catalog.select("nonexistent", vec!["*".to_string()], None, None);
         assert!(result.is_err());
     }
     
@@ -438,7 +451,7 @@ mod tests {
         ];
         
         catalog.create_table("empty".to_string(), columns).unwrap();
-        let rows = catalog.select("empty", vec!["*".to_string()], None).unwrap();
+        let rows = catalog.select("empty", vec!["*".to_string()], None, None).unwrap();
         assert_eq!(rows.len(), 0);
     }
     
@@ -463,7 +476,7 @@ mod tests {
             right: Box::new(Expr::Number(2)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], Value::Int(2));
         assert_eq!(rows[0][1], Value::Int(200));
@@ -489,7 +502,7 @@ mod tests {
             right: Box::new(Expr::Number(2)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -513,7 +526,7 @@ mod tests {
             right: Box::new(Expr::Number(25)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -537,7 +550,7 @@ mod tests {
             right: Box::new(Expr::Number(15)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -561,7 +574,7 @@ mod tests {
             right: Box::new(Expr::Number(20)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -585,7 +598,7 @@ mod tests {
             right: Box::new(Expr::Number(20)),
         });
         
-        let rows = catalog.select("data", vec!["*".to_string()], where_clause).unwrap();
+        let rows = catalog.select("data", vec!["*".to_string()], where_clause, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
     
@@ -686,5 +699,48 @@ mod tests {
         
         let deleted = catalog.delete("data", where_clause).unwrap();
         assert_eq!(deleted, 1);
+    }
+    
+    #[test]
+    fn test_select_with_order_by_asc() {
+        let catalog = Catalog::new();
+        let columns = vec![
+            ColumnDef { name: "id".to_string(), data_type: DataType::Int },
+            ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ];
+        
+        catalog.create_table("data".to_string(), columns).unwrap();
+        catalog.insert("data", vec![Expr::Number(3), Expr::Number(300)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+        
+        let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: true }]);
+        let rows = catalog.select("data", vec!["*".to_string()], None, order_by).unwrap();
+        
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0][0], Value::Int(1));
+        assert_eq!(rows[1][0], Value::Int(2));
+        assert_eq!(rows[2][0], Value::Int(3));
+    }
+    
+    #[test]
+    fn test_select_with_order_by_desc() {
+        let catalog = Catalog::new();
+        let columns = vec![
+            ColumnDef { name: "id".to_string(), data_type: DataType::Int },
+        ];
+        
+        catalog.create_table("data".to_string(), columns).unwrap();
+        catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(3)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(2)]).unwrap();
+        
+        let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: false }]);
+        let rows = catalog.select("data", vec!["*".to_string()], None, order_by).unwrap();
+        
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0][0], Value::Int(3));
+        assert_eq!(rows[1][0], Value::Int(2));
+        assert_eq!(rows[2][0], Value::Int(1));
     }
 }

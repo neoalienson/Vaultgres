@@ -119,35 +119,48 @@ SELECT * FROM orders ORDER BY date DESC, id ASC;
 
 ---
 
-### 2.8.3 ORDER BY ⏳ PLANNED
+### 2.8.3 ORDER BY ✅ COMPLETE
 
-**Goal**: Sort query results
+**Implementation**: Sort query results
 
 ```rust
-// Planned implementation
-pub fn select(&self, table: &str, columns: Vec<String>, where_clause: Option<Expr>, order_by: Option<Vec<OrderByExpr>>) -> Result<Vec<Vec<Value>>, String>
+// SelectStmt now includes order_by
+pub struct SelectStmt {
+    pub columns: Vec<Expr>,
+    pub from: String,
+    pub where_clause: Option<Expr>,
+    pub order_by: Option<Vec<OrderByExpr>>,
+}
 
-struct OrderByExpr {
-    column: String,
-    ascending: bool,
+pub struct OrderByExpr {
+    pub column: String,
+    pub ascending: bool,
 }
 ```
 
 **Features**:
-- Sort by single column
-- ASC/DESC support
-- Multiple column sorting
-- Uses existing Sort operator
+- ✅ Sort by single column
+- ✅ ASC/DESC support
+- ✅ Multiple column sorting
+- ✅ Works with WHERE clause
 
 **Examples**:
 ```sql
 SELECT * FROM users ORDER BY name;
 SELECT * FROM products ORDER BY price DESC;
-SELECT * FROM orders ORDER BY date DESC, id ASC;
+SELECT * FROM orders WHERE status = 'pending' ORDER BY date DESC;
 ```
 
-**Estimated Effort**: 2-3 hours
-**Priority**: High
+**Tests**: +3 tests (test_select_with_order_by_asc, test_select_with_order_by_desc, test_order_by_clause e2e)
+
+**Files Modified**:
+- `src/parser/ast.rs`: Added OrderByExpr struct and order_by field to SelectStmt
+- `src/parser/lexer.rs`: Added ORDER, BY, ASC, Descending tokens
+- `src/parser/parser.rs`: Added parse_order_by_list method
+- `src/catalog/mod.rs`: Added sorting logic to select method, made Value Ord
+- `src/protocol/connection.rs`: Pass order_by to catalog
+
+**Status**: ✅ Complete
 
 ---
 
@@ -455,17 +468,18 @@ SELECT * FROM products WHERE NOT (price < 10);
 **Current Status**:
 - ✅ WHERE clause execution complete
 - ✅ Additional comparison operators complete
-- ⏳ 5 more features planned
-- 🎯 Estimated total effort: 12-16 hours
+- ✅ ORDER BY complete
+- ⏳ 4 more features planned
+- 🎯 Estimated remaining effort: 8-12 hours
 
 **Next Steps**:
-1. Implement ORDER BY
-2. Implement LIMIT/OFFSET
-3. Implement basic aggregates
+1. Implement LIMIT/OFFSET
+2. Implement basic aggregates
+3. Implement GROUP BY
 4. Then move to Phase 3 (Parallelism)
 
 ---
 
 **Version**: 0.2.1 (Phase 2.8)
 **Status**: In Progress
-**Completion**: 2/7 features (28.6%)
+**Completion**: 3/7 features (42.9%)
