@@ -7,6 +7,8 @@ pub enum Statement {
     Delete(DeleteStmt),
     CreateTable(CreateTableStmt),
     DropTable(DropTableStmt),
+    CreateView(CreateViewStmt),
+    DropView(DropViewStmt),
     Describe(DescribeStmt),
     Union(UnionStmt),
     Intersect(IntersectStmt),
@@ -54,6 +56,20 @@ pub struct CTE {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DropTableStmt {
     pub table: String,
+    pub if_exists: bool,
+}
+
+/// CREATE VIEW statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateViewStmt {
+    pub name: String,
+    pub query: Box<SelectStmt>,
+}
+
+/// DROP VIEW statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct DropViewStmt {
+    pub name: String,
     pub if_exists: bool,
 }
 

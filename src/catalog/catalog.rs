@@ -1,4 +1,4 @@
-use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr};
+use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use super::{Value, TableSchema, Tuple};
 use super::predicate::PredicateEvaluator;
@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 
 pub struct Catalog {
     tables: Arc<RwLock<HashMap<String, TableSchema>>>,
+    views: Arc<RwLock<HashMap<String, SelectStmt>>>,
     data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
     txn_mgr: Arc<TransactionManager>,
     data_dir: Option<String>,
@@ -18,6 +19,7 @@ impl Catalog {
     pub fn new() -> Self {
         Self {
             tables: Arc::new(RwLock::new(HashMap::new())),
+            views: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: None,
@@ -27,6 +29,7 @@ impl Catalog {
     pub fn new_with_data_dir(data_dir: &str) -> Self {
         let catalog = Self {
             tables: Arc::new(RwLock::new(HashMap::new())),
+            views: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: Some(data_dir.to_string()),
@@ -91,6 +94,32 @@ impl Catalog {
     pub fn get_table(&self, name: &str) -> Option<TableSchema> {
         let tables = self.tables.read().unwrap();
         tables.get(name).cloned()
+    }
+    
+    pub fn create_view(&self, name: String, query: SelectStmt) -> Result<(), String> {
+        let mut views = self.views.write().unwrap();
+        
+        if views.contains_key(&name) {
+            return Err(format!("View '{}' already exists", name));
+        }
+        
+        views.insert(name, query);
+        Ok(())
+    }
+    
+    pub fn drop_view(&self, name: &str, if_exists: bool) -> Result<(), String> {
+        let mut views = self.views.write().unwrap();
+        
+        if views.remove(name).is_none() && !if_exists {
+            return Err(format!("View '{}' does not exist", name));
+        }
+        
+        Ok(())
+    }
+    
+    pub fn get_view(&self, name: &str) -> Option<SelectStmt> {
+        let views = self.views.read().unwrap();
+        views.get(name).cloned()
     }
     
     pub fn list_tables(&self) -> Vec<String> {

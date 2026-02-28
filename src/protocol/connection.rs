@@ -81,6 +81,14 @@ impl<S: Read + Write> Connection<S> {
                 self.catalog.drop_table(&drop.table, drop.if_exists)?;
                 Ok("DROP TABLE".to_string())
             }
+            Statement::CreateView(create) => {
+                self.catalog.create_view(create.name.clone(), *create.query)?;
+                Ok("CREATE VIEW".to_string())
+            }
+            Statement::DropView(drop) => {
+                self.catalog.drop_view(&drop.name, drop.if_exists)?;
+                Ok("DROP VIEW".to_string())
+            }
             Statement::Describe(desc) => {
                 if let Some(schema) = self.catalog.get_table(&desc.table) {
                     let cols: Vec<String> = schema.columns.iter()

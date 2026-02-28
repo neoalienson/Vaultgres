@@ -69,6 +69,7 @@ pub enum Token {
     Then,
     Else,
     End,
+    View,
     
     // Identifiers and literals
     Identifier(String),
@@ -262,6 +263,7 @@ impl Lexer {
             "THEN" => Token::Then,
             "ELSE" => Token::Else,
             "END" => Token::End,
+            "VIEW" => Token::View,
             _ => Token::Identifier(ident),
         };
         

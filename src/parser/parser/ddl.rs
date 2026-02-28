@@ -1,10 +1,20 @@
 use super::Parser;
 use crate::parser::error::{Result, ParseError};
 use crate::parser::lexer::Token;
-use crate::parser::ast::{Statement, CreateTableStmt, DropTableStmt, DescribeStmt, ColumnDef, DataType};
+use crate::parser::ast::{Statement, CreateTableStmt, DropTableStmt, CreateViewStmt, DropViewStmt, DescribeStmt, ColumnDef, DataType};
+use super::select;
 
 pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Create)?;
+    
+    match parser.current_token() {
+        Token::Table => parse_create_table(parser),
+        Token::View => parse_create_view(parser),
+        _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    }
+}
+
+fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Table)?;
     
     let table = parser.expect_identifier()?;
@@ -21,8 +31,32 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     }))
 }
 
+fn parse_create_view(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::View)?;
+    
+    let name = parser.expect_identifier()?;
+    
+    parser.expect(Token::As)?;
+    
+    let query = select::parse_select_stmt(parser)?;
+    
+    Ok(Statement::CreateView(CreateViewStmt {
+        name,
+        query: Box::new(query),
+    }))
+}
+
 pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Drop)?;
+    
+    match parser.current_token() {
+        Token::Table => parse_drop_table(parser),
+        Token::View => parse_drop_view(parser),
+        _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    }
+}
+
+fn parse_drop_table(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Table)?;
     
     let if_exists = if parser.current_token() == &Token::If {
@@ -36,6 +70,22 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
     let table = parser.expect_identifier()?;
     
     Ok(Statement::DropTable(DropTableStmt { table, if_exists }))
+}
+
+fn parse_drop_view(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::View)?;
+    
+    let if_exists = if parser.current_token() == &Token::If {
+        parser.advance();
+        parser.expect(Token::Exists)?;
+        true
+    } else {
+        false
+    };
+    
+    let name = parser.expect_identifier()?;
+    
+    Ok(Statement::DropView(DropViewStmt { name, if_exists }))
 }
 
 pub fn parse_describe(parser: &mut Parser) -> Result<Statement> {
