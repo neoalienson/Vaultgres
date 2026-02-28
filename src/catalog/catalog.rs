@@ -244,6 +244,30 @@ impl Catalog {
         match expr {
             Expr::BinaryOp { left, op, right } => {
                 match op {
+                    BinaryOperator::In => {
+                        let left_val = self.evaluate_expr(left, tuple, schema)?;
+                        if let Expr::List(values) = &**right {
+                            for val_expr in values {
+                                let val = self.evaluate_expr(val_expr, tuple, schema)?;
+                                if left_val == val {
+                                    return Ok(true);
+                                }
+                            }
+                            return Ok(false);
+                        }
+                        Err("IN requires list of values".to_string())
+                    },
+                    BinaryOperator::Between => {
+                        let left_val = self.evaluate_expr(left, tuple, schema)?;
+                        if let Expr::List(values) = &**right {
+                            if values.len() == 2 {
+                                let lower = self.evaluate_expr(&values[0], tuple, schema)?;
+                                let upper = self.evaluate_expr(&values[1], tuple, schema)?;
+                                return Ok(left_val >= lower && left_val <= upper);
+                            }
+                        }
+                        Err("BETWEEN requires two values".to_string())
+                    },
                     BinaryOperator::And => {
                         let left_result = self.evaluate_predicate(left, tuple, schema)?;
                         let right_result = self.evaluate_predicate(right, tuple, schema)?;
@@ -287,6 +311,9 @@ impl Catalog {
                                 }
                                 _ => Err("LIKE requires text values".to_string()),
                             },
+                            BinaryOperator::In | BinaryOperator::Between => {
+                                Err("IN/BETWEEN handled separately".to_string())
+                            },
                             _ => unreachable!(),
                         }
                     }
@@ -305,6 +332,7 @@ impl Catalog {
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::List(_) => Err("List not evaluable as value".to_string()),
             _ => Err("Unsupported expression".to_string()),
         }
     }

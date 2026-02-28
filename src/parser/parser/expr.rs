@@ -42,6 +42,34 @@ fn parse_and(parser: &mut Parser) -> Result<Expr> {
 fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
     let left = parse_primary(parser)?;
     
+    if parser.current_token() == &Token::In {
+        parser.advance();
+        parser.expect(Token::LeftParen)?;
+        let mut values = vec![parse_primary(parser)?];
+        while parser.current_token() == &Token::Comma {
+            parser.advance();
+            values.push(parse_primary(parser)?);
+        }
+        parser.expect(Token::RightParen)?;
+        return Ok(Expr::BinaryOp {
+            left: Box::new(left),
+            op: BinaryOperator::In,
+            right: Box::new(Expr::List(values)),
+        });
+    }
+    
+    if parser.current_token() == &Token::Between {
+        parser.advance();
+        let lower = parse_primary(parser)?;
+        parser.expect(Token::And)?;
+        let upper = parse_primary(parser)?;
+        return Ok(Expr::BinaryOp {
+            left: Box::new(left.clone()),
+            op: BinaryOperator::Between,
+            right: Box::new(Expr::List(vec![lower, upper])),
+        });
+    }
+    
     let op = match parser.current_token() {
         Token::Equals => BinaryOperator::Equals,
         Token::NotEquals => BinaryOperator::NotEquals,
@@ -50,8 +78,6 @@ fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
         Token::GreaterThan => BinaryOperator::GreaterThan,
         Token::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
         Token::Like => BinaryOperator::Like,
-        Token::In => BinaryOperator::In,
-        Token::Between => BinaryOperator::Between,
         _ => return Ok(left),
     };
     

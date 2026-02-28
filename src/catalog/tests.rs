@@ -718,3 +718,49 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, BinaryOperator, OrderByExpr}
         let rows = catalog.select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None).unwrap();
         assert_eq!(rows.len(), 2);
     }
+
+    #[test]
+    fn test_in_operator() {
+        let catalog = Catalog::new();
+        let columns = vec![
+            ColumnDef { name: "id".to_string(), data_type: DataType::Int },
+        ];
+        
+        catalog.create_table("data".to_string(), columns).unwrap();
+        catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(2)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(3)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(4)]).unwrap();
+        
+        let where_clause = Some(Expr::BinaryOp {
+            left: Box::new(Expr::Column("id".to_string())),
+            op: BinaryOperator::In,
+            right: Box::new(Expr::List(vec![Expr::Number(1), Expr::Number(3)])),
+        });
+        
+        let rows = catalog.select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None).unwrap();
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn test_between_operator() {
+        let catalog = Catalog::new();
+        let columns = vec![
+            ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ];
+        
+        catalog.create_table("data".to_string(), columns).unwrap();
+        catalog.insert("data", vec![Expr::Number(5)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(15)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(25)]).unwrap();
+        catalog.insert("data", vec![Expr::Number(35)]).unwrap();
+        
+        let where_clause = Some(Expr::BinaryOp {
+            left: Box::new(Expr::Column("value".to_string())),
+            op: BinaryOperator::Between,
+            right: Box::new(Expr::List(vec![Expr::Number(10), Expr::Number(30)])),
+        });
+        
+        let rows = catalog.select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None).unwrap();
+        assert_eq!(rows.len(), 2);
+    }

@@ -104,6 +104,7 @@ pub enum Expr {
         func: AggregateFunc,
         arg: Box<Expr>,
     },
+    List(Vec<Expr>),
 }
 
 /// Aggregate functions
