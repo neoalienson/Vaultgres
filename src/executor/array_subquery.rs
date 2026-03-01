@@ -1,5 +1,5 @@
 use crate::catalog::Value;
-use crate::parser::ast::{BinaryOperator, Expr};
+use crate::parser::ast::BinaryOperator;
 
 pub struct ArraySubqueryExecutor;
 

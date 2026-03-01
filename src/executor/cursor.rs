@@ -135,7 +135,6 @@ impl Default for CursorManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::Value;
     use crate::executor::MockTupleExecutor;
 
     fn make_tuple(val: i64) -> Tuple {

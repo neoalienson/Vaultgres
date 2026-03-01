@@ -1,6 +1,5 @@
 use super::{ExecutorError, Tuple};
 use crate::catalog::{Function, FunctionLanguage, Value};
-use std::collections::HashMap;
 
 pub struct TableValuedFunctionExecutor {
     function: Function,
