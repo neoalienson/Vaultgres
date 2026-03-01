@@ -1,6 +1,6 @@
+use crate::executor::parallel::hash_agg::AggregateState;
 use crate::executor::parallel::morsel::MorselGenerator;
 use crate::executor::parallel::partition::PartitionStrategy;
-use crate::executor::parallel::hash_agg::AggregateState;
 
 #[cfg(test)]
 mod tests {
@@ -36,7 +36,7 @@ mod tests {
     fn test_partition_distribution() {
         let strategy = PartitionStrategy::new(8);
         let mut counts = vec![0; 8];
-        
+
         for i in 0..1000 {
             let key = format!("key_{}", i);
             let partition = strategy.partition_key(key.as_bytes());
@@ -105,7 +105,7 @@ mod tests {
     fn test_partition_max_partitions() {
         let strategy = PartitionStrategy::new(1024);
         assert_eq!(strategy.num_partitions(), 1024);
-        
+
         let partition = strategy.partition_key(b"test");
         assert!(partition < 1024);
     }
@@ -113,11 +113,11 @@ mod tests {
     #[test]
     fn test_morsel_reset() {
         let gen = MorselGenerator::new(100, 10);
-        
+
         for _ in 0..5 {
             gen.next_morsel();
         }
-        
+
         gen.reset();
         let first = gen.next_morsel().unwrap();
         assert_eq!(first.start, 0);
@@ -129,7 +129,7 @@ mod tests {
         let mut state = AggregateState::new();
         state.update(&[0]);
         state.update(&[255]);
-        
+
         assert_eq!(state.count, 2);
         assert_eq!(state.min, Some(vec![0]));
         assert_eq!(state.max, Some(vec![255]));

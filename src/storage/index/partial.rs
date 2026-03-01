@@ -10,10 +10,7 @@ impl PartialIndex {
     where
         F: Fn(&[u8]) -> bool + Send + Sync + 'static,
     {
-        Self {
-            inner,
-            predicate: Box::new(predicate),
-        }
+        Self { inner, predicate: Box::new(predicate) }
     }
 
     fn should_index(&self, key: &[u8]) -> bool {
@@ -61,16 +58,16 @@ mod tests {
     fn test_partial_index_filters() {
         let hash_index = Box::new(HashIndex::new(16));
         let mut index = PartialIndex::new(hash_index, |key| key[0] > b'a');
-        
+
         let tid1 = (PageId(1), 0);
         let tid2 = (PageId(2), 0);
-        
+
         index.insert(b"a", tid1).unwrap();
         index.insert(b"z", tid2).unwrap();
-        
+
         // 'a' should not be indexed
         assert!(index.search(b"a").is_err());
-        
+
         // 'z' should be indexed
         assert_eq!(index.search(b"z").unwrap(), vec![tid2]);
     }
@@ -79,12 +76,12 @@ mod tests {
     fn test_partial_index_delete() {
         let hash_index = Box::new(HashIndex::new(16));
         let mut index = PartialIndex::new(hash_index, |key| key[0] > b'm');
-        
+
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"z", tid).unwrap();
         assert!(index.delete(b"z", tid).unwrap());
-        
+
         // Deleting non-indexed key returns false
         assert!(!index.delete(b"a", tid).unwrap());
     }

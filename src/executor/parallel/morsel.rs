@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::executor::executor::SimpleTuple;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone)]
 pub struct Morsel {
@@ -23,11 +23,7 @@ pub struct MorselGenerator {
 
 impl MorselGenerator {
     pub fn new(total_rows: usize, morsel_size: usize) -> Self {
-        Self {
-            morsel_size,
-            current_offset: AtomicUsize::new(0),
-            total_rows,
-        }
+        Self { morsel_size, current_offset: AtomicUsize::new(0), total_rows }
     }
 
     pub fn next_morsel(&self) -> Option<MorselRange> {

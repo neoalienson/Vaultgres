@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use crossbeam::channel::bounded;
 use crate::executor::executor::{ExecutorError, SimpleTuple};
 use crate::executor::parallel::morsel::{Morsel, MorselGenerator};
 use crate::executor::parallel::operator::ParallelOperator;
 use crate::executor::parallel::worker_pool::WorkerPool;
+use crossbeam::channel::bounded;
+use std::sync::Arc;
 
 pub struct ParallelCoordinator {
     worker_pool: Arc<WorkerPool>,
@@ -11,9 +11,7 @@ pub struct ParallelCoordinator {
 
 impl ParallelCoordinator {
     pub fn new(num_workers: usize) -> Self {
-        Self {
-            worker_pool: Arc::new(WorkerPool::new(num_workers)),
-        }
+        Self { worker_pool: Arc::new(WorkerPool::new(num_workers)) }
     }
 
     pub fn execute_parallel(
@@ -59,9 +57,7 @@ mod tests {
     impl ParallelOperator for TestOperator {
         fn process_morsel(&self, mut morsel: Morsel) -> Result<Morsel, ExecutorError> {
             for i in morsel.start_offset..morsel.end_offset {
-                morsel.tuples.push(SimpleTuple {
-                    data: vec![i as u8],
-                });
+                morsel.tuples.push(SimpleTuple { data: vec![i as u8] });
             }
             Ok(morsel)
         }

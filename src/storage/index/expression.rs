@@ -10,10 +10,7 @@ impl ExpressionIndex {
     where
         F: Fn(&[u8]) -> Vec<u8> + Send + Sync + 'static,
     {
-        Self {
-            inner,
-            expression: Box::new(expression),
-        }
+        Self { inner, expression: Box::new(expression) }
     }
 
     fn compute_key(&self, key: &[u8]) -> Vec<u8> {
@@ -57,18 +54,16 @@ mod tests {
     #[test]
     fn test_expression_index_lowercase() {
         let hash_index = Box::new(HashIndex::new(16));
-        let mut index = ExpressionIndex::new(hash_index, |key| {
-            key.to_ascii_lowercase()
-        });
-        
+        let mut index = ExpressionIndex::new(hash_index, |key| key.to_ascii_lowercase());
+
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"HELLO", tid).unwrap();
-        
+
         // Search with lowercase should find it
         let result = index.search(b"hello").unwrap();
         assert_eq!(result, vec![tid]);
-        
+
         // Search with uppercase should also find it
         let result = index.search(b"HELLO").unwrap();
         assert_eq!(result, vec![tid]);
@@ -81,11 +76,11 @@ mod tests {
             // Simple transformation: add 1 to each byte
             key.iter().map(|&b| b.wrapping_add(1)).collect()
         });
-        
+
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"abc", tid).unwrap();
-        
+
         // Search with original key
         let result = index.search(b"abc").unwrap();
         assert_eq!(result, vec![tid]);
@@ -95,9 +90,9 @@ mod tests {
     fn test_expression_index_delete() {
         let hash_index = Box::new(HashIndex::new(16));
         let mut index = ExpressionIndex::new(hash_index, |key| key.to_ascii_lowercase());
-        
+
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"TEST", tid).unwrap();
         assert!(index.delete(b"test", tid).unwrap());
         assert!(index.search(b"test").is_err());

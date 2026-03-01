@@ -1,11 +1,11 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::time::Duration;
-use crossbeam::channel::{bounded, Sender, Receiver};
 use crate::executor::executor::ExecutorError;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
+use crossbeam::channel::{bounded, Receiver, Sender};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 type TaskResult = Result<Morsel, ExecutorError>;
 
@@ -40,22 +40,18 @@ impl WorkerPool {
                 let handle = thread::spawn(move || {
                     Self::worker_loop(id, receiver, shutdown_flag);
                 });
-                Worker {
-                    id,
-                    handle: Some(handle),
-                }
+                Worker { id, handle: Some(handle) }
             })
             .collect();
 
-        Self {
-            workers,
-            task_sender,
-            num_workers,
-            shutdown,
-        }
+        Self { workers, task_sender, num_workers, shutdown }
     }
 
-    fn worker_loop(_worker_id: usize, task_receiver: Arc<Receiver<Task>>, shutdown: Arc<AtomicBool>) {
+    fn worker_loop(
+        _worker_id: usize,
+        task_receiver: Arc<Receiver<Task>>,
+        shutdown: Arc<AtomicBool>,
+    ) {
         while !shutdown.load(Ordering::Relaxed) {
             match task_receiver.recv_timeout(Duration::from_millis(100)) {
                 Ok(task) => {
@@ -78,11 +74,7 @@ impl WorkerPool {
         operator: Arc<dyn ParallelOperator>,
         result_sender: Sender<TaskResult>,
     ) -> Result<(), ExecutorError> {
-        let task = Task {
-            morsel,
-            operator,
-            result_sender,
-        };
+        let task = Task { morsel, operator, result_sender };
         self.task_sender
             .send(task)
             .map_err(|_| ExecutorError::Storage("Failed to submit task".to_string()))
@@ -130,12 +122,7 @@ mod tests {
         let operator = Arc::new(TestOperator);
         let (result_sender, result_receiver) = bounded(1);
 
-        let morsel = Morsel {
-            tuples: vec![],
-            start_offset: 0,
-            end_offset: 10,
-            partition_id: 0,
-        };
+        let morsel = Morsel { tuples: vec![], start_offset: 0, end_offset: 10, partition_id: 0 };
 
         pool.submit_task(morsel, operator, result_sender).unwrap();
         let result = result_receiver.recv().unwrap().unwrap();

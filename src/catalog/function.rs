@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn test_overload_resolution() {
         let mut registry = FunctionRegistry::new();
-        
+
         let func1 = Function {
             name: "add".to_string(),
             parameters: vec![
@@ -135,7 +135,7 @@ mod tests {
             body: "SELECT $1 + $2".to_string(),
             is_variadic: false,
         };
-        
+
         let func2 = Function {
             name: "add".to_string(),
             parameters: vec![
@@ -147,7 +147,7 @@ mod tests {
             body: "SELECT $1 || $2".to_string(),
             is_variadic: false,
         };
-        
+
         registry.register(func1).unwrap();
         registry.register(func2).unwrap();
 

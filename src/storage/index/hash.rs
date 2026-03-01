@@ -1,6 +1,6 @@
+use super::index_trait::{Index, IndexError, IndexType, TupleId};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use super::index_trait::{Index, IndexError, IndexType, TupleId};
 
 pub struct HashIndex {
     buckets: Vec<Bucket>,
@@ -46,10 +46,7 @@ impl Index for HashIndex {
             }
         }
 
-        bucket.entries.push(HashEntry {
-            key: key.to_vec(),
-            tids: vec![tid],
-        });
+        bucket.entries.push(HashEntry { key: key.to_vec(), tids: vec![tid] });
         Ok(())
     }
 
@@ -103,7 +100,7 @@ mod tests {
     fn test_hash_insert_and_search() {
         let mut index = HashIndex::new(16);
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"key1", tid).unwrap();
         let result = index.search(b"key1").unwrap();
         assert_eq!(result, vec![tid]);
@@ -119,7 +116,7 @@ mod tests {
     fn test_hash_delete() {
         let mut index = HashIndex::new(16);
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"key1", tid).unwrap();
         assert!(index.delete(b"key1", tid).unwrap());
         assert!(index.search(b"key1").is_err());
@@ -130,10 +127,10 @@ mod tests {
         let mut index = HashIndex::new(4);
         let tid1 = (PageId(1), 0);
         let tid2 = (PageId(2), 0);
-        
+
         index.insert(b"key1", tid1).unwrap();
         index.insert(b"key2", tid2).unwrap();
-        
+
         assert_eq!(index.search(b"key1").unwrap(), vec![tid1]);
         assert_eq!(index.search(b"key2").unwrap(), vec![tid2]);
     }

@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use crate::executor::executor::{ExecutorError, SimpleTuple};
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct AggregateState {
@@ -14,17 +14,12 @@ pub struct AggregateState {
 
 impl AggregateState {
     pub fn new() -> Self {
-        Self {
-            count: 0,
-            sum: 0.0,
-            min: None,
-            max: None,
-        }
+        Self { count: 0, sum: 0.0, min: None, max: None }
     }
 
     pub fn update(&mut self, value: &[u8]) {
         self.count += 1;
-        
+
         if let Some(&first_byte) = value.first() {
             self.sum += first_byte as f64;
         }
@@ -71,9 +66,7 @@ pub struct ParallelHashAgg {
 
 impl ParallelHashAgg {
     pub fn new(child: Arc<dyn ParallelOperator>, num_workers: usize) -> Self {
-        let hash_tables = (0..num_workers)
-            .map(|_| Mutex::new(HashMap::new()))
-            .collect();
+        let hash_tables = (0..num_workers).map(|_| Mutex::new(HashMap::new())).collect();
 
         Self { child, hash_tables }
     }
@@ -97,7 +90,8 @@ impl ParallelHashAgg {
         for hash_table in &self.hash_tables {
             let local_map = hash_table.lock().unwrap();
             for (key, state) in local_map.iter() {
-                let global_state = global_map.entry(key.clone()).or_insert_with(AggregateState::new);
+                let global_state =
+                    global_map.entry(key.clone()).or_insert_with(AggregateState::new);
                 global_state.merge(state);
             }
         }
@@ -163,12 +157,7 @@ mod tests {
         let child = Arc::new(MockOperator { tuples });
         let agg = ParallelHashAgg::new(child, 2);
 
-        let morsel = Morsel {
-            tuples: vec![],
-            start_offset: 0,
-            end_offset: 3,
-            partition_id: 0,
-        };
+        let morsel = Morsel { tuples: vec![], start_offset: 0, end_offset: 3, partition_id: 0 };
 
         agg.local_aggregate(morsel, 0).unwrap();
         let result = agg.global_combine().unwrap();

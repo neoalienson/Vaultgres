@@ -1,5 +1,7 @@
 use rustgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
-use rustgres::executor::{BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor};
+use rustgres::executor::{
+    BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor,
+};
 use rustgres::parser::ast::{BinaryOperator, Expr};
 use rustgres::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
 
@@ -15,7 +17,7 @@ fn test_udf_registration_and_execution() {
         return_type: "INT".to_string(),
         language: FunctionLanguage::Sql,
         body: "SELECT $1 + $2".to_string(),
-            is_variadic: false,
+        is_variadic: false,
     };
 
     registry.register(func).unwrap();
@@ -128,7 +130,8 @@ fn test_builtin_functions_integration() {
     assert!(registry.resolve("abs", &["INT".to_string()]).is_some());
     assert!(registry.resolve("power", &["INT".to_string(), "INT".to_string()]).is_some());
 
-    let upper_result = BuiltinFunctions::execute("upper", vec![Value::Text("hello".to_string())]).unwrap();
+    let upper_result =
+        BuiltinFunctions::execute("upper", vec![Value::Text("hello".to_string())]).unwrap();
     assert_eq!(upper_result, Value::Text("HELLO".to_string()));
 
     let abs_result = BuiltinFunctions::execute("abs", vec![Value::Int(-42)]).unwrap();
@@ -199,20 +202,28 @@ fn test_function_overload_different_types() {
 
     let func_int = Function {
         name: "process".to_string(),
-        parameters: vec![Parameter { name: "x".to_string(), data_type: "INT".to_string(), default: None }],
+        parameters: vec![Parameter {
+            name: "x".to_string(),
+            data_type: "INT".to_string(),
+            default: None,
+        }],
         return_type: "INT".to_string(),
         language: FunctionLanguage::Sql,
         body: "SELECT $1 * 2".to_string(),
-            is_variadic: false,
+        is_variadic: false,
     };
 
     let func_text = Function {
         name: "process".to_string(),
-        parameters: vec![Parameter { name: "x".to_string(), data_type: "TEXT".to_string(), default: None }],
+        parameters: vec![Parameter {
+            name: "x".to_string(),
+            data_type: "TEXT".to_string(),
+            default: None,
+        }],
         return_type: "TEXT".to_string(),
         language: FunctionLanguage::Sql,
         body: "SELECT UPPER($1)".to_string(),
-            is_variadic: false,
+        is_variadic: false,
     };
 
     registry.register(func_int).unwrap();
@@ -232,9 +243,7 @@ fn test_plpgsql_parameters() {
     let mut interp = PlPgSqlInterpreter::new();
     let func = PlPgSqlFunction {
         declarations: vec![],
-        body: vec![PlPgSqlStmt::Return {
-            value: Some(Expr::Column("$1".to_string())),
-        }],
+        body: vec![PlPgSqlStmt::Return { value: Some(Expr::Column("$1".to_string())) }],
     };
 
     let result = interp.execute(&func, vec![Value::Int(42)]).unwrap();
@@ -249,7 +258,9 @@ fn test_exception_handling_integration() {
         body: vec![PlPgSqlStmt::ExceptionBlock {
             try_stmts: vec![PlPgSqlStmt::Raise { message: "test error".to_string() }],
             exception_var: "err".to_string(),
-            catch_stmts: vec![PlPgSqlStmt::Return { value: Some(Expr::String("caught".to_string())) }],
+            catch_stmts: vec![PlPgSqlStmt::Return {
+                value: Some(Expr::String("caught".to_string())),
+            }],
         }],
     };
 
@@ -260,15 +271,14 @@ fn test_exception_handling_integration() {
 #[test]
 fn test_for_query_integration() {
     use std::collections::HashMap;
-    let mut interp = PlPgSqlInterpreter::new()
-        .with_query_executor(|_| {
-            let mut row1 = HashMap::new();
-            row1.insert("val".to_string(), Value::Int(10));
-            let mut row2 = HashMap::new();
-            row2.insert("val".to_string(), Value::Int(20));
-            Ok(vec![row1, row2])
-        });
-    
+    let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| {
+        let mut row1 = HashMap::new();
+        row1.insert("val".to_string(), Value::Int(10));
+        let mut row2 = HashMap::new();
+        row2.insert("val".to_string(), Value::Int(20));
+        Ok(vec![row1, row2])
+    });
+
     let func = PlPgSqlFunction {
         declarations: vec![PlPgSqlStmt::Declare {
             name: "total".to_string(),
@@ -298,11 +308,11 @@ fn test_for_query_integration() {
 
 #[test]
 fn test_builtin_split_part() {
-    let result = BuiltinFunctions::execute("split_part", vec![
-        Value::Text("a,b,c".to_string()),
-        Value::Text(",".to_string()),
-        Value::Int(2),
-    ]).unwrap();
+    let result = BuiltinFunctions::execute(
+        "split_part",
+        vec![Value::Text("a,b,c".to_string()), Value::Text(",".to_string()), Value::Int(2)],
+    )
+    .unwrap();
     assert_eq!(result, Value::Text("b".to_string()));
 }
 
@@ -319,9 +329,8 @@ fn test_builtin_random() {
 #[test]
 fn test_perform_statement() {
     use std::collections::HashMap;
-    let mut interp = PlPgSqlInterpreter::new()
-        .with_query_executor(|_| Ok(vec![]));
-    
+    let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| Ok(vec![]));
+
     let func = PlPgSqlFunction {
         declarations: vec![],
         body: vec![
@@ -390,10 +399,10 @@ fn test_like_operator_integration() {
 #[test]
 fn test_array_functions_integration() {
     let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
-    
+
     let len = BuiltinFunctions::execute("array_length", vec![arr.clone()]).unwrap();
     assert_eq!(len, Value::Int(3));
-    
+
     let appended = BuiltinFunctions::execute("array_append", vec![arr, Value::Int(40)]).unwrap();
     if let Value::Array(a) = appended {
         assert_eq!(a.len(), 4);
@@ -424,7 +433,7 @@ fn test_ilike_operator_integration() {
 #[test]
 fn test_foreach_integration() {
     let mut interp = PlPgSqlInterpreter::new();
-    
+
     let func = PlPgSqlFunction {
         declarations: vec![
             PlPgSqlStmt::Declare {
@@ -476,7 +485,9 @@ fn test_unnest_integration() {
 #[cfg(test)]
 mod advanced_sql_new_tests {
     use rustgres::catalog::{FunctionRegistry, Value};
-    use rustgres::executor::{ArraySubqueryExecutor, BuiltinFunctions, DerivedTableExecutor, MultipleCTEExecutor};
+    use rustgres::executor::{
+        ArraySubqueryExecutor, BuiltinFunctions, DerivedTableExecutor, MultipleCTEExecutor,
+    };
     use rustgres::parser::ast::BinaryOperator;
     use std::collections::HashMap;
 
@@ -484,14 +495,15 @@ mod advanced_sql_new_tests {
     fn test_extract_function() {
         let mut registry = FunctionRegistry::new();
         BuiltinFunctions::register_all(&mut registry);
-        
+
         let func = registry.resolve("extract", &["TEXT".to_string(), "INT".to_string()]).unwrap();
         assert_eq!(func.name, "extract");
-        
-        let result = BuiltinFunctions::execute("extract", vec![
-            Value::Text("hour".to_string()),
-            Value::Int(3661),
-        ]).unwrap();
+
+        let result = BuiltinFunctions::execute(
+            "extract",
+            vec![Value::Text("hour".to_string()), Value::Int(3661)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Int(1));
     }
 
@@ -499,14 +511,16 @@ mod advanced_sql_new_tests {
     fn test_date_trunc_function() {
         let mut registry = FunctionRegistry::new();
         BuiltinFunctions::register_all(&mut registry);
-        
-        let func = registry.resolve("date_trunc", &["TEXT".to_string(), "INT".to_string()]).unwrap();
+
+        let func =
+            registry.resolve("date_trunc", &["TEXT".to_string(), "INT".to_string()]).unwrap();
         assert_eq!(func.name, "date_trunc");
-        
-        let result = BuiltinFunctions::execute("date_trunc", vec![
-            Value::Text("day".to_string()),
-            Value::Int(90061),
-        ]).unwrap();
+
+        let result = BuiltinFunctions::execute(
+            "date_trunc",
+            vec![Value::Text("day".to_string()), Value::Int(90061)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Int(86400));
     }
 
@@ -514,10 +528,10 @@ mod advanced_sql_new_tests {
     fn test_any_operator() {
         let value = Value::Int(5);
         let subquery_results = vec![Value::Int(1), Value::Int(5), Value::Int(10)];
-        
+
         let result = ArraySubqueryExecutor::execute_any(&value, &subquery_results).unwrap();
         assert!(result);
-        
+
         let value2 = Value::Int(7);
         let result2 = ArraySubqueryExecutor::execute_any(&value2, &subquery_results).unwrap();
         assert!(!result2);
@@ -527,12 +541,22 @@ mod advanced_sql_new_tests {
     fn test_all_operator() {
         let value = Value::Int(10);
         let subquery_results = vec![Value::Int(1), Value::Int(5), Value::Int(9)];
-        
-        let result = ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &subquery_results).unwrap();
+
+        let result = ArraySubqueryExecutor::execute_all(
+            &value,
+            &BinaryOperator::GreaterThan,
+            &subquery_results,
+        )
+        .unwrap();
         assert!(result);
-        
+
         let value2 = Value::Int(5);
-        let result2 = ArraySubqueryExecutor::execute_all(&value2, &BinaryOperator::GreaterThan, &subquery_results).unwrap();
+        let result2 = ArraySubqueryExecutor::execute_all(
+            &value2,
+            &BinaryOperator::GreaterThan,
+            &subquery_results,
+        )
+        .unwrap();
         assert!(!result2);
     }
 
@@ -540,7 +564,7 @@ mod advanced_sql_new_tests {
     fn test_some_operator() {
         let value = Value::Int(5);
         let subquery_results = vec![Value::Int(1), Value::Int(5), Value::Int(10)];
-        
+
         let result = ArraySubqueryExecutor::execute_some(&value, &subquery_results).unwrap();
         assert!(result);
     }
@@ -550,14 +574,14 @@ mod advanced_sql_new_tests {
         let mut row1 = HashMap::new();
         row1.insert("id".to_string(), Value::Int(1));
         row1.insert("name".to_string(), Value::Text("Alice".to_string()));
-        
+
         let mut row2 = HashMap::new();
         row2.insert("id".to_string(), Value::Int(2));
         row2.insert("name".to_string(), Value::Text("Bob".to_string()));
-        
+
         let executor = DerivedTableExecutor::new(vec![row1, row2], "subq".to_string());
         let results = executor.execute();
-        
+
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].get("id"), Some(&Value::Int(1)));
         assert_eq!(results[1].get("name"), Some(&Value::Text("Bob".to_string())));
@@ -567,14 +591,26 @@ mod advanced_sql_new_tests {
     #[test]
     fn test_extract_multiple_fields() {
         let timestamp = Value::Int(3661);
-        
-        let hour = BuiltinFunctions::execute("extract", vec![Value::Text("hour".to_string()), timestamp.clone()]).unwrap();
+
+        let hour = BuiltinFunctions::execute(
+            "extract",
+            vec![Value::Text("hour".to_string()), timestamp.clone()],
+        )
+        .unwrap();
         assert_eq!(hour, Value::Int(1));
-        
-        let minute = BuiltinFunctions::execute("extract", vec![Value::Text("minute".to_string()), timestamp.clone()]).unwrap();
+
+        let minute = BuiltinFunctions::execute(
+            "extract",
+            vec![Value::Text("minute".to_string()), timestamp.clone()],
+        )
+        .unwrap();
         assert_eq!(minute, Value::Int(1));
-        
-        let second = BuiltinFunctions::execute("extract", vec![Value::Text("second".to_string()), timestamp]).unwrap();
+
+        let second = BuiltinFunctions::execute(
+            "extract",
+            vec![Value::Text("second".to_string()), timestamp],
+        )
+        .unwrap();
         assert_eq!(second, Value::Int(1));
     }
 
@@ -582,8 +618,13 @@ mod advanced_sql_new_tests {
     fn test_all_with_empty_results() {
         let value = Value::Int(5);
         let empty_results = vec![];
-        
-        let result = ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &empty_results).unwrap();
+
+        let result = ArraySubqueryExecutor::execute_all(
+            &value,
+            &BinaryOperator::GreaterThan,
+            &empty_results,
+        )
+        .unwrap();
         assert!(result);
     }
 
@@ -595,7 +636,7 @@ mod advanced_sql_new_tests {
             Value::Text("hello".to_string()),
             Value::Text("rust".to_string()),
         ];
-        
+
         let result = ArraySubqueryExecutor::execute_any(&value, &subquery_results).unwrap();
         assert!(result);
     }
@@ -604,53 +645,63 @@ mod advanced_sql_new_tests {
     fn test_json_functions() {
         let mut registry = FunctionRegistry::new();
         BuiltinFunctions::register_all(&mut registry);
-        
+
         assert!(registry.resolve("json_object", &[]).is_some());
         assert!(registry.resolve("json_array", &[]).is_some());
-        assert!(registry.resolve("json_extract", &["JSON".to_string(), "TEXT".to_string()]).is_some());
-        
+        assert!(registry
+            .resolve("json_extract", &["JSON".to_string(), "TEXT".to_string()])
+            .is_some());
+
         let obj = BuiltinFunctions::execute("json_object", vec![]).unwrap();
         assert_eq!(obj, Value::Json("{}".to_string()));
-        
+
         let arr = BuiltinFunctions::execute("json_array", vec![]).unwrap();
         assert_eq!(arr, Value::Json("[]".to_string()));
-        
+
         let json = Value::Json("{\"name\":\"Bob\",\"age\":25}".to_string());
-        let name = BuiltinFunctions::execute("json_extract", vec![json.clone(), Value::Text("$.name".to_string())]).unwrap();
+        let name = BuiltinFunctions::execute(
+            "json_extract",
+            vec![json.clone(), Value::Text("$.name".to_string())],
+        )
+        .unwrap();
         assert_eq!(name, Value::Text("Bob".to_string()));
-        
-        let age = BuiltinFunctions::execute("json_extract", vec![json, Value::Text("$.age".to_string())]).unwrap();
+
+        let age =
+            BuiltinFunctions::execute("json_extract", vec![json, Value::Text("$.age".to_string())])
+                .unwrap();
         assert_eq!(age, Value::Text("25".to_string()));
     }
 
     #[test]
     fn test_multiple_ctes() {
         let mut executor = MultipleCTEExecutor::new();
-        
+
         let mut row1 = HashMap::new();
         row1.insert("id".to_string(), Value::Int(1));
         row1.insert("value".to_string(), Value::Int(10));
         executor.add_cte("cte1".to_string(), vec![row1]);
-        
+
         let mut row2 = HashMap::new();
         row2.insert("id".to_string(), Value::Int(2));
         row2.insert("value".to_string(), Value::Int(20));
         executor.add_cte("cte2".to_string(), vec![row2]);
-        
+
         assert!(executor.get_cte("cte1").is_some());
         assert!(executor.get_cte("cte2").is_some());
-        
-        let result = executor.execute_with_ctes(|ctes| {
-            let mut combined = Vec::new();
-            if let Some(c1) = ctes.get("cte1") {
-                combined.extend(c1.clone());
-            }
-            if let Some(c2) = ctes.get("cte2") {
-                combined.extend(c2.clone());
-            }
-            Ok(combined)
-        }).unwrap();
-        
+
+        let result = executor
+            .execute_with_ctes(|ctes| {
+                let mut combined = Vec::new();
+                if let Some(c1) = ctes.get("cte1") {
+                    combined.extend(c1.clone());
+                }
+                if let Some(c2) = ctes.get("cte2") {
+                    combined.extend(c2.clone());
+                }
+                Ok(combined)
+            })
+            .unwrap();
+
         assert_eq!(result.len(), 2);
     }
 }
@@ -664,21 +715,29 @@ mod advanced_sql_new_tests2 {
     #[test]
     fn test_function_with_defaults() {
         let mut registry = FunctionRegistry::new();
-        
+
         let func = rustgres::catalog::Function {
             name: "greet".to_string(),
             parameters: vec![
-                rustgres::catalog::Parameter { name: "name".to_string(), data_type: "TEXT".to_string(), default: None },
-                rustgres::catalog::Parameter { name: "greeting".to_string(), data_type: "TEXT".to_string(), default: Some("Hello".to_string()) },
+                rustgres::catalog::Parameter {
+                    name: "name".to_string(),
+                    data_type: "TEXT".to_string(),
+                    default: None,
+                },
+                rustgres::catalog::Parameter {
+                    name: "greeting".to_string(),
+                    data_type: "TEXT".to_string(),
+                    default: Some("Hello".to_string()),
+                },
             ],
             return_type: "TEXT".to_string(),
             language: rustgres::catalog::FunctionLanguage::Sql,
             body: "SELECT $2 || ' ' || $1".to_string(),
             is_variadic: false,
         };
-        
+
         registry.register(func).unwrap();
-        
+
         let resolved = registry.resolve_with_defaults("greet", &["TEXT".to_string()]);
         assert!(resolved.is_some());
         assert_eq!(resolved.unwrap().parameters.len(), 2);
@@ -687,33 +746,37 @@ mod advanced_sql_new_tests2 {
     #[test]
     fn test_variadic_function() {
         let mut registry = FunctionRegistry::new();
-        
+
         let func = rustgres::catalog::Function {
             name: "concat_all".to_string(),
-            parameters: vec![
-                rustgres::catalog::Parameter { name: "values".to_string(), data_type: "TEXT".to_string(), default: None },
-            ],
+            parameters: vec![rustgres::catalog::Parameter {
+                name: "values".to_string(),
+                data_type: "TEXT".to_string(),
+                default: None,
+            }],
             return_type: "TEXT".to_string(),
             language: rustgres::catalog::FunctionLanguage::Sql,
             body: "VARIADIC".to_string(),
             is_variadic: true,
         };
-        
+
         registry.register(func).unwrap();
-        
-        let resolved = registry.resolve_with_defaults("concat_all", &["TEXT".to_string(), "TEXT".to_string()]);
+
+        let resolved =
+            registry.resolve_with_defaults("concat_all", &["TEXT".to_string(), "TEXT".to_string()]);
         assert!(resolved.is_some());
     }
 
     #[test]
     fn test_function_cache() {
         let cache = rustgres::executor::FunctionCache::new();
-        
-        let key = rustgres::executor::FunctionCache::make_key("add", &[Value::Int(5), Value::Int(3)]);
+
+        let key =
+            rustgres::executor::FunctionCache::make_key("add", &[Value::Int(5), Value::Int(3)]);
         cache.set(key.clone(), Value::Int(8));
-        
+
         assert_eq!(cache.get(&key), Some(Value::Int(8)));
-        
+
         cache.clear();
         assert_eq!(cache.get(&key), None);
     }
@@ -722,26 +785,25 @@ mod advanced_sql_new_tests2 {
     fn test_lateral_subquery() {
         let mut outer1 = HashMap::new();
         outer1.insert("x".to_string(), Value::Int(1));
-        
+
         let mut outer2 = HashMap::new();
         outer2.insert("x".to_string(), Value::Int(2));
-        
+
         let subquery_fn = |outer: &HashMap<String, Value>| {
             let x = match outer.get("x") {
                 Some(Value::Int(n)) => *n,
                 _ => return Err("Invalid x".to_string()),
             };
-            
+
             let mut row = HashMap::new();
             row.insert("y".to_string(), Value::Int(x * 2));
             Ok(vec![row])
         };
-        
-        let results = rustgres::executor::LateralSubqueryExecutor::execute(
-            vec![outer1, outer2],
-            subquery_fn,
-        ).unwrap();
-        
+
+        let results =
+            rustgres::executor::LateralSubqueryExecutor::execute(vec![outer1, outer2], subquery_fn)
+                .unwrap();
+
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].get("y"), Some(&Value::Int(2)));
         assert_eq!(results[1].get("y"), Some(&Value::Int(4)));

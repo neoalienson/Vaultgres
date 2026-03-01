@@ -15,9 +15,11 @@ impl<'a> ExprEvaluator<'a> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
-            Expr::Column(name) => {
-                self.variables.get(name).cloned().ok_or_else(|| format!("Variable '{}' not found", name))
-            }
+            Expr::Column(name) => self
+                .variables
+                .get(name)
+                .cloned()
+                .ok_or_else(|| format!("Variable '{}' not found", name)),
             Expr::List(exprs) => {
                 let mut arr = Vec::new();
                 for expr in exprs {
@@ -77,7 +79,12 @@ impl<'a> ExprEvaluator<'a> {
         }
     }
 
-    fn eval_binary_op(&self, left: &Value, op: &BinaryOperator, right: &Value) -> Result<Value, String> {
+    fn eval_binary_op(
+        &self,
+        left: &Value,
+        op: &BinaryOperator,
+        right: &Value,
+    ) -> Result<Value, String> {
         match (left, right) {
             (Value::Int(l), Value::Int(r)) => match op {
                 BinaryOperator::Equals => Ok(Value::Bool(l == r)),

@@ -47,7 +47,7 @@ impl RecursiveCTEExecutor {
                         match v {
                             Value::Int(n) => key.extend_from_slice(&n.to_le_bytes()),
                             Value::Text(s) => key.extend_from_slice(s.as_bytes()),
-                            _ => {},
+                            _ => {}
                         }
                     }
                 }
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_simple_recursive() {
         let base = vec![vec![Value::Int(1)]];
-        
+
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
             let mut results = Vec::new();
             for row in working {
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn test_cycle_detection() {
         let base = vec![vec![Value::Int(1)]];
-        
+
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
             let mut results = Vec::new();
             for row in working {
@@ -107,10 +107,9 @@ mod tests {
     #[test]
     fn test_empty_base() {
         let base: Vec<Vec<Value>> = vec![];
-        
-        let recursive_fn = |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![vec![Value::Int(1)]])
-        };
+
+        let recursive_fn =
+            |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![vec![Value::Int(1)]]) };
 
         let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 0);
@@ -119,10 +118,8 @@ mod tests {
     #[test]
     fn test_no_recursion() {
         let base = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
-        
-        let recursive_fn = |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![])
-        };
+
+        let recursive_fn = |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![]) };
 
         let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 2);

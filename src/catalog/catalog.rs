@@ -285,9 +285,13 @@ impl Catalog {
 
     pub fn get_function(&self, name: &str, arg_types: &[String]) -> Option<Function> {
         let functions = self.functions.read().unwrap();
-        functions.get(name)?.iter()
-            .find(|f| f.parameters.len() == arg_types.len() &&
-                f.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t))
+        functions
+            .get(name)?
+            .iter()
+            .find(|f| {
+                f.parameters.len() == arg_types.len()
+                    && f.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)
+            })
             .cloned()
     }
 

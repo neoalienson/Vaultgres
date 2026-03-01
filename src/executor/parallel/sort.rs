@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use crate::executor::executor::{ExecutorError, SimpleTuple};
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
+use std::sync::Arc;
 
 pub struct ParallelSort {
     child: Arc<dyn ParallelOperator>,
@@ -17,13 +17,15 @@ impl ParallelSort {
         let result = self.child.process_morsel(morsel)?;
         let mut tuples = result.tuples;
 
-        tuples.sort_by(|a, b| {
-            if self.ascending {
-                a.data.cmp(&b.data)
-            } else {
-                b.data.cmp(&a.data)
-            }
-        });
+        tuples.sort_by(
+            |a, b| {
+                if self.ascending {
+                    a.data.cmp(&b.data)
+                } else {
+                    b.data.cmp(&a.data)
+                }
+            },
+        );
 
         Ok(tuples)
     }
@@ -93,12 +95,7 @@ mod tests {
         let child = Arc::new(MockOperator { tuples });
         let sort = ParallelSort::new(child, true);
 
-        let morsel = Morsel {
-            tuples: vec![],
-            start_offset: 0,
-            end_offset: 3,
-            partition_id: 0,
-        };
+        let morsel = Morsel { tuples: vec![], start_offset: 0, end_offset: 3, partition_id: 0 };
 
         let result = sort.local_sort(morsel).unwrap();
         assert_eq!(result[0].data, vec![1]);
@@ -108,14 +105,8 @@ mod tests {
 
     #[test]
     fn test_merge_sorted_runs() {
-        let run1 = vec![
-            SimpleTuple { data: vec![1] },
-            SimpleTuple { data: vec![3] },
-        ];
-        let run2 = vec![
-            SimpleTuple { data: vec![2] },
-            SimpleTuple { data: vec![4] },
-        ];
+        let run1 = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![3] }];
+        let run2 = vec![SimpleTuple { data: vec![2] }, SimpleTuple { data: vec![4] }];
 
         let child = Arc::new(MockOperator { tuples: vec![] });
         let sort = ParallelSort::new(child, true);

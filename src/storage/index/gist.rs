@@ -28,10 +28,7 @@ struct BoundingBox {
 
 impl BoundingBox {
     fn new(key: &[u8]) -> Self {
-        Self {
-            min: key.to_vec(),
-            max: key.to_vec(),
-        }
+        Self { min: key.to_vec(), max: key.to_vec() }
     }
 
     fn contains(&self, key: &[u8]) -> bool {
@@ -39,8 +36,7 @@ impl BoundingBox {
     }
 
     fn overlaps(&self, other: &BoundingBox) -> bool {
-        self.max.as_slice() >= other.min.as_slice() && 
-        self.min.as_slice() <= other.max.as_slice()
+        self.max.as_slice() >= other.min.as_slice() && self.min.as_slice() <= other.max.as_slice()
     }
 
     fn union(&self, other: &BoundingBox) -> BoundingBox {
@@ -53,10 +49,7 @@ impl BoundingBox {
 
 impl GiSTIndex {
     pub fn new() -> Self {
-        Self {
-            root: None,
-            max_entries: 50,
-        }
+        Self { root: None, max_entries: 50 }
     }
 
     fn insert_into_leaf(&mut self, leaf: &mut LeafNode, key: &[u8], tid: TupleId) {
@@ -91,10 +84,7 @@ impl GiSTIndex {
 impl Index for GiSTIndex {
     fn insert(&mut self, key: &[u8], tid: TupleId) -> Result<(), IndexError> {
         if self.root.is_none() {
-            self.root = Some(Box::new(GiSTNode::Leaf(LeafNode {
-                keys: vec![],
-                tids: vec![],
-            })));
+            self.root = Some(Box::new(GiSTNode::Leaf(LeafNode { keys: vec![], tids: vec![] })));
         }
 
         if let Some(ref mut root) = self.root {
@@ -127,10 +117,7 @@ impl Index for GiSTIndex {
     }
 
     fn range_search(&self, start: &[u8], end: &[u8]) -> Result<Vec<TupleId>, IndexError> {
-        let query_box = BoundingBox {
-            min: start.to_vec(),
-            max: end.to_vec(),
-        };
+        let query_box = BoundingBox { min: start.to_vec(), max: end.to_vec() };
 
         fn search_range(node: &GiSTNode, query: &BoundingBox) -> Vec<TupleId> {
             match node {
@@ -182,7 +169,7 @@ mod tests {
     fn test_gist_insert_and_search() {
         let mut index = GiSTIndex::new();
         let tid = (PageId(1), 0);
-        
+
         index.insert(b"key1", tid).unwrap();
         let result = index.search(b"key1").unwrap();
         assert_eq!(result, vec![tid]);
@@ -191,11 +178,11 @@ mod tests {
     #[test]
     fn test_gist_range_search() {
         let mut index = GiSTIndex::new();
-        
+
         index.insert(b"a", (PageId(1), 0)).unwrap();
         index.insert(b"m", (PageId(2), 0)).unwrap();
         index.insert(b"z", (PageId(3), 0)).unwrap();
-        
+
         let result = index.range_search(b"a", b"n").unwrap();
         assert!(result.len() >= 2);
     }
@@ -210,10 +197,10 @@ mod tests {
     fn test_bounding_box() {
         let bbox1 = BoundingBox::new(b"a");
         let bbox2 = BoundingBox::new(b"z");
-        
+
         assert!(bbox1.contains(b"a"));
         assert!(!bbox1.contains(b"z"));
-        
+
         let union = bbox1.union(&bbox2);
         assert!(union.contains(b"a"));
         assert!(union.contains(b"m"));

@@ -112,7 +112,10 @@ impl Persistence {
         serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize indexes: {}", e))
     }
 
-    pub fn save_functions(data_dir: &str, functions: &HashMap<String, Vec<Function>>) -> Result<(), String> {
+    pub fn save_functions(
+        data_dir: &str,
+        functions: &HashMap<String, Vec<Function>>,
+    ) -> Result<(), String> {
         let path = format!("{}/functions.json", data_dir);
         let json = serde_json::to_string(functions)
             .map_err(|e| format!("Failed to serialize functions: {}", e))?;
@@ -250,7 +253,9 @@ fn write_value<W: Write>(writer: &mut W, value: &Value) -> Result<(), String> {
         }
         Value::Bool(b) => {
             writer.write_all(&[4]).map_err(|e| format!("Write error: {}", e))?;
-            writer.write_all(&[if *b { 1 } else { 0 }]).map_err(|e| format!("Write error: {}", e))?;
+            writer
+                .write_all(&[if *b { 1 } else { 0 }])
+                .map_err(|e| format!("Write error: {}", e))?;
         }
         Value::Text(s) => {
             writer.write_all(&[1]).map_err(|e| format!("Write error: {}", e))?;

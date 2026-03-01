@@ -87,7 +87,9 @@ fn test_error_response_length() {
 fn test_server_bind_with_data_dir() {
     use tempfile::TempDir;
     let temp = TempDir::new().unwrap();
-    let server = Server::bind_with_data_dir("127.0.0.1:0", temp.path().to_str().unwrap().to_string()).unwrap();
+    let server =
+        Server::bind_with_data_dir("127.0.0.1:0", temp.path().to_str().unwrap().to_string())
+            .unwrap();
     assert!(server.local_addr().is_ok());
 }
 
@@ -124,10 +126,12 @@ fn test_connection_handle_query_insert() {
     use rustgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
-    catalog.create_table("t".to_string(), vec![ColumnDef {
-        name: "id".to_string(),
-        data_type: DataType::Int,
-    }]).unwrap();
+    catalog
+        .create_table(
+            "t".to_string(),
+            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+        )
+        .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("INSERT INTO t VALUES (1)");
     assert!(result.is_ok());
@@ -148,10 +152,12 @@ fn test_connection_handle_query_update() {
     use rustgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
-    catalog.create_table("t".to_string(), vec![ColumnDef {
-        name: "id".to_string(),
-        data_type: DataType::Int,
-    }]).unwrap();
+    catalog
+        .create_table(
+            "t".to_string(),
+            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+        )
+        .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("UPDATE t SET id = 1");
     assert!(result.is_ok());
@@ -172,10 +178,12 @@ fn test_connection_handle_query_describe() {
     use rustgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
-    catalog.create_table("t".to_string(), vec![ColumnDef {
-        name: "id".to_string(),
-        data_type: DataType::Int,
-    }]).unwrap();
+    catalog
+        .create_table(
+            "t".to_string(),
+            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+        )
+        .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("DESCRIBE t");
     assert!(result.is_ok());
@@ -194,7 +202,9 @@ fn test_connection_handle_query_describe_nonexistent() {
 fn test_server_shutdown() {
     use tempfile::TempDir;
     let temp = TempDir::new().unwrap();
-    let server = Server::bind_with_data_dir("127.0.0.1:0", temp.path().to_str().unwrap().to_string()).unwrap();
+    let server =
+        Server::bind_with_data_dir("127.0.0.1:0", temp.path().to_str().unwrap().to_string())
+            .unwrap();
     let result = server.shutdown();
     assert!(result.is_ok());
 }

@@ -5,9 +5,7 @@ pub struct UnnestExecutor;
 impl UnnestExecutor {
     pub fn execute(array: Value) -> Result<Vec<Vec<Value>>, String> {
         match array {
-            Value::Array(arr) => {
-                Ok(arr.into_iter().map(|v| vec![v]).collect())
-            }
+            Value::Array(arr) => Ok(arr.into_iter().map(|v| vec![v]).collect()),
             _ => Err("unnest requires array".to_string()),
         }
     }
@@ -36,11 +34,8 @@ mod tests {
 
     #[test]
     fn test_unnest_mixed_types() {
-        let arr = Value::Array(vec![
-            Value::Int(1),
-            Value::Text("hello".to_string()),
-            Value::Bool(true),
-        ]);
+        let arr =
+            Value::Array(vec![Value::Int(1), Value::Text("hello".to_string()), Value::Bool(true)]);
         let result = UnnestExecutor::execute(arr).unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], vec![Value::Int(1)]);

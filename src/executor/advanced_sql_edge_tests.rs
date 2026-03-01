@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod tests {
     use crate::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
-    use crate::executor::{BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor};
+    use crate::executor::{
+        BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor,
+    };
     use crate::parser::ast::{BinaryOperator, Expr};
     use crate::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
 
@@ -18,10 +20,7 @@ mod tests {
         let mut interp = PlPgSqlInterpreter::new();
         let func = PlPgSqlFunction {
             declarations: vec![],
-            body: vec![PlPgSqlStmt::Assign {
-                target: "x".to_string(),
-                value: Expr::Number(42),
-            }],
+            body: vec![PlPgSqlStmt::Assign { target: "x".to_string(), value: Expr::Number(42) }],
         };
         let result = interp.execute(&func, vec![]).unwrap();
         assert_eq!(result, Value::Null);
@@ -32,9 +31,7 @@ mod tests {
         let mut interp = PlPgSqlInterpreter::new();
         let func = PlPgSqlFunction {
             declarations: vec![],
-            body: vec![PlPgSqlStmt::Return {
-                value: Some(Expr::Column("undefined".to_string())),
-            }],
+            body: vec![PlPgSqlStmt::Return { value: Some(Expr::Column("undefined".to_string())) }],
         };
         let result = interp.execute(&func, vec![]);
         assert!(result.is_err());
@@ -111,9 +108,8 @@ mod tests {
     #[test]
     fn test_correlated_exists_empty_outer() {
         let outer: Vec<Vec<Value>> = vec![];
-        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![vec![Value::Int(1)]])
-        };
+        let subquery_fn =
+            |_: &[Value]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![vec![Value::Int(1)]]) };
 
         let result = CorrelatedExecutor::execute_exists(&outer, &subquery_fn).unwrap();
         assert_eq!(result.len(), 0);
@@ -122,9 +118,8 @@ mod tests {
     #[test]
     fn test_correlated_in_null_value() {
         let outer = vec![vec![Value::Null]];
-        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![vec![Value::Null]])
-        };
+        let subquery_fn =
+            |_: &[Value]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![vec![Value::Null]]) };
 
         let result = CorrelatedExecutor::execute_in(&outer, 0, &subquery_fn).unwrap();
         assert_eq!(result.len(), 1);
@@ -138,13 +133,15 @@ mod tests {
 
     #[test]
     fn test_builtin_length_empty() {
-        let result = BuiltinFunctions::execute("length", vec![Value::Text("".to_string())]).unwrap();
+        let result =
+            BuiltinFunctions::execute("length", vec![Value::Text("".to_string())]).unwrap();
         assert_eq!(result, Value::Int(0));
     }
 
     #[test]
     fn test_builtin_power_large_exponent() {
-        let result = BuiltinFunctions::execute("power", vec![Value::Int(2), Value::Int(10)]).unwrap();
+        let result =
+            BuiltinFunctions::execute("power", vec![Value::Int(2), Value::Int(10)]).unwrap();
         assert_eq!(result, Value::Int(1024));
     }
 
@@ -159,7 +156,11 @@ mod tests {
         let mut registry = FunctionRegistry::new();
         let func = Function {
             name: "test".to_string(),
-            parameters: vec![Parameter { name: "a".to_string(), data_type: "INT".to_string(), default: None }],
+            parameters: vec![Parameter {
+                name: "a".to_string(),
+                data_type: "INT".to_string(),
+                default: None,
+            }],
             return_type: "INT".to_string(),
             language: FunctionLanguage::Sql,
             body: "SELECT $1".to_string(),
@@ -267,9 +268,8 @@ mod tests {
 
     #[test]
     fn test_for_query_empty_results() {
-        let mut interp = PlPgSqlInterpreter::new()
-            .with_query_executor(|_| Ok(vec![]));
-        
+        let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| Ok(vec![]));
+
         let func = PlPgSqlFunction {
             declarations: vec![PlPgSqlStmt::Declare {
                 name: "count".to_string(),
@@ -295,21 +295,21 @@ mod tests {
 
     #[test]
     fn test_split_part_out_of_bounds() {
-        let result = BuiltinFunctions::execute("split_part", vec![
-            Value::Text("a,b".to_string()),
-            Value::Text(",".to_string()),
-            Value::Int(5),
-        ]).unwrap();
+        let result = BuiltinFunctions::execute(
+            "split_part",
+            vec![Value::Text("a,b".to_string()), Value::Text(",".to_string()), Value::Int(5)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("".to_string()));
     }
 
     #[test]
     fn test_split_part_empty_string() {
-        let result = BuiltinFunctions::execute("split_part", vec![
-            Value::Text("".to_string()),
-            Value::Text(",".to_string()),
-            Value::Int(1),
-        ]).unwrap();
+        let result = BuiltinFunctions::execute(
+            "split_part",
+            vec![Value::Text("".to_string()), Value::Text(",".to_string()), Value::Int(1)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("".to_string()));
     }
 
@@ -431,7 +431,7 @@ mod tests {
     fn test_datetime_functions_positive() {
         let now = BuiltinFunctions::execute("now", vec![]).unwrap();
         let date = BuiltinFunctions::execute("current_date", vec![]).unwrap();
-        
+
         if let (Value::Int(n), Value::Int(d)) = (now, date) {
             assert!(n > 0);
             assert!(d > 0);

@@ -14,7 +14,9 @@ mod tests {
             body: vec![PlPgSqlStmt::ExceptionBlock {
                 try_stmts: vec![PlPgSqlStmt::Raise { message: "error occurred".to_string() }],
                 exception_var: "err".to_string(),
-                catch_stmts: vec![PlPgSqlStmt::Return { value: Some(Expr::Column("err".to_string())) }],
+                catch_stmts: vec![PlPgSqlStmt::Return {
+                    value: Some(Expr::Column("err".to_string())),
+                }],
             }],
         };
 
@@ -24,9 +26,8 @@ mod tests {
 
     #[test]
     fn test_dynamic_sql() {
-        let mut interp = PlPgSqlInterpreter::new()
-            .with_query_executor(|_| Ok(vec![]));
-        
+        let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| Ok(vec![]));
+
         let func = PlPgSqlFunction {
             declarations: vec![],
             body: vec![
@@ -41,15 +42,14 @@ mod tests {
 
     #[test]
     fn test_for_query() {
-        let mut interp = PlPgSqlInterpreter::new()
-            .with_query_executor(|_| {
-                let mut row1 = HashMap::new();
-                row1.insert("id".to_string(), Value::Int(1));
-                let mut row2 = HashMap::new();
-                row2.insert("id".to_string(), Value::Int(2));
-                Ok(vec![row1, row2])
-            });
-        
+        let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| {
+            let mut row1 = HashMap::new();
+            row1.insert("id".to_string(), Value::Int(1));
+            let mut row2 = HashMap::new();
+            row2.insert("id".to_string(), Value::Int(2));
+            Ok(vec![row1, row2])
+        });
+
         let func = PlPgSqlFunction {
             declarations: vec![PlPgSqlStmt::Declare {
                 name: "sum".to_string(),
@@ -127,9 +127,8 @@ mod tests {
 
     #[test]
     fn test_perform() {
-        let mut interp = PlPgSqlInterpreter::new()
-            .with_query_executor(|_| Ok(vec![]));
-        
+        let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| Ok(vec![]));
+
         let func = PlPgSqlFunction {
             declarations: vec![],
             body: vec![

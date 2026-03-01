@@ -32,7 +32,7 @@ impl CorrelatedExecutor {
         for outer_row in outer_rows {
             let subquery_results = subquery_fn(outer_row)?;
             let outer_value = &outer_row[outer_col_idx];
-            
+
             if subquery_results.iter().any(|row| row.get(0) == Some(outer_value)) {
                 result.push(outer_row.clone());
             }
@@ -48,7 +48,7 @@ impl CorrelatedExecutor {
         for outer_row in outer_rows {
             let subquery_results = subquery_fn(outer_row)?;
             let mut combined = outer_row.clone();
-            
+
             if let Some(inner_row) = subquery_results.first() {
                 combined.extend(inner_row.clone());
             } else {
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_exists_with_results() {
         let outer = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
-        
+
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Int(n) = row[0] {
                 if n == 1 {
@@ -88,10 +88,8 @@ mod tests {
     #[test]
     fn test_exists_no_results() {
         let outer = vec![vec![Value::Int(1)]];
-        
-        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![])
-        };
+
+        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![]) };
 
         let result = CorrelatedExecutor::execute_exists(&outer, &subquery_fn).unwrap();
         assert_eq!(result.len(), 0);
@@ -100,7 +98,7 @@ mod tests {
     #[test]
     fn test_in_match() {
         let outer = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
-        
+
         let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             Ok(vec![vec![Value::Int(1)], vec![Value::Int(3)]])
         };
@@ -113,7 +111,7 @@ mod tests {
     #[test]
     fn test_in_no_match() {
         let outer = vec![vec![Value::Int(5)]];
-        
+
         let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             Ok(vec![vec![Value::Int(1)], vec![Value::Int(2)]])
         };
@@ -125,7 +123,7 @@ mod tests {
     #[test]
     fn test_scalar_with_result() {
         let outer = vec![vec![Value::Int(1)]];
-        
+
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Int(n) = row[0] {
                 Ok(vec![vec![Value::Int(n * 10)]])
@@ -142,10 +140,8 @@ mod tests {
     #[test]
     fn test_scalar_no_result() {
         let outer = vec![vec![Value::Int(1)]];
-        
-        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-            Ok(vec![])
-        };
+
+        let subquery_fn = |_: &[Value]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![]) };
 
         let result = CorrelatedExecutor::execute_scalar(&outer, &subquery_fn).unwrap();
         assert_eq!(result.len(), 1);

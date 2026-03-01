@@ -1,8 +1,8 @@
+use super::control_flow::ControlFlow;
+use super::executor::StmtExecutor;
 use crate::catalog::Value;
 use crate::parser::plpgsql_ast::PlPgSqlFunction;
 use std::collections::HashMap;
-use super::control_flow::ControlFlow;
-use super::executor::StmtExecutor;
 
 pub struct PlPgSqlInterpreter {
     variables: HashMap<String, Value>,

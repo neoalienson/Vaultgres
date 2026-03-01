@@ -31,10 +31,14 @@ impl Ord for Value {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a.cmp(b),
             (Value::Float(a), Value::Float(b)) => {
-                if a < b { std::cmp::Ordering::Less }
-                else if a > b { std::cmp::Ordering::Greater }
-                else { std::cmp::Ordering::Equal }
-            },
+                if a < b {
+                    std::cmp::Ordering::Less
+                } else if a > b {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }
             (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
             (Value::Text(a), Value::Text(b)) => a.cmp(b),
             (Value::Json(a), Value::Json(b)) => a.cmp(b),

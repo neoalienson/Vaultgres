@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use crate::executor::executor::{ExecutorError, SimpleTuple};
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
 use crate::executor::parallel::partition::PartitionStrategy;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub struct ParallelHashJoin {
     build_side: Arc<dyn ParallelOperator>,
@@ -18,9 +18,7 @@ pub struct ConcurrentHashTable {
 
 impl ConcurrentHashTable {
     pub fn new(num_partitions: usize) -> Self {
-        let partitions = (0..num_partitions)
-            .map(|_| Mutex::new(HashMap::new()))
-            .collect();
+        let partitions = (0..num_partitions).map(|_| Mutex::new(HashMap::new())).collect();
         Self { partitions }
     }
 
@@ -44,17 +42,12 @@ impl ParallelHashJoin {
         let partition_strategy = Arc::new(PartitionStrategy::new(num_partitions));
         let hash_table = Arc::new(ConcurrentHashTable::new(num_partitions));
 
-        Self {
-            build_side,
-            probe_side,
-            hash_table,
-            partition_strategy,
-        }
+        Self { build_side, probe_side, hash_table, partition_strategy }
     }
 
     pub fn build_phase(&self, morsel: Morsel) -> Result<(), ExecutorError> {
         let build_result = self.build_side.process_morsel(morsel)?;
-        
+
         for tuple in build_result.tuples {
             let key = tuple.data.clone();
             let partition_id = self.partition_strategy.partition_key(&key);
@@ -72,11 +65,9 @@ impl ParallelHashJoin {
             let key = &tuple.data;
             let partition_id = self.partition_strategy.partition_key(key);
             let matches = self.hash_table.probe(partition_id, key);
-            
+
             for matched in matches {
-                let mut joined = SimpleTuple {
-                    data: matched.data.clone(),
-                };
+                let mut joined = SimpleTuple { data: matched.data.clone() };
                 joined.data.extend_from_slice(&tuple.data);
                 joined_tuples.push(joined);
             }
@@ -122,20 +113,12 @@ mod tests {
 
         let join = ParallelHashJoin::new(build_op, probe_op, 4);
 
-        let build_morsel = Morsel {
-            tuples: vec![],
-            start_offset: 0,
-            end_offset: 1,
-            partition_id: 0,
-        };
+        let build_morsel =
+            Morsel { tuples: vec![], start_offset: 0, end_offset: 1, partition_id: 0 };
         join.build_phase(build_morsel).unwrap();
 
-        let probe_morsel = Morsel {
-            tuples: vec![],
-            start_offset: 0,
-            end_offset: 1,
-            partition_id: 0,
-        };
+        let probe_morsel =
+            Morsel { tuples: vec![], start_offset: 0, end_offset: 1, partition_id: 0 };
         let result = join.probe_phase(probe_morsel).unwrap();
         assert_eq!(result.len(), 1);
     }

@@ -13,11 +13,15 @@ impl ArraySubqueryExecutor {
         Ok(false)
     }
 
-    pub fn execute_all(value: &Value, op: &BinaryOperator, subquery_results: &[Value]) -> Result<bool, String> {
+    pub fn execute_all(
+        value: &Value,
+        op: &BinaryOperator,
+        subquery_results: &[Value],
+    ) -> Result<bool, String> {
         if subquery_results.is_empty() {
             return Ok(true);
         }
-        
+
         for result in subquery_results {
             let matches = Self::compare(value, op, result)?;
             if !matches {
@@ -74,14 +78,20 @@ mod tests {
     fn test_all_true() {
         let value = Value::Int(10);
         let results = vec![Value::Int(1), Value::Int(5), Value::Int(9)];
-        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results).unwrap());
+        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
+            .unwrap());
     }
 
     #[test]
     fn test_all_false() {
         let value = Value::Int(5);
         let results = vec![Value::Int(1), Value::Int(5), Value::Int(10)];
-        assert!(!ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results).unwrap());
+        assert!(!ArraySubqueryExecutor::execute_all(
+            &value,
+            &BinaryOperator::GreaterThan,
+            &results
+        )
+        .unwrap());
     }
 
     #[test]
@@ -95,6 +105,7 @@ mod tests {
     fn test_all_empty() {
         let value = Value::Int(5);
         let results = vec![];
-        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results).unwrap());
+        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
+            .unwrap());
     }
 }
