@@ -1,9 +1,11 @@
 use super::select;
 use super::Parser;
 use crate::parser::ast::{
-    ColumnDef, CreateIndexStmt, CreateMaterializedViewStmt, CreateTableStmt, CreateTriggerStmt,
-    CreateViewStmt, DataType, DescribeStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt,
-    DropTriggerStmt, DropViewStmt, Statement, TriggerEvent, TriggerFor, TriggerTiming,
+    CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
+    CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
+    DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
+    DropViewStmt, FetchCursorStmt, FetchDirection, FunctionParameter, FunctionReturnType,
+    FunctionVolatility, ParameterMode, Statement, TriggerEvent, TriggerFor, TriggerTiming,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -24,6 +26,7 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
         Token::Materialized => parse_create_materialized_view(parser),
         Token::Trigger => parse_create_trigger(parser),
         Token::Index => parse_create_index(parser, unique),
+        Token::Function | Token::Procedure => parse_create_function(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -184,6 +187,7 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
         Token::Materialized => parse_drop_materialized_view(parser),
         Token::Trigger => parse_drop_trigger(parser),
         Token::Index => parse_drop_index(parser),
+        Token::Function | Token::Procedure => parse_drop_function(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -323,4 +327,337 @@ fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
         }
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
+}
+
+fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
+    parser.advance(); // FUNCTION or PROCEDURE
+    let name = parser.expect_identifier()?;
+    parser.expect(Token::LeftParen)?;
+
+    let mut parameters = Vec::new();
+    if parser.current_token() != &Token::RightParen {
+        loop {
+            let mode = match parser.current_token() {
+                Token::Out => {
+                    parser.advance();
+                    ParameterMode::Out
+                }
+                Token::Inout => {
+                    parser.advance();
+                    ParameterMode::InOut
+                }
+                Token::Variadic => {
+                    parser.advance();
+                    ParameterMode::Variadic
+                }
+                _ => ParameterMode::In,
+            };
+
+            let param_name = parser.expect_identifier()?;
+            let data_type = match parser.current_token() {
+                Token::Int => {
+                    parser.advance();
+                    "INT".to_string()
+                }
+                Token::Text => {
+                    parser.advance();
+                    "TEXT".to_string()
+                }
+                Token::Avg => {
+                    parser.advance();
+                    "FLOAT".to_string()
+                }
+                Token::Identifier(s) => {
+                    let t = s.clone();
+                    parser.advance();
+                    t
+                }
+                _ => {
+                    return Err(ParseError::UnexpectedToken(format!(
+                        "{:?}",
+                        parser.current_token()
+                    )))
+                }
+            };
+
+            let default = if parser.current_token() == &Token::Equals {
+                parser.advance();
+                match parser.current_token() {
+                    Token::String(s) => {
+                        let val = format!("'{}'", s);
+                        parser.advance();
+                        Some(val)
+                    }
+                    Token::Number(n) => {
+                        let val = n.to_string();
+                        parser.advance();
+                        Some(val)
+                    }
+                    Token::Identifier(s) => {
+                        let val = s.clone();
+                        parser.advance();
+                        Some(val)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+            parameters.push(FunctionParameter { name: param_name, data_type, mode, default });
+
+            if parser.current_token() != &Token::Comma {
+                break;
+            }
+            parser.advance();
+        }
+    }
+    parser.expect(Token::RightParen)?;
+
+    parser.expect(Token::Returns)?;
+    let return_type = if parser.current_token() == &Token::Table {
+        parser.advance();
+        parser.expect(Token::LeftParen)?;
+        let mut cols = Vec::new();
+        loop {
+            let col_name = parser.expect_identifier()?;
+            let col_type = match parser.current_token() {
+                Token::Int => {
+                    parser.advance();
+                    "INT".to_string()
+                }
+                Token::Text => {
+                    parser.advance();
+                    "TEXT".to_string()
+                }
+                Token::Identifier(s) => {
+                    let t = s.clone();
+                    parser.advance();
+                    t
+                }
+                _ => {
+                    return Err(ParseError::UnexpectedToken(format!(
+                        "{:?}",
+                        parser.current_token()
+                    )))
+                }
+            };
+            cols.push((col_name, col_type));
+            if parser.current_token() != &Token::Comma {
+                break;
+            }
+            parser.advance();
+        }
+        parser.expect(Token::RightParen)?;
+        FunctionReturnType::Table(cols)
+    } else if parser.current_token() == &Token::Setof {
+        parser.advance();
+        let type_name = match parser.current_token() {
+            Token::Int => {
+                parser.advance();
+                "INT".to_string()
+            }
+            Token::Text => {
+                parser.advance();
+                "TEXT".to_string()
+            }
+            Token::Identifier(s) => {
+                let t = s.clone();
+                parser.advance();
+                t
+            }
+            _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+        };
+        FunctionReturnType::Setof(type_name)
+    } else {
+        let type_name = match parser.current_token() {
+            Token::Int => {
+                parser.advance();
+                "INT".to_string()
+            }
+            Token::Text => {
+                parser.advance();
+                "TEXT".to_string()
+            }
+            Token::Identifier(s) => {
+                let t = s.clone();
+                parser.advance();
+                t
+            }
+            _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+        };
+        FunctionReturnType::Type(type_name)
+    };
+
+    parser.expect(Token::Language)?;
+    let language = match parser.current_token() {
+        Token::Sql => {
+            parser.advance();
+            "SQL".to_string()
+        }
+        Token::PlPgSql => {
+            parser.advance();
+            "PLPGSQL".to_string()
+        }
+        Token::Identifier(s) => {
+            let l = s.clone();
+            parser.advance();
+            l
+        }
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+
+    // Optional volatility
+    let volatility = match parser.current_token() {
+        Token::Immutable => {
+            parser.advance();
+            Some(FunctionVolatility::Immutable)
+        }
+        Token::Stable => {
+            parser.advance();
+            Some(FunctionVolatility::Stable)
+        }
+        Token::Volatile => {
+            parser.advance();
+            Some(FunctionVolatility::Volatile)
+        }
+        _ => None,
+    };
+
+    // Optional cost hint
+    let cost = if parser.current_token() == &Token::Cost {
+        parser.advance();
+        if let Token::Number(n) = parser.current_token() {
+            let c = *n as f64;
+            parser.advance();
+            Some(c)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Optional rows hint
+    let rows = if parser.current_token() == &Token::Rows {
+        parser.advance();
+        if let Token::Number(n) = parser.current_token() {
+            let r = *n as u64;
+            parser.advance();
+            Some(r)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    parser.expect(Token::As)?;
+    let body = if let Token::String(s) = parser.current_token().clone() {
+        parser.advance();
+        s
+    } else {
+        return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token())));
+    };
+
+    Ok(Statement::CreateFunction(CreateFunctionStmt {
+        name,
+        parameters,
+        return_type,
+        language,
+        body,
+        volatility,
+        cost,
+        rows,
+    }))
+}
+
+fn parse_drop_function(parser: &mut Parser) -> Result<Statement> {
+    parser.advance(); // FUNCTION or PROCEDURE
+
+    let if_exists = if parser.current_token() == &Token::If {
+        parser.advance();
+        parser.expect(Token::Exists)?;
+        true
+    } else {
+        false
+    };
+
+    let name = parser.expect_identifier()?;
+
+    Ok(Statement::DropFunction(DropFunctionStmt { name, if_exists }))
+}
+
+pub fn parse_declare_cursor(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Declare)?;
+    let name = parser.expect_identifier()?;
+    parser.expect(Token::Cursor)?;
+    parser.expect(Token::For)?;
+    let query = select::parse_select_stmt(parser)?;
+    Ok(Statement::DeclareCursor(DeclareCursorStmt { name, query: Box::new(query) }))
+}
+
+pub fn parse_fetch_cursor(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Fetch)?;
+
+    let (direction, count) = match parser.current_token() {
+        Token::Next => {
+            parser.advance();
+            (FetchDirection::Next, None)
+        }
+        Token::Prior => {
+            parser.advance();
+            (FetchDirection::Prior, None)
+        }
+        Token::First => {
+            parser.advance();
+            (FetchDirection::First, None)
+        }
+        Token::Last => {
+            parser.advance();
+            (FetchDirection::Last, None)
+        }
+        Token::Absolute => {
+            parser.advance();
+            let count = if let Token::Number(n) = parser.current_token() {
+                let num = *n;
+                parser.advance();
+                Some(num)
+            } else {
+                None
+            };
+            (FetchDirection::Absolute, count)
+        }
+        Token::Relative => {
+            parser.advance();
+            let count = if let Token::Number(n) = parser.current_token() {
+                let num = *n;
+                parser.advance();
+                Some(num)
+            } else {
+                None
+            };
+            (FetchDirection::Relative, count)
+        }
+        Token::Forward => {
+            parser.advance();
+            (FetchDirection::Forward, None)
+        }
+        Token::Backward => {
+            parser.advance();
+            (FetchDirection::Backward, None)
+        }
+        _ => (FetchDirection::Next, None),
+    };
+
+    parser.expect(Token::From)?;
+    let name = parser.expect_identifier()?;
+
+    Ok(Statement::FetchCursor(FetchCursorStmt { name, direction, count }))
+}
+
+pub fn parse_close_cursor(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Close)?;
+    let name = parser.expect_identifier()?;
+    Ok(Statement::CloseCursor(CloseCursorStmt { name }))
 }

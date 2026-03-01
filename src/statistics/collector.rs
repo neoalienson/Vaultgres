@@ -9,6 +9,12 @@ pub struct TableStats {
     pub avg_row_size: u32,
 }
 
+impl Default for TableStats {
+    fn default() -> Self {
+        Self { row_count: 0, page_count: 0, avg_row_size: 0 }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ColumnStats {
     pub n_distinct: f64,

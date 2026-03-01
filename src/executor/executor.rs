@@ -28,4 +28,6 @@ pub enum ExecutorError {
     ColumnNotFound(String),
     #[error("Type mismatch: {0}")]
     TypeMismatch(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }

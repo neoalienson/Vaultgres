@@ -21,6 +21,11 @@ pub enum Statement {
     Intersect(IntersectStmt),
     Except(ExceptStmt),
     With(WithStmt),
+    CreateFunction(CreateFunctionStmt),
+    DropFunction(DropFunctionStmt),
+    DeclareCursor(DeclareCursorStmt),
+    FetchCursor(FetchCursorStmt),
+    CloseCursor(CloseCursorStmt),
 }
 
 /// UNION statement
@@ -161,6 +166,94 @@ pub struct DropIndexStmt {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DescribeStmt {
     pub table: String,
+}
+
+/// CREATE FUNCTION statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CreateFunctionStmt {
+    pub name: String,
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type: FunctionReturnType,
+    pub language: String,
+    pub body: String,
+    pub volatility: Option<FunctionVolatility>,
+    pub cost: Option<f64>,
+    pub rows: Option<u64>,
+}
+
+/// Function volatility
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum FunctionVolatility {
+    Immutable,
+    Stable,
+    Volatile,
+}
+
+/// Function parameter
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FunctionParameter {
+    pub name: String,
+    pub data_type: String,
+    pub mode: ParameterMode,
+    pub default: Option<String>,
+}
+
+/// Parameter mode
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ParameterMode {
+    In,
+    Out,
+    InOut,
+    Variadic,
+}
+
+/// Function return type
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum FunctionReturnType {
+    Type(String),
+    Table(Vec<(String, String)>),
+    Setof(String),
+}
+
+/// DROP FUNCTION statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DropFunctionStmt {
+    pub name: String,
+    pub if_exists: bool,
+}
+
+/// DECLARE CURSOR statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DeclareCursorStmt {
+    pub name: String,
+    pub query: Box<SelectStmt>,
+}
+
+/// FETCH CURSOR statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FetchCursorStmt {
+    pub name: String,
+    pub direction: FetchDirection,
+    pub count: Option<i64>,
+}
+
+/// Fetch direction
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum FetchDirection {
+    Next,
+    Prior,
+    First,
+    Last,
+    Absolute,
+    Relative,
+    Forward,
+    Backward,
+}
+
+/// CLOSE CURSOR statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CloseCursorStmt {
+    pub name: String,
 }
 
 /// CREATE TABLE statement

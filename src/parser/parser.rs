@@ -28,6 +28,18 @@ impl Parser {
             return self.parse_with();
         }
 
+        if self.current_token() == &Token::Declare {
+            return ddl::parse_declare_cursor(self);
+        }
+
+        if self.current_token() == &Token::Fetch {
+            return ddl::parse_fetch_cursor(self);
+        }
+
+        if self.current_token() == &Token::Close {
+            return ddl::parse_close_cursor(self);
+        }
+
         if self.current_token() == &Token::Select {
             let select = select::parse_select(self)?;
             // Check for set operations

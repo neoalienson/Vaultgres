@@ -1,4 +1,6 @@
-use rustgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
+use rustgres::catalog::{
+    Function, FunctionLanguage, FunctionRegistry, FunctionVolatility, Parameter, Value,
+};
 use rustgres::executor::{
     BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor,
 };
@@ -18,6 +20,9 @@ fn test_udf_registration_and_execution() {
         language: FunctionLanguage::Sql,
         body: "SELECT $1 + $2".to_string(),
         is_variadic: false,
+        cost: 100.0,
+        rows: 1,
+        volatility: rustgres::catalog::FunctionVolatility::Immutable,
     };
 
     registry.register(func).unwrap();
@@ -211,6 +216,9 @@ fn test_function_overload_different_types() {
         language: FunctionLanguage::Sql,
         body: "SELECT $1 * 2".to_string(),
         is_variadic: false,
+        cost: 100.0,
+        rows: 1,
+        volatility: rustgres::catalog::FunctionVolatility::Immutable,
     };
 
     let func_text = Function {
@@ -224,6 +232,9 @@ fn test_function_overload_different_types() {
         language: FunctionLanguage::Sql,
         body: "SELECT UPPER($1)".to_string(),
         is_variadic: false,
+        cost: 100.0,
+        rows: 1,
+        volatility: rustgres::catalog::FunctionVolatility::Immutable,
     };
 
     registry.register(func_int).unwrap();
@@ -734,6 +745,9 @@ mod advanced_sql_new_tests2 {
             language: rustgres::catalog::FunctionLanguage::Sql,
             body: "SELECT $2 || ' ' || $1".to_string(),
             is_variadic: false,
+            cost: 100.0,
+            rows: 1,
+            volatility: rustgres::catalog::FunctionVolatility::Immutable,
         };
 
         registry.register(func).unwrap();
@@ -758,6 +772,9 @@ mod advanced_sql_new_tests2 {
             language: rustgres::catalog::FunctionLanguage::Sql,
             body: "VARIADIC".to_string(),
             is_variadic: true,
+            cost: 100.0,
+            rows: 1,
+            volatility: rustgres::catalog::FunctionVolatility::Immutable,
         };
 
         registry.register(func).unwrap();

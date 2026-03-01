@@ -14,7 +14,7 @@ mod tests;
 
 // Re-export public types
 pub use catalog::Catalog;
-pub use function::{Function, FunctionLanguage, FunctionRegistry, Parameter};
+pub use function::{Function, FunctionLanguage, FunctionRegistry, FunctionVolatility, Parameter};
 pub use schema::TableSchema;
 pub use tuple::Tuple;
 pub use value::Value;

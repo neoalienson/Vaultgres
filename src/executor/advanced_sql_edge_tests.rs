@@ -165,6 +165,9 @@ mod tests {
             language: FunctionLanguage::Sql,
             body: "SELECT $1".to_string(),
             is_variadic: false,
+            cost: 100.0,
+            rows: 1,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
         };
 
         registry.register(func.clone()).unwrap();

@@ -21,6 +21,22 @@ pub struct Function {
     pub language: FunctionLanguage,
     pub body: String,
     pub is_variadic: bool,
+    pub volatility: FunctionVolatility,
+    pub cost: f64,
+    pub rows: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum FunctionVolatility {
+    Immutable,
+    Stable,
+    Volatile,
+}
+
+impl Default for FunctionVolatility {
+    fn default() -> Self {
+        FunctionVolatility::Volatile
+    }
 }
 
 pub struct FunctionRegistry {
@@ -89,6 +105,9 @@ mod tests {
             language: FunctionLanguage::Sql,
             body: "SELECT $1 + $2".to_string(),
             is_variadic: false,
+            volatility: FunctionVolatility::Immutable,
+            cost: 100.0,
+            rows: 1,
         };
         assert!(registry.register(func).is_ok());
     }
@@ -106,6 +125,9 @@ mod tests {
             language: FunctionLanguage::Sql,
             body: "SELECT $1 + $2".to_string(),
             is_variadic: false,
+            volatility: FunctionVolatility::Immutable,
+            cost: 100.0,
+            rows: 1,
         };
         registry.register(func).unwrap();
 
@@ -134,6 +156,9 @@ mod tests {
             language: FunctionLanguage::Sql,
             body: "SELECT $1 + $2".to_string(),
             is_variadic: false,
+            volatility: FunctionVolatility::Immutable,
+            cost: 100.0,
+            rows: 1,
         };
 
         let func2 = Function {
@@ -146,6 +171,9 @@ mod tests {
             language: FunctionLanguage::Sql,
             body: "SELECT $1 || $2".to_string(),
             is_variadic: false,
+            volatility: FunctionVolatility::Stable,
+            cost: 100.0,
+            rows: 1,
         };
 
         registry.register(func1).unwrap();

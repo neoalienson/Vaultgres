@@ -24,6 +24,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:upper".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -38,6 +41,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:lower".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -52,6 +58,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:length".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -78,6 +87,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:substring".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -99,6 +111,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:concat".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -113,6 +128,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:trim".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -139,6 +157,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:replace".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -165,6 +186,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:split_part".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
     }
@@ -182,6 +206,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:abs".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -203,6 +230,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:power".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -217,6 +247,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:sqrt".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -238,6 +271,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:mod".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -252,6 +288,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:round".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -266,6 +305,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:ceil".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -280,6 +322,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:floor".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -290,6 +335,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:random".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
     }
@@ -303,6 +351,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:now".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -313,6 +364,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:current_date".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -334,6 +388,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:extract".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -355,6 +412,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:date_trunc".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
     }
@@ -372,6 +432,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:array_length".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -393,6 +456,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:array_append".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
     }
@@ -406,6 +472,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:json_object".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -416,6 +485,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:json_array".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
         registry
@@ -437,6 +509,9 @@ impl BuiltinFunctions {
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:json_extract".to_string(),
                 is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
     }
