@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  rustgres:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rustgres:latest
+    container_name: rustgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - rustgres-data:/var/lib/rustgres/data
+      - rustgres-wal:/var/lib/rustgres/wal
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+
+volumes:
+  rustgres-data:
+    driver: local
+  rustgres-wal:
+    driver: local

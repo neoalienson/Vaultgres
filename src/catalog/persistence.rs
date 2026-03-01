@@ -1,4 +1,4 @@
-use crate::parser::ast::{ColumnDef, DataType, SelectStmt, CreateTriggerStmt};
+use crate::parser::ast::{ColumnDef, DataType, SelectStmt, CreateTriggerStmt, CreateIndexStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use super::{Value, TableSchema, Tuple};
 use std::collections::HashMap;
@@ -99,6 +99,32 @@ impl Persistence {
             .map_err(|e| format!("Failed to read triggers: {}", e))?;
         serde_json::from_str(&json)
             .map_err(|e| format!("Failed to deserialize triggers: {}", e))
+    }
+    
+    pub fn save_indexes(
+        data_dir: &str,
+        indexes: &HashMap<String, CreateIndexStmt>,
+    ) -> Result<(), String> {
+        let path = format!("{}/indexes.json", data_dir);
+        let json = serde_json::to_string(indexes)
+            .map_err(|e| format!("Failed to serialize indexes: {}", e))?;
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write indexes: {}", e))?;
+        log::info!("💾 Saved {} indexes", indexes.len());
+        Ok(())
+    }
+    
+    pub fn load_indexes(
+        data_dir: &str,
+    ) -> Result<HashMap<String, CreateIndexStmt>, String> {
+        let path = format!("{}/indexes.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read indexes: {}", e))?;
+        serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to deserialize indexes: {}", e))
     }
 
     pub fn load(

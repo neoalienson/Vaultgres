@@ -32,6 +32,12 @@ mod trigger_tests;
 #[cfg(test)]
 mod trigger_edge_tests;
 
+#[cfg(test)]
+mod index_tests;
+
+#[cfg(test)]
+mod index_edge_tests;
+
 pub use error::{ParseError, Result};
 pub use lexer::{Lexer, Token};
 pub use ast::*;

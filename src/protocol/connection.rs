@@ -109,6 +109,14 @@ impl<S: Read + Write> Connection<S> {
                 self.catalog.drop_trigger(&drop.name, drop.if_exists)?;
                 Ok("DROP TRIGGER".to_string())
             }
+            Statement::CreateIndex(create) => {
+                self.catalog.create_index(create)?;
+                Ok("CREATE INDEX".to_string())
+            }
+            Statement::DropIndex(drop) => {
+                self.catalog.drop_index(&drop.name, drop.if_exists)?;
+                Ok("DROP INDEX".to_string())
+            }
             Statement::Describe(desc) => {
                 if let Some(schema) = self.catalog.get_table(&desc.table) {
                     let cols: Vec<String> = schema.columns.iter()

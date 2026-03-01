@@ -80,6 +80,8 @@ pub enum Token {
     Row,
     Statement,
     Begin,
+    Index,
+    Unique,
     
     // Identifiers and literals
     Identifier(String),
@@ -284,6 +286,8 @@ impl Lexer {
             "ROW" => Token::Row,
             "STATEMENT" => Token::Statement,
             "BEGIN" => Token::Begin,
+            "INDEX" => Token::Index,
+            "UNIQUE" => Token::Unique,
             _ => Token::Identifier(ident),
         };
         

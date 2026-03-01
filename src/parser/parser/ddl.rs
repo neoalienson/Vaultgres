@@ -1,17 +1,25 @@
 use super::Parser;
 use crate::parser::error::{Result, ParseError};
 use crate::parser::lexer::Token;
-use crate::parser::ast::{Statement, CreateTableStmt, DropTableStmt, CreateViewStmt, DropViewStmt, CreateMaterializedViewStmt, RefreshMaterializedViewStmt, DropMaterializedViewStmt, CreateTriggerStmt, DropTriggerStmt, TriggerTiming, TriggerEvent, TriggerFor, DescribeStmt, ColumnDef, DataType};
+use crate::parser::ast::{Statement, CreateTableStmt, DropTableStmt, CreateViewStmt, DropViewStmt, CreateMaterializedViewStmt, RefreshMaterializedViewStmt, DropMaterializedViewStmt, CreateTriggerStmt, DropTriggerStmt, CreateIndexStmt, DropIndexStmt, TriggerTiming, TriggerEvent, TriggerFor, DescribeStmt, ColumnDef, DataType};
 use super::select;
 
 pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Create)?;
+    
+    let unique = if parser.current_token() == &Token::Unique {
+        parser.advance();
+        true
+    } else {
+        false
+    };
     
     match parser.current_token() {
         Token::Table => parse_create_table(parser),
         Token::View => parse_create_view(parser),
         Token::Materialized => parse_create_materialized_view(parser),
         Token::Trigger => parse_create_trigger(parser),
+        Token::Index => parse_create_index(parser, unique),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -127,6 +135,32 @@ fn parse_create_trigger(parser: &mut Parser) -> Result<Statement> {
     }))
 }
 
+fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
+    parser.expect(Token::Index)?;
+    
+    let name = parser.expect_identifier()?;
+    
+    parser.expect(Token::On)?;
+    let table = parser.expect_identifier()?;
+    
+    parser.expect(Token::LeftParen)?;
+    let mut columns = vec![parser.expect_identifier()?];
+    
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        columns.push(parser.expect_identifier()?);
+    }
+    
+    parser.expect(Token::RightParen)?;
+    
+    Ok(Statement::CreateIndex(CreateIndexStmt {
+        name,
+        table,
+        columns,
+        unique,
+    }))
+}
+
 pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Drop)?;
     
@@ -135,6 +169,7 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
         Token::View => parse_drop_view(parser),
         Token::Materialized => parse_drop_materialized_view(parser),
         Token::Trigger => parse_drop_trigger(parser),
+        Token::Index => parse_drop_index(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -202,6 +237,22 @@ fn parse_drop_trigger(parser: &mut Parser) -> Result<Statement> {
     let name = parser.expect_identifier()?;
     
     Ok(Statement::DropTrigger(DropTriggerStmt { name, if_exists }))
+}
+
+fn parse_drop_index(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Index)?;
+    
+    let if_exists = if parser.current_token() == &Token::If {
+        parser.advance();
+        parser.expect(Token::Exists)?;
+        true
+    } else {
+        false
+    };
+    
+    let name = parser.expect_identifier()?;
+    
+    Ok(Statement::DropIndex(DropIndexStmt { name, if_exists }))
 }
 
 pub fn parse_describe(parser: &mut Parser) -> Result<Statement> {

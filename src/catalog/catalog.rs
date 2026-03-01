@@ -1,4 +1,4 @@
-use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr, SelectStmt, CreateTriggerStmt};
+use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr, SelectStmt, CreateTriggerStmt, CreateIndexStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use super::{Value, TableSchema, Tuple};
 use super::predicate::PredicateEvaluator;
@@ -12,6 +12,7 @@ pub struct Catalog {
     views: Arc<RwLock<HashMap<String, SelectStmt>>>,
     materialized_views: Arc<RwLock<HashMap<String, (SelectStmt, Vec<Vec<Value>>)>>>,
     triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
+    indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
     txn_mgr: Arc<TransactionManager>,
     data_dir: Option<String>,
@@ -24,6 +25,7 @@ impl Catalog {
             views: Arc::new(RwLock::new(HashMap::new())),
             materialized_views: Arc::new(RwLock::new(HashMap::new())),
             triggers: Arc::new(RwLock::new(HashMap::new())),
+            indexes: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: None,
@@ -36,6 +38,7 @@ impl Catalog {
             views: Arc::new(RwLock::new(HashMap::new())),
             materialized_views: Arc::new(RwLock::new(HashMap::new())),
             triggers: Arc::new(RwLock::new(HashMap::new())),
+            indexes: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: Some(data_dir.to_string()),
@@ -55,6 +58,10 @@ impl Catalog {
         
         if let Ok(triggers) = Persistence::load_triggers(data_dir) {
             *catalog.triggers.write().unwrap() = triggers;
+        }
+        
+        if let Ok(indexes) = Persistence::load_indexes(data_dir) {
+            *catalog.indexes.write().unwrap() = indexes;
         }
         
         catalog
@@ -77,6 +84,11 @@ impl Catalog {
             let triggers_clone = self.triggers.read().unwrap().clone();
             if let Err(e) = Persistence::save_triggers(dir, &triggers_clone) {
                 log::error!("Triggers auto-save failed: {}", e);
+            }
+            
+            let indexes_clone = self.indexes.read().unwrap().clone();
+            if let Err(e) = Persistence::save_indexes(dir, &indexes_clone) {
+                log::error!("Indexes auto-save failed: {}", e);
             }
         }
     }
@@ -212,6 +224,35 @@ impl Catalog {
     pub fn get_trigger(&self, name: &str) -> Option<CreateTriggerStmt> {
         let triggers = self.triggers.read().unwrap();
         triggers.get(name).cloned()
+    }
+    
+    pub fn create_index(&self, index: CreateIndexStmt) -> Result<(), String> {
+        let mut indexes = self.indexes.write().unwrap();
+        
+        if indexes.contains_key(&index.name) {
+            return Err(format!("Index '{}' already exists", index.name));
+        }
+        
+        indexes.insert(index.name.clone(), index);
+        drop(indexes);
+        self.auto_save();
+        Ok(())
+    }
+    
+    pub fn drop_index(&self, name: &str, if_exists: bool) -> Result<(), String> {
+        let mut indexes = self.indexes.write().unwrap();
+        
+        if indexes.remove(name).is_none() && !if_exists {
+            return Err(format!("Index '{}' does not exist", name));
+        }
+        drop(indexes);
+        self.auto_save();
+        Ok(())
+    }
+    
+    pub fn get_index(&self, name: &str) -> Option<CreateIndexStmt> {
+        let indexes = self.indexes.read().unwrap();
+        indexes.get(name).cloned()
     }
     
     pub fn list_tables(&self) -> Vec<String> {

@@ -14,6 +14,8 @@ pub enum Statement {
     DropMaterializedView(DropMaterializedViewStmt),
     CreateTrigger(CreateTriggerStmt),
     DropTrigger(DropTriggerStmt),
+    CreateIndex(CreateIndexStmt),
+    DropIndex(DropIndexStmt),
     Describe(DescribeStmt),
     Union(UnionStmt),
     Intersect(IntersectStmt),
@@ -137,6 +139,22 @@ pub enum TriggerEvent {
 pub enum TriggerFor {
     EachRow,
     EachStatement,
+}
+
+/// CREATE INDEX statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CreateIndexStmt {
+    pub name: String,
+    pub table: String,
+    pub columns: Vec<String>,
+    pub unique: bool,
+}
+
+/// DROP INDEX statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DropIndexStmt {
+    pub name: String,
+    pub if_exists: bool,
 }
 
 /// DESCRIBE statement

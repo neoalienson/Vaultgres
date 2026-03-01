@@ -1,0 +1,39 @@
+# Build artifacts
+target/
+*.o
+*.so
+*.a
+
+# Data directories
+data/
+wal/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/e2e/
+
+# Config files
+config.*.yaml
+!config.yaml
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Amazon Q
+.amazonq/
