@@ -102,18 +102,32 @@ impl<S: Read + Write> Connection<S> {
         column_names: &[String],
         rows: Vec<Vec<crate::catalog::Value>>,
     ) -> Result<ResultSet, String> {
+        // If we have "*", we need to get actual column count from first row
+        let actual_column_count = if !rows.is_empty() {
+            rows[0].len()
+        } else {
+            column_names.len()
+        };
+
         // Build column metadata
-        let columns: Vec<ColumnMetadata> = column_names
-            .iter()
-            .enumerate()
-            .map(|(i, name)| {
+        let columns: Vec<ColumnMetadata> = (0..actual_column_count)
+            .map(|i| {
+                let name = if column_names.len() == 1 && column_names[0] == "*" {
+                    format!("column{}", i + 1)
+                } else if i < column_names.len() {
+                    column_names[i].clone()
+                } else {
+                    format!("column{}", i + 1)
+                };
+
                 let (type_oid, type_size) = if !rows.is_empty() && i < rows[0].len() {
                     value_to_pg_type(&rows[0][i])
                 } else {
                     (25, -1) // Default to TEXT
                 };
+
                 ColumnMetadata {
-                    name: name.clone(),
+                    name,
                     table_oid: 0,
                     column_attr_number: 0,
                     type_oid,
