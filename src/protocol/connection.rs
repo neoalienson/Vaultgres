@@ -1,8 +1,15 @@
 use super::message::{Message, ProtocolError, Response};
+use super::result_set::{ColumnMetadata, ResultSet, Row};
+use super::type_mapping::{serialize_value, value_to_pg_type};
 use crate::catalog::Catalog;
 use crate::parser::{Parser, Statement};
 use std::io::{Read, Write};
 use std::sync::Arc;
+
+pub enum ExecutionResult {
+    CommandComplete(String),
+    ResultSet(ResultSet),
+}
 
 pub struct Connection<S: Read + Write> {
     stream: S,
@@ -40,8 +47,28 @@ impl<S: Read + Write> Connection<S> {
                 Ok(stmt) => {
                     log::debug!("Parsed statement: {:?}", stmt);
                     match self.execute_statement(stmt) {
-                        Ok(tag) => {
+                        Ok(ExecutionResult::CommandComplete(tag)) => {
                             Response::CommandComplete { tag }.write(&mut self.stream)?;
+                            Response::ReadyForQuery.write(&mut self.stream)?;
+                        }
+                        Ok(ExecutionResult::ResultSet(result_set)) => {
+                            // Send RowDescription
+                            Response::RowDescriptionDetailed {
+                                columns: result_set.columns.clone(),
+                            }
+                            .write(&mut self.stream)?;
+
+                            // Send DataRow for each row
+                            for row in &result_set.rows {
+                                Response::DataRowDetailed { fields: row.fields.clone() }
+                                    .write(&mut self.stream)?;
+                            }
+
+                            // Send CommandComplete
+                            Response::CommandComplete {
+                                tag: format!("SELECT {}", result_set.row_count()),
+                            }
+                            .write(&mut self.stream)?;
                             Response::ReadyForQuery.write(&mut self.stream)?;
                         }
                         Err(e) => {
@@ -70,53 +97,91 @@ impl<S: Read + Write> Connection<S> {
         Ok(())
     }
 
-    fn execute_statement(&self, stmt: Statement) -> Result<String, String> {
+    fn build_result_set(
+        &self,
+        column_names: &[String],
+        rows: Vec<Vec<crate::catalog::Value>>,
+    ) -> Result<ResultSet, String> {
+        // Build column metadata
+        let columns: Vec<ColumnMetadata> = column_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let (type_oid, type_size) = if !rows.is_empty() && i < rows[0].len() {
+                    value_to_pg_type(&rows[0][i])
+                } else {
+                    (25, -1) // Default to TEXT
+                };
+                ColumnMetadata {
+                    name: name.clone(),
+                    table_oid: 0,
+                    column_attr_number: 0,
+                    type_oid,
+                    type_size,
+                    type_modifier: -1,
+                    format_code: 0,
+                }
+            })
+            .collect();
+
+        let mut result_set = ResultSet::new(columns);
+
+        // Convert rows
+        for row in rows {
+            let fields: Vec<Option<Vec<u8>>> = row.iter().map(serialize_value).collect();
+            result_set.add_row(Row::new(fields));
+        }
+
+        Ok(result_set)
+    }
+
+    fn execute_statement(&self, stmt: Statement) -> Result<ExecutionResult, String> {
         use crate::parser::ast::Expr;
 
         match stmt {
             Statement::CreateTable(create) => {
                 self.catalog.create_table(create.table.clone(), create.columns)?;
-                Ok("CREATE TABLE".to_string())
+                Ok(ExecutionResult::CommandComplete("CREATE TABLE".to_string()))
             }
             Statement::DropTable(drop) => {
                 self.catalog.drop_table(&drop.table, drop.if_exists)?;
-                Ok("DROP TABLE".to_string())
+                Ok(ExecutionResult::CommandComplete("DROP TABLE".to_string()))
             }
             Statement::CreateView(create) => {
                 self.catalog.create_view(create.name.clone(), *create.query)?;
-                Ok("CREATE VIEW".to_string())
+                Ok(ExecutionResult::CommandComplete("CREATE VIEW".to_string()))
             }
             Statement::DropView(drop) => {
                 self.catalog.drop_view(&drop.name, drop.if_exists)?;
-                Ok("DROP VIEW".to_string())
+                Ok(ExecutionResult::CommandComplete("DROP VIEW".to_string()))
             }
             Statement::CreateMaterializedView(create) => {
                 self.catalog.create_materialized_view(create.name.clone(), *create.query)?;
-                Ok("CREATE MATERIALIZED VIEW".to_string())
+                Ok(ExecutionResult::CommandComplete("CREATE MATERIALIZED VIEW".to_string()))
             }
             Statement::RefreshMaterializedView(refresh) => {
                 self.catalog.refresh_materialized_view(&refresh.name)?;
-                Ok("REFRESH MATERIALIZED VIEW".to_string())
+                Ok(ExecutionResult::CommandComplete("REFRESH MATERIALIZED VIEW".to_string()))
             }
             Statement::DropMaterializedView(drop) => {
                 self.catalog.drop_materialized_view(&drop.name, drop.if_exists)?;
-                Ok("DROP MATERIALIZED VIEW".to_string())
+                Ok(ExecutionResult::CommandComplete("DROP MATERIALIZED VIEW".to_string()))
             }
             Statement::CreateTrigger(create) => {
                 self.catalog.create_trigger(create)?;
-                Ok("CREATE TRIGGER".to_string())
+                Ok(ExecutionResult::CommandComplete("CREATE TRIGGER".to_string()))
             }
             Statement::DropTrigger(drop) => {
                 self.catalog.drop_trigger(&drop.name, drop.if_exists)?;
-                Ok("DROP TRIGGER".to_string())
+                Ok(ExecutionResult::CommandComplete("DROP TRIGGER".to_string()))
             }
             Statement::CreateIndex(create) => {
                 self.catalog.create_index(create)?;
-                Ok("CREATE INDEX".to_string())
+                Ok(ExecutionResult::CommandComplete("CREATE INDEX".to_string()))
             }
             Statement::DropIndex(drop) => {
                 self.catalog.drop_index(&drop.name, drop.if_exists)?;
-                Ok("DROP INDEX".to_string())
+                Ok(ExecutionResult::CommandComplete("DROP INDEX".to_string()))
             }
             Statement::Describe(desc) => {
                 if let Some(schema) = self.catalog.get_table(&desc.table) {
@@ -125,14 +190,14 @@ impl<S: Read + Write> Connection<S> {
                         .iter()
                         .map(|c| format!("{}: {:?}", c.name, c.data_type))
                         .collect();
-                    Ok(format!("DESCRIBE\n{}", cols.join("\n")))
+                    Ok(ExecutionResult::CommandComplete(format!("DESCRIBE\n{}", cols.join("\n"))))
                 } else {
                     Err(format!("Table '{}' does not exist", desc.table))
                 }
             }
             Statement::Insert(insert) => {
                 self.catalog.insert(&insert.table, insert.values)?;
-                Ok("INSERT 0 1".to_string())
+                Ok(ExecutionResult::CommandComplete("INSERT 0 1".to_string()))
             }
             Statement::Select(select) => {
                 let columns: Vec<String> = select
@@ -163,7 +228,7 @@ impl<S: Read + Write> Connection<S> {
                 let rows = self.catalog.select(
                     &select.from,
                     select.distinct,
-                    columns,
+                    columns.clone(),
                     select.where_clause,
                     select.group_by,
                     select.having,
@@ -171,18 +236,21 @@ impl<S: Read + Write> Connection<S> {
                     select.limit,
                     select.offset,
                 )?;
-                Ok(format!("SELECT {}", rows.len()))
+                
+                // Build result set
+                let result_set = self.build_result_set(&columns, rows)?;
+                Ok(ExecutionResult::ResultSet(result_set))
             }
             Statement::Update(update) => {
                 let count =
                     self.catalog.update(&update.table, update.assignments, update.where_clause)?;
-                Ok(format!("UPDATE {}", count))
+                Ok(ExecutionResult::CommandComplete(format!("UPDATE {}", count)))
             }
             Statement::Delete(delete) => {
                 let count = self.catalog.delete(&delete.table, delete.where_clause)?;
-                Ok(format!("DELETE {}", count))
+                Ok(ExecutionResult::CommandComplete(format!("DELETE {}", count)))
             }
-            _ => Ok("SELECT 0".to_string()),
+            _ => Ok(ExecutionResult::CommandComplete("SELECT 0".to_string())),
         }
     }
 
