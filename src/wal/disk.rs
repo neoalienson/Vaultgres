@@ -90,8 +90,8 @@ mod tests {
         let record = WALRecord::new(1, 1, RecordType::Insert, Some(PageId(1)), vec![1, 2, 3]);
 
         let lsn = writer.write(&record).unwrap();
-        // Verify LSN was assigned
-        assert!(lsn >= 0);
+        // Verify LSN was assigned (LSN is u64, always >= 0)
+        assert!(lsn < WAL_SEGMENT_SIZE * 1000);
     }
 
     #[test]

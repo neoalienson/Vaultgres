@@ -59,8 +59,8 @@ fn test_wal_disk_writer_persistence() {
     let lsn = writer.write(&record).unwrap();
     writer.flush().unwrap();
 
-    // Verify LSN was assigned
-    assert!(lsn >= 0);
+    // Verify LSN was assigned (LSN is u64, always >= 0)
+    assert!(lsn < 16 * 1024 * 1024 * 1000); // Less than 1000 segments
 
     // Verify file was created
     let wal_files: Vec<_> = std::fs::read_dir(temp_dir.path())

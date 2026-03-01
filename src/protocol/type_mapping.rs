@@ -85,10 +85,10 @@ mod tests {
 
     #[test]
     fn test_float_serialization() {
-        let value = Value::Float(3.14);
+        let value = Value::Float(std::f64::consts::PI);
         let serialized = serialize_value(&value);
         assert!(serialized.is_some());
-        assert!(String::from_utf8_lossy(&serialized.unwrap()).contains("3.14"));
+        assert!(String::from_utf8_lossy(&serialized.unwrap()).starts_with("3.14"));
     }
 
     #[test]
