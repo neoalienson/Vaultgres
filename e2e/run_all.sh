@@ -40,7 +40,7 @@ case $MODE in
             cargo test --package e2e --test scenarios -- --list | grep ': test$' | sed 's/: test$//'
         elif [ -n "$TEST_NAME" ]; then
             echo -e "${GREEN}Running scenario: $TEST_NAME${NC}"
-            cargo test --package e2e --test scenarios $TEST_NAME -- --test-threads=1 --nocapture
+            cargo test --package e2e --test scenarios pet_store::test_$TEST_NAME -- --test-threads=1 --nocapture
         else
             echo -e "${GREEN}Running all scenarios tests${NC}"
             cargo test --package e2e --test scenarios -- --test-threads=1 --nocapture
@@ -48,16 +48,9 @@ case $MODE in
         ;;
 
     pet_store)
-        if [ "$TEST_NAME" = "list" ]; then
-            echo -e "${GREEN}Available pet store tests:${NC}"
-            cargo test --package e2e --test pet_store -- --list | grep ': test$' | sed 's/: test$//'
-        elif [ -n "$TEST_NAME" ]; then
-            echo -e "${GREEN}Running pet store test: $TEST_NAME${NC}"
-            cargo test --package e2e --test pet_store $TEST_NAME -- --test-threads=1 --nocapture
-        else
-            echo -e "${GREEN}Running all pet store tests${NC}"
-            cargo test --package e2e --test pet_store -- --test-threads=1 --nocapture
-        fi
+        echo -e "${YELLOW}Note: pet_store tests are part of scenarios${NC}"
+        echo -e "${YELLOW}Use: ./run_all.sh scenarios pet_store_basic_operations${NC}"
+        exit 1
         ;;
 
     full)
@@ -104,8 +97,6 @@ case $MODE in
         echo "  quick list               - List available smoke tests"
         echo "  scenarios [test_name]    - Run scenario tests (all or specific)"
         echo "  scenarios list           - List available scenarios"
-        echo "  pet_store [test_name]    - Run pet store tests (all or specific)"
-        echo "  pet_store list           - List available pet store tests"
         echo "  full                     - Run full test suite"
         echo "  load                     - Run load tests"
         echo "  soak                     - Run soak tests (24h+)"
@@ -117,11 +108,8 @@ case $MODE in
         echo "  $0 quick test_basic_create_table"
         echo "  $0 quick list"
         echo "  $0 scenarios"
-        echo "  $0 scenarios test_oltp_simple_transactions"
+        echo "  $0 scenarios pet_store_basic_operations"
         echo "  $0 scenarios list"
-        echo "  $0 pet_store"
-        echo "  $0 pet_store test_pet_store_basic_operations"
-        echo "  $0 pet_store list"
         exit 1
         ;;
 esac

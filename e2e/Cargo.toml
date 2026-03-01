@@ -7,10 +7,6 @@ edition = "2021"
 path = "lib.rs"
 
 [[test]]
-name = "pet_store"
-path = "scenarios/pet_store.rs"
-
-[[test]]
 name = "smoke"
 path = "scenarios/smoke_tests.rs"
 

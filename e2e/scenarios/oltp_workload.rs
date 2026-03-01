@@ -2,6 +2,8 @@ use e2e::*;
 use std::thread;
 use std::time::Instant;
 
+mod pet_store;
+
 #[test]
 fn test_oltp_simple_transactions() {
     let env = TestEnv::new().with_rustgres().start();
