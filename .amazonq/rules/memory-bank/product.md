@@ -12,36 +12,19 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - **Modern Architecture**: Built from the ground up with async runtime, vectorized execution, and columnar storage
 - **Single Binary Deployment**: No external dependencies, easy to deploy and operate
 
-## Key Features
+## Current Status
 
-### Core Database Engine
-- **Storage Engine**: Pluggable storage with B+Tree and LSM-Tree implementations
-- **Transaction Manager**: MVCC (Multi-Version Concurrency Control) with snapshot isolation and serializable support
-- **Query Optimizer**: Cost-based optimization with statistics and histograms
-- **Execution Engine**: Vectorized execution with SIMD acceleration
-- **Index Support**: B-Tree, Hash, GiST, GIN, BRIN indexes
-- **WAL (Write-Ahead Logging)**: Crash recovery and point-in-time recovery
+**Version**: 0.2.6-alpha
 
-### SQL Support
-- SQL:2016 compliance with window functions, CTEs, and JSON support
-- All PostgreSQL data types including arrays, JSON, UUID, and geometric types
-- Advanced features: triggers, stored procedures, views, materialized views
-- Built-in full-text search with ranking and highlighting
-- Foreign data wrappers for querying external data sources
+**Test Coverage**:
+- 686 unit tests (100% pass rate)
+- 185 integration tests
+- 91 unit tests
+- Test execution time: <0.12s
 
-### Concurrency & Performance
-- **MVCC**: Non-blocking reads with optimistic writes
-- **Parallel Query**: Automatic parallelization of scans, joins, and aggregates
-- **Built-in Connection Pooling**: Integrated connection pooler
-- **Async I/O**: Tokio-based async runtime for maximum throughput
-- **Lock-Free Structures**: Concurrent B+Trees and hash tables
+**Features**: See [COMPLETED_FEATURES.md](../../docs/project-status/COMPLETED_FEATURES.md) for detailed list
 
-### Operations & Monitoring
-- **Replication**: Streaming replication with automatic failover
-- **Backup & Recovery**: Online backups, PITR, incremental backups
-- **Monitoring**: Prometheus metrics, query statistics, slow query log
-- **Administration**: SQL-based configuration, online schema changes
-- **Security**: TLS/SSL, SCRAM authentication, row-level security
+**Roadmap**: See [PLANNED_FEATURES.md](../../docs/project-status/PLANNED_FEATURES.md) for upcoming features
 
 ## Target Users
 
@@ -56,162 +39,25 @@ RustGres is a high-performance, PostgreSQL-compatible relational database manage
 - **Embedded Databases**: Applications requiring a full-featured RDBMS without external dependencies
 - **Cloud-Native Applications**: Modern applications leveraging async I/O and efficient resource usage
 
-## Project Status
+## Documentation
 
-**Current Version**: 0.2.0-alpha
+### For Users
+- [Quick Start Tutorial](../../docs/users/QUICKSTART.md)
+- [SQL Reference](../../docs/users/SQL.md)
 
-**Completed Components**:
+### For Administrators
+- [Installation Guide](../../docs/admins/INSTALLATION.md)
+- [Configuration Guide](../../docs/admins/CONFIGURATION.md)
+- [Server Operations](../../docs/admins/SERVER.md)
+- [Logging](../../docs/admins/LOGGING.md)
 
-**Core Engine:**
-- Storage engine with B+Tree indexes
-- MVCC transaction manager with snapshot isolation
-- SQL parser (SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, DROP TABLE, DESCRIBE)
-- Query optimizer (cost-based with statistics and rule-based)
-- PostgreSQL wire protocol
-- WAL and crash recovery (ARIES protocol)
+### For Developers
+- [Architecture Overview](../../docs/developers/ARCHITECTURE.md)
+- [Contributing Guide](../../docs/developers/CONTRIBUTING.md)
+- [Coding Standards](../../docs/developers/STANDARDS.md)
+- [Testing Guide](../../docs/developers/testing/TESTING.md)
+- [Roadmap](../../docs/developers/ROADMAP.md)
 
-**SQL Query Features:**
-- WHERE clause with comparison operators (<, >, <=, >=, !=, =)
-- Logical operators (AND, OR, NOT)
-- ORDER BY (ASC/DESC)
-- LIMIT/OFFSET
-- Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
-- GROUP BY clause
-- HAVING clause
-- DISTINCT
-- JOIN (INNER, LEFT, RIGHT, FULL OUTER)
-- Set operations (UNION/UNION ALL, INTERSECT, EXCEPT)
-- Subqueries (scalar and IN subqueries)
-- CTEs (Common Table Expressions with WITH clause)
-- Window functions (ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD)
-- CASE expressions (CASE WHEN ... THEN ... ELSE ... END)
-- Views (CREATE VIEW, DROP VIEW)
-- Materialized Views (CREATE MATERIALIZED VIEW, REFRESH MATERIALIZED VIEW, DROP MATERIALIZED VIEW)
-- Triggers (CREATE TRIGGER, DROP TRIGGER with BEFORE/AFTER, FOR EACH ROW/STATEMENT)
-
-**Execution Operators:**
-- Sequential Scan
-- Filter (WHERE clause)
-- Project (column selection)
-- Nested Loop Join
-- Hash Join
-- Merge Join
-- Sort (with external merge sort)
-- Hash Aggregation
-- Limit/Offset
-- Group By
-- Having
-- Distinct
-- Union/Intersect/Except
-- Window functions
-- CASE expressions
-
-**Testing:**
-- 657 comprehensive tests (100% pass rate)
-- Unit tests: 553 tests
-- Edge case tests: 98 tests
-- Integration tests: 6 new persistence tests
-- Test execution time: <0.12s
-
-**In Progress**:
-- None
-
-**Known Limitations**:
-- No parallel query execution
-- No advanced indexes (GiST, GIN, BRIN, Hash)
-- No stored procedures
-- No table partitioning
-- No replication
-- No full-text search
-- No JSON/JSONB operators
-- No recursive CTEs
-- No correlated subqueries
-
-**Planned Features**:
-
-**Version 0.3.0 (Beta) - Parallel Execution & Advanced Indexes:**
-- Parallel sequential scan
-- Parallel hash join and aggregation
-- Parallel sort with work-stealing scheduler
-- Morsel-driven parallelism
-- GiST (Generalized Search Tree) indexes
-- GIN (Generalized Inverted Index) indexes
-- BRIN (Block Range Index) indexes
-- Hash indexes
-- Partial and expression indexes
-- Views and materialized views
-- Triggers (BEFORE/AFTER, FOR EACH ROW/STATEMENT)
-- Stored procedures (PL/pgSQL)
-- User-defined functions
-- Recursive CTEs
-
-**Version 0.4.0 (Beta) - Replication & Operations:**
-- Streaming replication (async and sync)
-- Logical replication with replication slots
-- Automatic failover and read replicas
-- Online backups (pg_basebackup compatible)
-- Point-in-time recovery (PITR)
-- Incremental backups with compression
-- Prometheus metrics exporter
-- Query statistics (pg_stat_statements)
-- Slow query log and lock monitoring
-- Buffer pool statistics
-
-**Version 0.5.0 (Beta) - Storage & Performance:**
-- LSM-Tree storage engine
-- Columnar storage for OLAP workloads
-- Table partitioning (range, hash, list)
-- Compression (LZ4, Zstd)
-- TOAST (large object storage)
-- Vectorized execution with SIMD
-- JIT compilation for expressions
-- Adaptive query execution
-- Query result caching
-- Prepared statement caching
-- Full-text search with ranking
-- JSON/JSONB operators and functions
-- Array operations and range types
-
-**Version 0.6.0 (RC) - Security & Administration:**
-- TLS/SSL support
-- SCRAM-SHA-256 authentication
-- Certificate authentication
-- Row-level security (RLS)
-- Column-level encryption
-- Audit logging
-- Online schema changes
-- Parallel vacuum and autovacuum tuning
-- Built-in connection pooler
-- PostgreSQL 16 compatibility
-- Foreign data wrappers (FDW)
-- Extensions API
-- pg_dump/pg_restore compatibility
-
-**Version 1.0.0 (Stable) - Production Ready:**
-- Comprehensive integration and fuzz testing
-- Performance benchmarks (TPC-C, TPC-H)
-- Complete documentation (user, admin, internals)
-- Migration tools from PostgreSQL
-- Production deployment guides
-- Client libraries (Rust, Python, Node.js, Go)
-- GUI tools (pgAdmin compatibility)
-- Monitoring dashboards
-- Cloud deployment templates
-
-**Future (1.1.0+) - Distributed & Advanced:**
-- Horizontal sharding
-- Distributed transactions (2PC, Raft)
-- Cross-shard queries and automatic rebalancing
-- Multi-region support
-- Columnar execution engine
-- Approximate query processing
-- Machine learning integration (SQL/ML)
-- Time-series optimizations
-- Kubernetes operator
-- Auto-scaling and serverless mode
-- Multi-tenancy
-- Cloud storage integration (S3, GCS)
-- NUMA-aware memory allocation
-- GPU acceleration for analytics
-- Persistent memory (PMEM) support
-- Zero-copy networking (io_uring)
+### Project Status
+- [Completed Features](../../docs/project-status/COMPLETED_FEATURES.md)
+- [Planned Features](../../docs/project-status/PLANNED_FEATURES.md)
