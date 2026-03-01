@@ -1,8 +1,8 @@
 # RustGres
 
-[![CI](https://github.com/rustgres/rustgres/workflows/CI/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/ci.yml)
-[![Integration Tests](https://github.com/rustgres/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/integration.yml)
-[![codecov](https://codecov.io/gh/rustgres/rustgres/branch/main/graph/badge.svg)](https://codecov.io/gh/rustgres/rustgres)
+[![CI](https://github.com/neoalienson/rustgres/workflows/CI/badge.svg)](https://github.com/neoalienson/rustgres/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/neoalienson/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/neoalienson/rustgres/actions/workflows/integration.yml)
+[![codecov](https://codecov.io/gh/neoalienson/rustgres/branch/main/graph/badge.svg)](https://codecov.io/gh/neoalienson/rustgres)
 [![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
