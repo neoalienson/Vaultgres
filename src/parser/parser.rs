@@ -52,7 +52,7 @@ impl Parser {
             Token::Delete => dml::parse_delete(self),
             Token::Create => ddl::parse_create(self),
             Token::Drop => ddl::parse_drop(self),
-            Token::Describe | Token::Desc => ddl::parse_describe(self),
+            Token::Describe => ddl::parse_describe(self),
             _ => Err(ParseError::UnexpectedToken(format!("{:?}", self.current_token()))),
         }?;
         
@@ -335,19 +335,6 @@ mod tests {
         match stmt {
             Statement::Describe(s) => {
                 assert_eq!(s.table, "users");
-            }
-            _ => panic!("Expected DESCRIBE statement"),
-        }
-    }
-    
-    #[test]
-    fn test_parse_desc() {
-        let mut parser = Parser::new("DESC products").unwrap();
-        let stmt = parser.parse().unwrap();
-        
-        match stmt {
-            Statement::Describe(s) => {
-                assert_eq!(s.table, "products");
             }
             _ => panic!("Expected DESCRIBE statement"),
         }

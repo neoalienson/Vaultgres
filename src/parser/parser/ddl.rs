@@ -256,9 +256,7 @@ fn parse_drop_index(parser: &mut Parser) -> Result<Statement> {
 }
 
 pub fn parse_describe(parser: &mut Parser) -> Result<Statement> {
-    if parser.current_token() == &Token::Describe || parser.current_token() == &Token::Desc {
-        parser.advance();
-    }
+    parser.expect(Token::Describe)?;
     
     let table = parser.expect_identifier()?;
     
