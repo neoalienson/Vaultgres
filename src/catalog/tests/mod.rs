@@ -1,4 +1,5 @@
 mod aggregate_tests;
+mod coverage_tests;
 mod ddl_tests;
 mod edge_case_tests;
 mod insert_tests;

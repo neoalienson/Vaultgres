@@ -72,4 +72,28 @@ mod tests {
         let msg = Message::parse(b'Q', b"SELECT 1\0\0\0").unwrap();
         assert_eq!(msg, Message::Query { sql: "SELECT 1".to_string() });
     }
+
+    #[test]
+    fn test_startup_with_database_only() {
+        let data = b"database=mydb\0";
+        let msg = Message::parse(0, data).unwrap();
+        match msg {
+            Message::Startup { database, .. } => assert_eq!(database, "mydb"),
+            _ => panic!("Expected Startup"),
+        }
+    }
+
+    #[test]
+    fn test_response_row_description() {
+        let mut buf = Vec::new();
+        Response::RowDescription { columns: vec!["id".to_string()] }.write(&mut buf).unwrap();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn test_response_data_row() {
+        let mut buf = Vec::new();
+        Response::DataRow { values: vec![vec![1, 2, 3]] }.write(&mut buf).unwrap();
+        assert!(buf.is_empty());
+    }
 }
