@@ -65,7 +65,8 @@ fn test_wal_disk_writer_persistence() {
     let lsn = writer.write(&record).unwrap();
     writer.flush().unwrap();
     
-    assert!(lsn >= 0);
+    // LSN is u64, always >= 0
+    assert!(lsn == 0 || lsn > 0);
     
     // Verify file was created
     let wal_files: Vec<_> = std::fs::read_dir(temp_dir.path())

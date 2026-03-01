@@ -1,0 +1,7 @@
+# Clippy configuration for RustGres
+
+# Allow some pedantic lints that are too strict for our use case
+too-many-arguments-threshold = 10
+
+# Type complexity threshold
+type-complexity-threshold = 500

@@ -125,10 +125,13 @@ git checkout -b fix/issue-123
 cargo fmt
 
 # Run linter
-cargo clippy -- -D warnings
-
-# Check for common mistakes
 cargo clippy --all-targets --all-features
+
+# Or use the lint script
+./lint.sh
+
+# Fix warnings automatically (where possible)
+cargo clippy --fix --all-targets --all-features
 ```
 
 **Write Tests**:

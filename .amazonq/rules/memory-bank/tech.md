@@ -104,10 +104,16 @@ cargo fmt
 cargo fmt -- --check
 
 # Run linter
-cargo clippy
+cargo clippy --all-targets --all-features
 
-# Run linter with all warnings
-cargo clippy -- -W clippy::all
+# Or use the lint script
+./lint.sh
+
+# Fix warnings automatically
+cargo clippy --fix --all-targets --all-features
+
+# Run linter with strict mode (fail on warnings)
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ### Running
