@@ -1,5 +1,10 @@
 # RustGres
 
+[![CI](https://github.com/rustgres/rustgres/workflows/CI/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/rustgres/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/integration.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
+[![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+
 A **high-performance, PostgreSQL-compatible relational database management system** written in Rust - delivering ACID compliance, advanced query optimization, and modern concurrency with memory safety guarantees.
 
 ## Purpose
