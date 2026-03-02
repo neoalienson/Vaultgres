@@ -150,7 +150,12 @@ impl<S: Read + Write> Connection<S> {
 
         match stmt {
             Statement::CreateTable(create) => {
-                self.catalog.create_table(create.table.clone(), create.columns)?;
+                self.catalog.create_table_with_constraints(
+                    create.table.clone(),
+                    create.columns,
+                    create.primary_key,
+                    create.foreign_keys,
+                )?;
                 Ok(ExecutionResult::CommandComplete("CREATE TABLE".to_string()))
             }
             Statement::DropTable(drop) => {

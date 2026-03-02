@@ -3,6 +3,7 @@ use std::thread;
 use std::time::Instant;
 
 mod pet_store;
+mod referential_integrity;
 
 #[test]
 fn test_oltp_simple_transactions() {

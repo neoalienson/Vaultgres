@@ -4,7 +4,7 @@ use crate::parser::ast::{ColumnDef, DataType, Expr};
 #[test]
 fn test_aggregate_count() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -21,7 +21,7 @@ fn test_aggregate_count() {
 #[test]
 fn test_aggregate_sum() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(10)]).unwrap();
@@ -48,7 +48,7 @@ fn test_aggregate_sum() {
 #[test]
 fn test_aggregate_avg() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(10)]).unwrap();
@@ -75,7 +75,7 @@ fn test_aggregate_avg() {
 #[test]
 fn test_aggregate_min_max() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(10)]).unwrap();
@@ -117,8 +117,8 @@ fn test_aggregate_min_max() {
 fn test_group_by() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "category".to_string(), data_type: DataType::Text },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("category".to_string(), DataType::Text),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -139,8 +139,8 @@ fn test_group_by() {
 fn test_having_clause() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "category".to_string(), data_type: DataType::Text },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("category".to_string(), DataType::Text),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();

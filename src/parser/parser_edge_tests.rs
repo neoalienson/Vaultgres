@@ -406,3 +406,113 @@ fn test_parse_mixed_case_keywords() {
     let result = parse("SeLeCt * FrOm users");
     assert!(result.is_ok());
 }
+
+// PRIMARY KEY and FOREIGN KEY tests
+#[test]
+fn test_parse_primary_key_column_level() {
+    let mut parser = Parser::new("CREATE TABLE users (id INT PRIMARY KEY, name TEXT)").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "users");
+            assert_eq!(s.columns.len(), 2);
+            assert!(s.columns[0].is_primary_key);
+            assert!(!s.columns[1].is_primary_key);
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_primary_key_table_level() {
+    let mut parser = Parser::new("CREATE TABLE users (id INT, name TEXT, PRIMARY KEY (id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "users");
+            assert_eq!(s.primary_key, Some(vec!["id".to_string()]));
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_composite_primary_key() {
+    let mut parser = Parser::new("CREATE TABLE orders (user_id INT, product_id INT, PRIMARY KEY (user_id, product_id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "orders");
+            assert_eq!(s.primary_key, Some(vec!["user_id".to_string(), "product_id".to_string()]));
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_foreign_key_column_level() {
+    let mut parser = Parser::new("CREATE TABLE orders (id INT, customer_id INT REFERENCES customers(id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "orders");
+            assert_eq!(s.columns.len(), 2);
+            assert!(s.columns[1].foreign_key.is_some());
+            let fk = s.columns[1].foreign_key.as_ref().unwrap();
+            assert_eq!(fk.table, "customers");
+            assert_eq!(fk.column, "id");
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_foreign_key_table_level() {
+    let mut parser = Parser::new("CREATE TABLE orders (id INT, customer_id INT, FOREIGN KEY (customer_id) REFERENCES customers(id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "orders");
+            assert_eq!(s.foreign_keys.len(), 1);
+            assert_eq!(s.foreign_keys[0].columns, vec!["customer_id".to_string()]);
+            assert_eq!(s.foreign_keys[0].ref_table, "customers");
+            assert_eq!(s.foreign_keys[0].ref_columns, vec!["id".to_string()]);
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_pk_and_fk_combined() {
+    let mut parser = Parser::new("CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT REFERENCES customers(id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "orders");
+            assert!(s.columns[0].is_primary_key);
+            assert!(s.columns[1].foreign_key.is_some());
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}
+
+#[test]
+fn test_parse_multiple_foreign_keys() {
+    let mut parser = Parser::new("CREATE TABLE order_items (order_id INT REFERENCES orders(id), product_id INT REFERENCES products(id))").unwrap();
+    let stmt = parser.parse().unwrap();
+    
+    match stmt {
+        Statement::CreateTable(s) => {
+            assert_eq!(s.table, "order_items");
+            assert!(s.columns[0].foreign_key.is_some());
+            assert!(s.columns[1].foreign_key.is_some());
+        }
+        _ => panic!("Expected CREATE TABLE"),
+    }
+}

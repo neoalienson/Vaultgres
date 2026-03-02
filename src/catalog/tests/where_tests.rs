@@ -5,8 +5,8 @@ use crate::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
 fn test_select_with_where() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -31,7 +31,7 @@ fn test_select_with_where() {
 #[test]
 fn test_select_with_not_equals() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -53,7 +53,7 @@ fn test_select_with_not_equals() {
 #[test]
 fn test_select_with_less_than() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(10)]).unwrap();
@@ -75,7 +75,7 @@ fn test_select_with_less_than() {
 #[test]
 fn test_select_with_greater_than() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(10)]).unwrap();
@@ -98,8 +98,8 @@ fn test_select_with_greater_than() {
 fn test_where_with_and() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -131,7 +131,7 @@ fn test_where_with_and() {
 #[test]
 fn test_where_with_or() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -161,7 +161,7 @@ fn test_where_with_or() {
 #[test]
 fn test_like_operator() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "name".to_string(), data_type: DataType::Text }];
+    let columns = vec![ColumnDef::new("name".to_string(), DataType::Text)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::String("hello world".to_string())]).unwrap();
@@ -183,7 +183,7 @@ fn test_like_operator() {
 #[test]
 fn test_in_operator() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -206,7 +206,7 @@ fn test_in_operator() {
 #[test]
 fn test_between_operator() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(5)]).unwrap();

@@ -5,8 +5,8 @@ use crate::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
 fn test_update() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -29,8 +29,8 @@ fn test_update_nonexistent_table() {
 fn test_update_with_where() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -52,7 +52,7 @@ fn test_update_with_where() {
 #[test]
 fn test_delete() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -66,7 +66,7 @@ fn test_delete() {
 #[test]
 fn test_delete_empty_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("empty".to_string(), columns).unwrap();
     let deleted = catalog.delete("empty", None).unwrap();
@@ -76,7 +76,7 @@ fn test_delete_empty_table() {
 #[test]
 fn test_delete_with_where() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();

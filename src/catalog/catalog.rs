@@ -3,7 +3,8 @@ use super::persistence::Persistence;
 use super::predicate::PredicateEvaluator;
 use super::{Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{
-    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, Expr, OrderByExpr, SelectStmt,
+    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, Expr, ForeignKeyDef, OrderByExpr,
+    SelectStmt,
 };
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
@@ -108,13 +109,58 @@ impl Catalog {
     }
 
     pub fn create_table(&self, name: String, columns: Vec<ColumnDef>) -> Result<(), String> {
+        self.create_table_with_constraints(name, columns, None, Vec::new())
+    }
+
+    pub fn create_table_with_constraints(
+        &self,
+        name: String,
+        columns: Vec<ColumnDef>,
+        primary_key: Option<Vec<String>>,
+        foreign_keys: Vec<ForeignKeyDef>,
+    ) -> Result<(), String> {
         let mut tables = self.tables.write().unwrap();
 
         if tables.contains_key(&name) {
             return Err(format!("Table '{}' already exists", name));
         }
 
-        tables.insert(name.clone(), TableSchema { name: name.clone(), columns });
+        // Collect primary key from column-level constraints
+        let mut pk = primary_key;
+        if pk.is_none() {
+            let pk_cols: Vec<String> = columns
+                .iter()
+                .filter(|c| c.is_primary_key)
+                .map(|c| c.name.clone())
+                .collect();
+            if !pk_cols.is_empty() {
+                pk = Some(pk_cols);
+            }
+        }
+
+        // Collect foreign keys from column-level constraints
+        let mut fks = foreign_keys;
+        for col in &columns {
+            if let Some(ref fk_ref) = col.foreign_key {
+                fks.push(ForeignKeyDef {
+                    columns: vec![col.name.clone()],
+                    ref_table: fk_ref.table.clone(),
+                    ref_columns: vec![fk_ref.column.clone()],
+                });
+            }
+        }
+
+        // Validate foreign key references
+        for fk in &fks {
+            if !tables.contains_key(&fk.ref_table) {
+                return Err(format!("Referenced table '{}' does not exist", fk.ref_table));
+            }
+        }
+
+        tables.insert(
+            name.clone(),
+            TableSchema::with_constraints(name.clone(), columns, pk, fks),
+        );
         drop(tables);
 
         let mut data = self.data.write().unwrap();
@@ -322,6 +368,96 @@ impl Catalog {
             }
 
             tuple_data.push(value);
+        }
+
+        // Validate PRIMARY KEY uniqueness
+        if let Some(ref pk_cols) = schema.primary_key {
+            let pk_indices: Vec<usize> = pk_cols
+                .iter()
+                .map(|col| schema.columns.iter().position(|c| &c.name == col).unwrap())
+                .collect();
+
+            // Check for NULL in PK columns
+            for &idx in &pk_indices {
+                if tuple_data[idx] == Value::Null {
+                    return Err(format!(
+                        "Primary key column '{}' cannot be NULL",
+                        schema.columns[idx].name
+                    ));
+                }
+            }
+
+            // Check for duplicate PK
+            let data = self.data.read().unwrap();
+            if let Some(tuples) = data.get(table) {
+                let snapshot = self.txn_mgr.get_snapshot();
+                for existing in tuples {
+                    if existing.header.is_visible(&snapshot, &self.txn_mgr) {
+                        let mut pk_match = true;
+                        for &idx in &pk_indices {
+                            if existing.data[idx] != tuple_data[idx] {
+                                pk_match = false;
+                                break;
+                            }
+                        }
+                        if pk_match {
+                            return Err("Primary key violation: duplicate key value".to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Validate FOREIGN KEY references
+        for fk in &schema.foreign_keys {
+            let fk_indices: Vec<usize> = fk
+                .columns
+                .iter()
+                .map(|col| schema.columns.iter().position(|c| &c.name == col).unwrap())
+                .collect();
+
+            let fk_values: Vec<Value> = fk_indices.iter().map(|&idx| tuple_data[idx].clone()).collect();
+
+            // Check if referenced row exists
+            let ref_schema = self
+                .get_table(&fk.ref_table)
+                .ok_or_else(|| format!("Referenced table '{}' does not exist", fk.ref_table))?;
+
+            let ref_indices: Vec<usize> = fk
+                .ref_columns
+                .iter()
+                .map(|col| ref_schema.columns.iter().position(|c| &c.name == col).unwrap())
+                .collect();
+
+            let data = self.data.read().unwrap();
+            let ref_tuples = data
+                .get(&fk.ref_table)
+                .ok_or_else(|| format!("Referenced table '{}' has no data", fk.ref_table))?;
+
+            let snapshot = self.txn_mgr.get_snapshot();
+            let mut found = false;
+            for ref_tuple in ref_tuples {
+                if ref_tuple.header.is_visible(&snapshot, &self.txn_mgr) {
+                    let mut match_found = true;
+                    for (i, &ref_idx) in ref_indices.iter().enumerate() {
+                        if ref_tuple.data[ref_idx] != fk_values[i] {
+                            match_found = false;
+                            break;
+                        }
+                    }
+                    if match_found {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if !found {
+                return Err(format!(
+                    "Foreign key violation: referenced row does not exist in table '{}'",
+                    fk.ref_table
+                ));
+            }
         }
 
         let tuple = Tuple { header, data: tuple_data };

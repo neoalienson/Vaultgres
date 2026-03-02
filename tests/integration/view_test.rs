@@ -10,8 +10,8 @@ fn test_create_and_drop_view() {
         .create_table(
             "users".to_string(),
             vec![
-                ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-                ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("name".to_string(), DataType::Text),
             ],
         )
         .unwrap();
@@ -74,8 +74,8 @@ fn test_view_with_filter() {
         .create_table(
             "users".to_string(),
             vec![
-                ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-                ColumnDef { name: "active".to_string(), data_type: DataType::Int },
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("active".to_string(), DataType::Int),
             ],
         )
         .unwrap();

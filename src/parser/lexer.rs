@@ -108,6 +108,10 @@ pub enum Token {
     Volatile,
     Cost,
     Rows,
+    Primary,
+    Key,
+    Foreign,
+    References,
 
     // Identifiers and literals
     Identifier(String),
@@ -339,6 +343,10 @@ impl Lexer {
             "VOLATILE" => Token::Volatile,
             "COST" => Token::Cost,
             "ROWS" => Token::Rows,
+            "PRIMARY" => Token::Primary,
+            "KEY" => Token::Key,
+            "FOREIGN" => Token::Foreign,
+            "REFERENCES" => Token::References,
             _ => Token::Identifier(ident),
         };
 

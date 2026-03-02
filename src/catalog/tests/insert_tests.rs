@@ -5,8 +5,8 @@ use crate::parser::ast::{ColumnDef, DataType, Expr};
 fn test_insert() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -19,7 +19,7 @@ fn test_insert() {
 #[test]
 fn test_insert_wrong_column_count() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("users".to_string(), columns).unwrap();
 
@@ -30,7 +30,7 @@ fn test_insert_wrong_column_count() {
 #[test]
 fn test_insert_type_mismatch() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("users".to_string(), columns).unwrap();
 
@@ -42,8 +42,8 @@ fn test_insert_type_mismatch() {
 fn test_insert_multiple_rows() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();

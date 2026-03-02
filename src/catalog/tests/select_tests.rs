@@ -5,8 +5,8 @@ use crate::parser::ast::{ColumnDef, DataType, Expr, OrderByExpr};
 fn test_select_all() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -24,8 +24,8 @@ fn test_select_all() {
 fn test_select_specific_columns() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -58,7 +58,7 @@ fn test_select_nonexistent_table() {
 #[test]
 fn test_select_empty_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("empty".to_string(), columns).unwrap();
     let rows = catalog
@@ -71,8 +71,8 @@ fn test_select_empty_table() {
 fn test_select_with_order_by_asc() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -94,7 +94,7 @@ fn test_select_with_order_by_asc() {
 #[test]
 fn test_select_with_order_by_desc() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -115,7 +115,7 @@ fn test_select_with_order_by_desc() {
 #[test]
 fn test_select_with_limit() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -132,7 +132,7 @@ fn test_select_with_limit() {
 #[test]
 fn test_select_with_offset() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -150,7 +150,7 @@ fn test_select_with_offset() {
 #[test]
 fn test_select_with_limit_and_offset() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -170,7 +170,7 @@ fn test_select_with_limit_and_offset() {
 #[test]
 fn test_distinct() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "category".to_string(), data_type: DataType::Text }];
+    let columns = vec![ColumnDef::new("category".to_string(), DataType::Text)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::String("A".to_string())]).unwrap();

@@ -125,8 +125,8 @@ mod tests {
         let schema = TableSchema {
             name: "test".to_string(),
             columns: vec![
-                ColumnDef { name: "category".to_string(), data_type: DataType::Text },
-                ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+                ColumnDef::new("category".to_string(), DataType::Text),
+                ColumnDef::new("value".to_string(), DataType::Int),
             ],
         };
 
@@ -195,8 +195,8 @@ mod tests {
         let schema = TableSchema {
             name: "test".to_string(),
             columns: vec![
-                ColumnDef { name: "category".to_string(), data_type: DataType::Text },
-                ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+                ColumnDef::new("category".to_string(), DataType::Text),
+                ColumnDef::new("value".to_string(), DataType::Int),
             ],
         };
 

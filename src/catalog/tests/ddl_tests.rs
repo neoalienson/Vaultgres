@@ -5,8 +5,8 @@ use crate::parser::ast::{ColumnDef, DataType};
 fn test_create_table() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     assert!(catalog.create_table("users".to_string(), columns).is_ok());
@@ -16,7 +16,7 @@ fn test_create_table() {
 #[test]
 fn test_create_duplicate_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("users".to_string(), columns.clone()).unwrap();
     assert!(catalog.create_table("users".to_string(), columns).is_err());
@@ -25,7 +25,7 @@ fn test_create_duplicate_table() {
 #[test]
 fn test_drop_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("users".to_string(), columns).unwrap();
     assert!(catalog.drop_table("users", false).is_ok());

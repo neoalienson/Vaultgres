@@ -261,6 +261,8 @@ pub struct CloseCursorStmt {
 pub struct CreateTableStmt {
     pub table: String,
     pub columns: Vec<ColumnDef>,
+    pub primary_key: Option<Vec<String>>,
+    pub foreign_keys: Vec<ForeignKeyDef>,
 }
 
 /// Column definition
@@ -268,6 +270,29 @@ pub struct CreateTableStmt {
 pub struct ColumnDef {
     pub name: String,
     pub data_type: DataType,
+    pub is_primary_key: bool,
+    pub foreign_key: Option<ForeignKeyRef>,
+}
+
+impl ColumnDef {
+    pub fn new(name: String, data_type: DataType) -> Self {
+        Self { name, data_type, is_primary_key: false, foreign_key: None }
+    }
+}
+
+/// Foreign key reference (column-level)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ForeignKeyRef {
+    pub table: String,
+    pub column: String,
+}
+
+/// Foreign key definition (table-level)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ForeignKeyDef {
+    pub columns: Vec<String>,
+    pub ref_table: String,
+    pub ref_columns: Vec<String>,
 }
 
 /// Data type

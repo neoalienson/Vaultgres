@@ -14,7 +14,7 @@ fn test_parallel_seq_scan_integration() {
     catalog
         .create_table(
             "test".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -36,13 +36,13 @@ fn test_parallel_hash_join_integration() {
     catalog
         .create_table(
             "left_table".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
     catalog
         .create_table(
             "right_table".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -90,7 +90,7 @@ fn test_parallel_aggregation_integration() {
     catalog
         .create_table(
             "agg_test".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -125,7 +125,7 @@ fn test_parallel_sort_integration() {
     catalog
         .create_table(
             "sort_test".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -177,7 +177,7 @@ fn test_single_worker_execution() {
     catalog
         .create_table(
             "single".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 

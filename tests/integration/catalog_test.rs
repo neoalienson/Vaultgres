@@ -6,8 +6,8 @@ fn test_catalog_create_and_query() {
     let catalog = Catalog::new();
 
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -22,8 +22,8 @@ fn test_catalog_insert_and_count() {
     let catalog = Catalog::new();
 
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -42,14 +42,14 @@ fn test_catalog_multiple_tables() {
     catalog
         .create_table(
             "users".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
     catalog
         .create_table(
             "products".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -63,7 +63,7 @@ fn test_catalog_multiple_tables() {
 fn test_catalog_drop_and_recreate() {
     let catalog = Catalog::new();
 
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("temp".to_string(), columns.clone()).unwrap();
     catalog.insert("temp", vec![Expr::Number(1)]).unwrap();
@@ -80,7 +80,7 @@ fn test_catalog_drop_and_recreate() {
 fn test_catalog_varchar_type() {
     let catalog = Catalog::new();
 
-    let columns = vec![ColumnDef { name: "email".to_string(), data_type: DataType::Varchar(100) }];
+    let columns = vec![ColumnDef::new("email".to_string(), DataType::Varchar(100))];
 
     catalog.create_table("contacts".to_string(), columns).unwrap();
     catalog.insert("contacts", vec![Expr::String("test@example.com".to_string())]).unwrap();
@@ -93,8 +93,8 @@ fn test_catalog_insert_validation() {
     let catalog = Catalog::new();
 
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -108,7 +108,7 @@ fn test_catalog_insert_validation() {
 fn test_catalog_type_validation() {
     let catalog = Catalog::new();
 
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("numbers".to_string(), columns).unwrap();
 
@@ -124,7 +124,7 @@ fn test_catalog_concurrent_operations() {
     catalog
         .create_table(
             "test".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 
@@ -142,7 +142,7 @@ fn test_catalog_empty_table() {
     catalog
         .create_table(
             "empty".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
 

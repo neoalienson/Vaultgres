@@ -4,8 +4,9 @@ use crate::parser::ast::{
     CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
     CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
     DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
-    DropViewStmt, FetchCursorStmt, FetchDirection, FunctionParameter, FunctionReturnType,
-    FunctionVolatility, ParameterMode, Statement, TriggerEvent, TriggerFor, TriggerTiming,
+    DropViewStmt, FetchCursorStmt, FetchDirection, ForeignKeyDef, ForeignKeyRef, FunctionParameter,
+    FunctionReturnType, FunctionVolatility, ParameterMode, Statement, TriggerEvent, TriggerFor,
+    TriggerTiming,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -38,11 +39,60 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
 
     parser.expect(Token::LeftParen)?;
 
-    let columns = parse_column_defs(parser)?;
+    let mut columns = Vec::new();
+    let mut primary_key = None;
+    let mut foreign_keys = Vec::new();
+
+    loop {
+        // Check for table-level constraints
+        if parser.current_token() == &Token::Primary {
+            parser.advance();
+            parser.expect(Token::Key)?;
+            parser.expect(Token::LeftParen)?;
+            let mut pk_cols = vec![parser.expect_identifier()?];
+            while parser.current_token() == &Token::Comma {
+                parser.advance();
+                pk_cols.push(parser.expect_identifier()?);
+            }
+            parser.expect(Token::RightParen)?;
+            primary_key = Some(pk_cols);
+        } else if parser.current_token() == &Token::Foreign {
+            parser.advance();
+            parser.expect(Token::Key)?;
+            parser.expect(Token::LeftParen)?;
+            let mut fk_cols = vec![parser.expect_identifier()?];
+            while parser.current_token() == &Token::Comma {
+                parser.advance();
+                fk_cols.push(parser.expect_identifier()?);
+            }
+            parser.expect(Token::RightParen)?;
+            parser.expect(Token::References)?;
+            let ref_table = parser.expect_identifier()?;
+            parser.expect(Token::LeftParen)?;
+            let mut ref_cols = vec![parser.expect_identifier()?];
+            while parser.current_token() == &Token::Comma {
+                parser.advance();
+                ref_cols.push(parser.expect_identifier()?);
+            }
+            parser.expect(Token::RightParen)?;
+            foreign_keys.push(ForeignKeyDef {
+                columns: fk_cols,
+                ref_table,
+                ref_columns: ref_cols,
+            });
+        } else {
+            columns.push(parse_column_def(parser)?);
+        }
+
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
+        parser.advance();
+    }
 
     parser.expect(Token::RightParen)?;
 
-    Ok(Statement::CreateTable(CreateTableStmt { table, columns }))
+    Ok(Statement::CreateTable(CreateTableStmt { table, columns, primary_key, foreign_keys }))
 }
 
 fn parse_create_view(parser: &mut Parser) -> Result<Statement> {
@@ -296,7 +346,27 @@ fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
     let name = parser.expect_identifier()?;
     let data_type = parse_data_type(parser)?;
 
-    Ok(ColumnDef { name, data_type })
+    let mut is_primary_key = false;
+    let mut foreign_key = None;
+
+    // Check for column-level PRIMARY KEY
+    if parser.current_token() == &Token::Primary {
+        parser.advance();
+        parser.expect(Token::Key)?;
+        is_primary_key = true;
+    }
+
+    // Check for column-level REFERENCES
+    if parser.current_token() == &Token::References {
+        parser.advance();
+        let ref_table = parser.expect_identifier()?;
+        parser.expect(Token::LeftParen)?;
+        let ref_column = parser.expect_identifier()?;
+        parser.expect(Token::RightParen)?;
+        foreign_key = Some(ForeignKeyRef { table: ref_table, column: ref_column });
+    }
+
+    Ok(ColumnDef { name, data_type, is_primary_key, foreign_key })
 }
 
 fn parse_data_type(parser: &mut Parser) -> Result<DataType> {

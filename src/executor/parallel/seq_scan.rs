@@ -40,7 +40,7 @@ mod tests {
         catalog
             .create_table(
                 "test".to_string(),
-                vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+                vec![ColumnDef::new("id".to_string(), DataType::Int)],
             )
             .unwrap();
 

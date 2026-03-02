@@ -129,7 +129,7 @@ fn test_connection_handle_query_insert() {
     catalog
         .create_table(
             "t".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
     let mut conn = Connection::new(stream, catalog);
@@ -155,7 +155,7 @@ fn test_connection_handle_query_update() {
     catalog
         .create_table(
             "t".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
     let mut conn = Connection::new(stream, catalog);
@@ -181,7 +181,7 @@ fn test_connection_handle_query_describe() {
     catalog
         .create_table(
             "t".to_string(),
-            vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }],
+            vec![ColumnDef::new("id".to_string(), DataType::Int)],
         )
         .unwrap();
     let mut conn = Connection::new(stream, catalog);

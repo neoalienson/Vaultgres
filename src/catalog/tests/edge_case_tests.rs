@@ -5,8 +5,8 @@ use crate::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
 fn test_insert_null_value() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
@@ -20,7 +20,7 @@ fn test_insert_null_value() {
 #[test]
 fn test_select_from_empty_result() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -41,8 +41,8 @@ fn test_select_from_empty_result() {
 fn test_update_no_matching_rows() {
     let catalog = Catalog::new();
     let columns = vec![
-        ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-        ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -63,7 +63,7 @@ fn test_update_no_matching_rows() {
 #[test]
 fn test_delete_no_matching_rows() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -81,7 +81,7 @@ fn test_delete_no_matching_rows() {
 #[test]
 fn test_select_with_invalid_column() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -103,7 +103,7 @@ fn test_select_with_invalid_column() {
 #[test]
 fn test_where_with_invalid_column() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -131,7 +131,7 @@ fn test_where_with_invalid_column() {
 #[test]
 fn test_update_invalid_column() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -143,7 +143,7 @@ fn test_update_invalid_column() {
 #[test]
 fn test_limit_larger_than_result_set() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -158,7 +158,7 @@ fn test_limit_larger_than_result_set() {
 #[test]
 fn test_offset_larger_than_result_set() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -172,7 +172,7 @@ fn test_offset_larger_than_result_set() {
 #[test]
 fn test_aggregate_on_empty_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
 
@@ -185,7 +185,7 @@ fn test_aggregate_on_empty_table() {
 #[test]
 fn test_in_operator_empty_list() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -205,7 +205,7 @@ fn test_in_operator_empty_list() {
 #[test]
 fn test_between_with_reversed_bounds() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(15)]).unwrap();
@@ -226,7 +226,7 @@ fn test_between_with_reversed_bounds() {
 #[test]
 fn test_like_with_empty_pattern() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "name".to_string(), data_type: DataType::Text }];
+    let columns = vec![ColumnDef::new("name".to_string(), DataType::Text)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::String("test".to_string())]).unwrap();
@@ -246,7 +246,7 @@ fn test_like_with_empty_pattern() {
 #[test]
 fn test_distinct_on_empty_table() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
 
@@ -259,7 +259,7 @@ fn test_distinct_on_empty_table() {
 #[test]
 fn test_distinct_all_duplicates() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "value".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -275,7 +275,7 @@ fn test_distinct_all_duplicates() {
 #[test]
 fn test_order_by_with_invalid_column() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -302,7 +302,7 @@ fn test_order_by_with_invalid_column() {
 #[test]
 fn test_group_by_with_invalid_column() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
@@ -325,7 +325,7 @@ fn test_group_by_with_invalid_column() {
 #[test]
 fn test_zero_limit() {
     let catalog = Catalog::new();
-    let columns = vec![ColumnDef { name: "id".to_string(), data_type: DataType::Int }];
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();

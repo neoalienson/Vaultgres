@@ -177,9 +177,9 @@ mod tests {
         TableSchema {
             name: "test".to_string(),
             columns: vec![
-                ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-                ColumnDef { name: "name".to_string(), data_type: DataType::Text },
-                ColumnDef { name: "age".to_string(), data_type: DataType::Int },
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("name".to_string(), DataType::Text),
+                ColumnDef::new("age".to_string(), DataType::Int),
             ],
         }
     }

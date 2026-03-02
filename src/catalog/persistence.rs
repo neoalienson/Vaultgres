@@ -161,10 +161,10 @@ impl Persistence {
             for _ in 0..num_columns {
                 let col_name = read_string(&mut reader)?;
                 let data_type = read_data_type(&mut reader)?;
-                columns.push(ColumnDef { name: col_name, data_type });
+                columns.push(ColumnDef::new(col_name, data_type));
             }
 
-            let schema = TableSchema { name: table_name.clone(), columns };
+            let schema = TableSchema::new(table_name.clone(), columns);
             let num_tuples = read_u32(&mut reader)?;
             let mut tuples = Vec::new();
 
@@ -339,8 +339,8 @@ mod tests {
         let schema = TableSchema {
             name: "users".to_string(),
             columns: vec![
-                ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-                ColumnDef { name: "name".to_string(), data_type: DataType::Text },
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("name".to_string(), DataType::Text),
             ],
         };
 
@@ -381,8 +381,8 @@ mod tests {
         let schema = TableSchema {
             name: "test".to_string(),
             columns: vec![
-                ColumnDef { name: "id".to_string(), data_type: DataType::Int },
-                ColumnDef { name: "value".to_string(), data_type: DataType::Int },
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("value".to_string(), DataType::Int),
             ],
         };
 
