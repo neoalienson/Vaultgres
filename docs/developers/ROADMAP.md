@@ -38,6 +38,7 @@ RustGres development roadmap with planned features and milestones.
 - ✅ DML: INSERT, UPDATE, DELETE
 - ✅ Queries: SELECT with WHERE, ORDER BY, GROUP BY, HAVING
 - ✅ Subqueries: Scalar and IN subqueries with caching
+- ✅ Correlated subqueries: EXISTS, NOT EXISTS, IN, NOT IN, Scalar
 - ✅ Common Table Expressions (CTEs) with WITH clause
 - ✅ Window functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD
 - ✅ Set operations: UNION, UNION ALL, INTERSECT, EXCEPT
@@ -47,9 +48,9 @@ RustGres development roadmap with planned features and milestones.
 - ✅ PRIMARY KEY and FOREIGN KEY constraints
 
 **Testing Infrastructure**
-- ✅ 966 comprehensive tests (100% pass rate)
-- ✅ 494 unit tests across all modules
-- ✅ 91 edge case tests
+- ✅ 981 comprehensive tests (100% pass rate)
+- ✅ 496 unit tests across all modules
+- ✅ 104 edge case tests
 - ✅ Integration tests for cross-module features
 - ✅ Docker-based E2E testing framework
 - ✅ Performance comparison tests (RustGres vs PostgreSQL)
@@ -65,7 +66,6 @@ RustGres development roadmap with planned features and milestones.
 ## Version 0.2.0 (Current - Alpha)
 
 **In Progress**
-- 🚧 Correlated subqueries
 - 🚧 Query plan caching
 
 **Next Up**
