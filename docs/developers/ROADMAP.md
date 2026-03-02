@@ -27,6 +27,7 @@ RustGres development roadmap with planned features and milestones.
 - ✅ Index scan with B+Tree
 - ✅ Nested loop join
 - ✅ Hash join implementation
+- ✅ Merge join with sorted inputs
 - ✅ Hash aggregation with GROUP BY
 - ✅ Sort operator with external merge sort
 - ✅ Filter and projection operators
@@ -46,9 +47,9 @@ RustGres development roadmap with planned features and milestones.
 - ✅ PRIMARY KEY and FOREIGN KEY constraints
 
 **Testing Infrastructure**
-- ✅ 961 comprehensive tests (100% pass rate)
-- ✅ 489 unit tests across all modules
-- ✅ 85 edge case tests
+- ✅ 966 comprehensive tests (100% pass rate)
+- ✅ 494 unit tests across all modules
+- ✅ 91 edge case tests
 - ✅ Integration tests for cross-module features
 - ✅ Docker-based E2E testing framework
 - ✅ Performance comparison tests (RustGres vs PostgreSQL)
@@ -64,7 +65,6 @@ RustGres development roadmap with planned features and milestones.
 ## Version 0.2.0 (Current - Alpha)
 
 **In Progress**
-- 🚧 Merge join implementation
 - 🚧 Correlated subqueries
 - 🚧 Query plan caching
 

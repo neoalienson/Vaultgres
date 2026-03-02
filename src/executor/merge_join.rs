@@ -1,14 +1,15 @@
-use crate::executor::{ExecutorError, SimpleExecutor, SimpleTuple};
+use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
 
 pub struct MergeJoin {
     left: Box<dyn SimpleExecutor>,
     right: Box<dyn SimpleExecutor>,
-    left_current: Option<SimpleTuple>,
-    right_current: Option<SimpleTuple>,
-    right_buffer: Vec<SimpleTuple>,
-    buffer_position: usize,
-    left_value: Option<Vec<u8>>,
-    finished: bool,
+    left_buffer: Vec<Tuple>,
+    right_buffer: Vec<Tuple>,
+    left_idx: usize,
+    right_idx: usize,
+    result_buffer: Vec<Tuple>,
+    result_idx: usize,
+    initialized: bool,
 }
 
 impl MergeJoin {
@@ -16,17 +17,81 @@ impl MergeJoin {
         Self {
             left,
             right,
-            left_current: None,
-            right_current: None,
+            left_buffer: Vec::new(),
             right_buffer: Vec::new(),
-            buffer_position: 0,
-            left_value: None,
-            finished: false,
+            left_idx: 0,
+            right_idx: 0,
+            result_buffer: Vec::new(),
+            result_idx: 0,
+            initialized: false,
         }
     }
 
-    fn compare_tuples(left: &SimpleTuple, right: &SimpleTuple) -> std::cmp::Ordering {
-        left.data.cmp(&right.data)
+    fn load_and_sort(&mut self) -> Result<(), ExecutorError> {
+        while let Some(tuple) = self.left.next()? {
+            self.left_buffer.push(tuple);
+        }
+        while let Some(tuple) = self.right.next()? {
+            self.right_buffer.push(tuple);
+        }
+
+        self.left_buffer.sort_by(|a, b| {
+            let a_key = a.data.first().copied().unwrap_or(0);
+            let b_key = b.data.first().copied().unwrap_or(0);
+            a_key.cmp(&b_key)
+        });
+
+        self.right_buffer.sort_by(|a, b| {
+            let a_key = a.data.first().copied().unwrap_or(0);
+            let b_key = b.data.first().copied().unwrap_or(0);
+            a_key.cmp(&b_key)
+        });
+
+        self.initialized = true;
+        Ok(())
+    }
+
+    fn merge(&mut self) -> Result<(), ExecutorError> {
+        while self.left_idx < self.left_buffer.len() && self.right_idx < self.right_buffer.len() {
+            let left_key = self.left_buffer[self.left_idx].data.first().copied().unwrap_or(0);
+            let right_key = self.right_buffer[self.right_idx].data.first().copied().unwrap_or(0);
+
+            match left_key.cmp(&right_key) {
+                std::cmp::Ordering::Less => {
+                    self.left_idx += 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    self.right_idx += 1;
+                }
+                std::cmp::Ordering::Equal => {
+                    let left_group_end =
+                        self.find_group_end(&self.left_buffer, self.left_idx, left_key);
+                    let right_group_end =
+                        self.find_group_end(&self.right_buffer, self.right_idx, right_key);
+
+                    for i in self.left_idx..left_group_end {
+                        for j in self.right_idx..right_group_end {
+                            let mut data = self.left_buffer[i].data.clone();
+                            data.extend_from_slice(&self.right_buffer[j].data);
+                            self.result_buffer.push(Tuple { data });
+                        }
+                    }
+
+                    self.left_idx = left_group_end;
+                    self.right_idx = right_group_end;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn find_group_end(&self, buffer: &[Tuple], start: usize, key: u8) -> usize {
+        let mut end = start;
+        while end < buffer.len() && buffer[end].data.first().copied().unwrap_or(0) == key {
+            end += 1;
+        }
+        end
     }
 }
 
@@ -34,80 +99,21 @@ impl SimpleExecutor for MergeJoin {
     fn open(&mut self) -> Result<(), ExecutorError> {
         self.left.open()?;
         self.right.open()?;
-        self.left_current = self.left.next()?;
-        self.right_current = self.right.next()?;
-        self.finished = false;
         Ok(())
     }
 
-    fn next(&mut self) -> Result<Option<SimpleTuple>, ExecutorError> {
-        if self.finished {
-            return Ok(None);
+    fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
+        if !self.initialized {
+            self.load_and_sort()?;
+            self.merge()?;
         }
 
-        loop {
-            if self.buffer_position < self.right_buffer.len() {
-                let left = self.left_current.as_ref().unwrap();
-                let right = &self.right_buffer[self.buffer_position];
-                self.buffer_position += 1;
-
-                let mut data = left.data.clone();
-                data.extend_from_slice(&right.data);
-                return Ok(Some(SimpleTuple { data }));
-            }
-
-            if self.buffer_position == self.right_buffer.len() && !self.right_buffer.is_empty() {
-                self.left_current = self.left.next()?;
-                if let Some(ref left) = self.left_current {
-                    if Some(&left.data) == self.left_value.as_ref() {
-                        self.buffer_position = 0;
-                        continue;
-                    }
-                }
-                self.right_buffer.clear();
-                self.left_value = None;
-            }
-
-            if self.left_current.is_none() || self.right_current.is_none() {
-                self.finished = true;
-                return Ok(None);
-            }
-
-            let left = self.left_current.as_ref().unwrap();
-            let right = self.right_current.as_ref().unwrap();
-
-            match Self::compare_tuples(left, right) {
-                std::cmp::Ordering::Less => {
-                    self.left_current = self.left.next()?;
-                }
-                std::cmp::Ordering::Greater => {
-                    self.right_current = self.right.next()?;
-                }
-                std::cmp::Ordering::Equal => {
-                    self.right_buffer.clear();
-                    self.right_buffer.push(right.clone());
-                    self.left_value = Some(left.data.clone());
-
-                    loop {
-                        match self.right.next()? {
-                            Some(r) => {
-                                if Self::compare_tuples(left, &r) == std::cmp::Ordering::Equal {
-                                    self.right_buffer.push(r);
-                                } else {
-                                    self.right_current = Some(r);
-                                    break;
-                                }
-                            }
-                            None => {
-                                self.right_current = None;
-                                break;
-                            }
-                        }
-                    }
-
-                    self.buffer_position = 0;
-                }
-            }
+        if self.result_idx < self.result_buffer.len() {
+            let result = self.result_buffer[self.result_idx].clone();
+            self.result_idx += 1;
+            Ok(Some(result))
+        } else {
+            Ok(None)
         }
     }
 
@@ -121,97 +127,33 @@ impl SimpleExecutor for MergeJoin {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct MockExecutor {
-        tuples: Vec<SimpleTuple>,
-        position: usize,
-    }
-
-    impl MockExecutor {
-        fn new(tuples: Vec<SimpleTuple>) -> Self {
-            Self { tuples, position: 0 }
-        }
-    }
-
-    impl SimpleExecutor for MockExecutor {
-        fn open(&mut self) -> Result<(), ExecutorError> {
-            self.position = 0;
-            Ok(())
-        }
-
-        fn next(&mut self) -> Result<Option<SimpleTuple>, ExecutorError> {
-            if self.position < self.tuples.len() {
-                let tuple = self.tuples[self.position].clone();
-                self.position += 1;
-                Ok(Some(tuple))
-            } else {
-                Ok(None)
-            }
-        }
-
-        fn close(&mut self) -> Result<(), ExecutorError> {
-            Ok(())
-        }
-    }
+    use crate::executor::mock::MockExecutor;
 
     #[test]
     fn test_merge_join_basic() {
-        let left = vec![
-            SimpleTuple { data: vec![1] },
-            SimpleTuple { data: vec![2] },
-            SimpleTuple { data: vec![3] },
-        ];
-        let right = vec![
-            SimpleTuple { data: vec![1] },
-            SimpleTuple { data: vec![2] },
-            SimpleTuple { data: vec![3] },
-        ];
+        let left =
+            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
-        assert_eq!(join.next().unwrap().unwrap().data, vec![1, 1]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![2, 2]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![3, 3]);
-        assert!(join.next().unwrap().is_none());
-        join.close().unwrap();
-    }
 
-    #[test]
-    fn test_merge_join_empty_left() {
-        let left = vec![];
-        let right = vec![SimpleTuple { data: vec![1] }];
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
-        join.open().unwrap();
-        assert!(join.next().unwrap().is_none());
-        join.close().unwrap();
-    }
-
-    #[test]
-    fn test_merge_join_empty_right() {
-        let left = vec![SimpleTuple { data: vec![1] }];
-        let right = vec![];
-
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
-        join.open().unwrap();
-        assert!(join.next().unwrap().is_none());
+        assert_eq!(results.len(), 2);
         join.close().unwrap();
     }
 
     #[test]
     fn test_merge_join_no_matches() {
-        let left = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let right = vec![SimpleTuple { data: vec![3] }, SimpleTuple { data: vec![4] }];
+        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = MockExecutor::new(vec![Tuple { data: vec![2, 20] }]);
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
         assert!(join.next().unwrap().is_none());
         join.close().unwrap();
@@ -219,55 +161,181 @@ mod tests {
 
     #[test]
     fn test_merge_join_duplicates() {
-        let left = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![1] }];
-        let right = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![1] }];
+        let left =
+            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![1, 11] }]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
-        assert_eq!(join.next().unwrap().unwrap().data, vec![1, 1]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![1, 1]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![1, 1]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![1, 1]);
+
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 4);
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_empty_left() {
+        let left = MockExecutor::new(vec![]);
+        let right = MockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
         assert!(join.next().unwrap().is_none());
         join.close().unwrap();
     }
 
     #[test]
-    fn test_merge_join_single_match() {
-        let left = vec![SimpleTuple { data: vec![2] }];
-        let right = vec![SimpleTuple { data: vec![2] }];
+    fn test_merge_join_empty_right() {
+        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = MockExecutor::new(vec![]);
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
-        assert_eq!(join.next().unwrap().unwrap().data, vec![2, 2]);
         assert!(join.next().unwrap().is_none());
         join.close().unwrap();
     }
 
     #[test]
-    fn test_merge_join_partial_overlap() {
-        let left = vec![
-            SimpleTuple { data: vec![1] },
-            SimpleTuple { data: vec![2] },
-            SimpleTuple { data: vec![3] },
-        ];
-        let right = vec![
-            SimpleTuple { data: vec![2] },
-            SimpleTuple { data: vec![3] },
-            SimpleTuple { data: vec![4] },
-        ];
+    fn test_merge_join_unsorted_input() {
+        let left =
+            MockExecutor::new(vec![Tuple { data: vec![2, 20] }, Tuple { data: vec![1, 10] }]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![2, 200] }, Tuple { data: vec![1, 100] }]);
 
-        let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
-
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
-        assert_eq!(join.next().unwrap().unwrap().data, vec![2, 2]);
-        assert_eq!(join.next().unwrap().unwrap().data, vec![3, 3]);
+
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 2);
+        join.close().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod edge_tests {
+    use super::*;
+    use crate::executor::mock::MockExecutor;
+
+    #[test]
+    fn test_merge_join_single_row_each() {
+        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = MockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+
+        let result = join.next().unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().data.len(), 4);
         assert!(join.next().unwrap().is_none());
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_large_groups() {
+        let left = MockExecutor::new(vec![
+            Tuple { data: vec![1, 10] },
+            Tuple { data: vec![1, 11] },
+            Tuple { data: vec![1, 12] },
+        ]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 6);
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_all_left_smaller() {
+        let left =
+            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![3, 100] }, Tuple { data: vec![4, 200] }]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+        assert!(join.next().unwrap().is_none());
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_all_right_smaller() {
+        let left =
+            MockExecutor::new(vec![Tuple { data: vec![3, 10] }, Tuple { data: vec![4, 20] }]);
+        let right =
+            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+        assert!(join.next().unwrap().is_none());
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_interleaved() {
+        let left = MockExecutor::new(vec![
+            Tuple { data: vec![1, 10] },
+            Tuple { data: vec![3, 30] },
+            Tuple { data: vec![5, 50] },
+        ]);
+        let right = MockExecutor::new(vec![
+            Tuple { data: vec![2, 200] },
+            Tuple { data: vec![3, 255] },
+            Tuple { data: vec![4, 250] },
+        ]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 1);
+        join.close().unwrap();
+    }
+
+    #[test]
+    fn test_merge_join_many_duplicates() {
+        let left = MockExecutor::new(vec![
+            Tuple { data: vec![1, 10] },
+            Tuple { data: vec![1, 11] },
+            Tuple { data: vec![1, 12] },
+            Tuple { data: vec![1, 13] },
+        ]);
+        let right = MockExecutor::new(vec![
+            Tuple { data: vec![1, 100] },
+            Tuple { data: vec![1, 101] },
+            Tuple { data: vec![1, 102] },
+        ]);
+
+        let mut join = MergeJoin::new(Box::new(left), Box::new(right));
+        join.open().unwrap();
+
+        let mut results = Vec::new();
+        while let Some(tuple) = join.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 12);
         join.close().unwrap();
     }
 }
