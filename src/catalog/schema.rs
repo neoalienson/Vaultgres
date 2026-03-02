@@ -13,7 +13,7 @@ impl TableSchema {
     pub fn new(name: String, columns: Vec<ColumnDef>) -> Self {
         Self { name, columns, primary_key: None, foreign_keys: Vec::new() }
     }
-    
+
     pub fn with_constraints(
         name: String,
         columns: Vec<ColumnDef>,

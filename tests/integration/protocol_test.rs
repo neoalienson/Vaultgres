@@ -127,10 +127,7 @@ fn test_connection_handle_query_insert() {
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "t".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("INSERT INTO t VALUES (1)");
@@ -153,10 +150,7 @@ fn test_connection_handle_query_update() {
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "t".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("UPDATE t SET id = 1");
@@ -179,10 +173,7 @@ fn test_connection_handle_query_describe() {
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "t".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
     let mut conn = Connection::new(stream, catalog);
     let result = conn.handle_query("DESCRIBE t");

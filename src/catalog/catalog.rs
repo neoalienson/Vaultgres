@@ -128,11 +128,8 @@ impl Catalog {
         // Collect primary key from column-level constraints
         let mut pk = primary_key;
         if pk.is_none() {
-            let pk_cols: Vec<String> = columns
-                .iter()
-                .filter(|c| c.is_primary_key)
-                .map(|c| c.name.clone())
-                .collect();
+            let pk_cols: Vec<String> =
+                columns.iter().filter(|c| c.is_primary_key).map(|c| c.name.clone()).collect();
             if !pk_cols.is_empty() {
                 pk = Some(pk_cols);
             }
@@ -157,10 +154,7 @@ impl Catalog {
             }
         }
 
-        tables.insert(
-            name.clone(),
-            TableSchema::with_constraints(name.clone(), columns, pk, fks),
-        );
+        tables.insert(name.clone(), TableSchema::with_constraints(name.clone(), columns, pk, fks));
         drop(tables);
 
         let mut data = self.data.write().unwrap();
@@ -416,7 +410,8 @@ impl Catalog {
                 .map(|col| schema.columns.iter().position(|c| &c.name == col).unwrap())
                 .collect();
 
-            let fk_values: Vec<Value> = fk_indices.iter().map(|&idx| tuple_data[idx].clone()).collect();
+            let fk_values: Vec<Value> =
+                fk_indices.iter().map(|&idx| tuple_data[idx].clone()).collect();
 
             // Check if referenced row exists
             let ref_schema = self

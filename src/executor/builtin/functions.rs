@@ -654,8 +654,7 @@ impl BuiltinFunctions {
                 use std::collections::hash_map::RandomState;
                 use std::hash::BuildHasher;
                 let s = RandomState::new();
-                
-                
+
                 Ok(Value::Int((s.hash_one(std::time::SystemTime::now()) % 1000) as i64))
             }
             "now" => {

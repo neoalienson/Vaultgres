@@ -75,11 +75,7 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
                 ref_cols.push(parser.expect_identifier()?);
             }
             parser.expect(Token::RightParen)?;
-            foreign_keys.push(ForeignKeyDef {
-                columns: fk_cols,
-                ref_table,
-                ref_columns: ref_cols,
-            });
+            foreign_keys.push(ForeignKeyDef { columns: fk_cols, ref_table, ref_columns: ref_cols });
         } else {
             columns.push(parse_column_def(parser)?);
         }

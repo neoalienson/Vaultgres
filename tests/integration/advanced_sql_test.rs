@@ -1,6 +1,4 @@
-use rustgres::catalog::{
-    Function, FunctionLanguage, FunctionRegistry, Parameter, Value,
-};
+use rustgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
 use rustgres::executor::{
     BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor,
 };
@@ -339,7 +337,6 @@ fn test_builtin_random() {
 
 #[test]
 fn test_perform_statement() {
-    
     let mut interp = PlPgSqlInterpreter::new().with_query_executor(|_| Ok(vec![]));
 
     let func = PlPgSqlFunction {
@@ -720,7 +717,7 @@ mod advanced_sql_new_tests {
 mod advanced_sql_new_tests2 {
 
     use rustgres::catalog::{FunctionRegistry, Value};
-    
+
     use std::collections::HashMap;
 
     #[test]

@@ -5,9 +5,7 @@ use rustgres::executor::{
     CursorManager, Executor, MockTupleExecutor, SetReturningFunctionExecutor,
     TableValuedFunctionExecutor,
 };
-use rustgres::parser::ast::{
-    FetchDirection, FunctionReturnType, ParameterMode, Statement,
-};
+use rustgres::parser::ast::{FetchDirection, FunctionReturnType, ParameterMode, Statement};
 use rustgres::parser::Parser;
 use std::collections::HashMap;
 

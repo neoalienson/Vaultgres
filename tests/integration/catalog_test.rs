@@ -40,17 +40,11 @@ fn test_catalog_multiple_tables() {
     let catalog = Catalog::new();
 
     catalog
-        .create_table(
-            "users".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("users".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     catalog
-        .create_table(
-            "products".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("products".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     let tables = catalog.list_tables();
@@ -122,10 +116,7 @@ fn test_catalog_concurrent_operations() {
     let catalog = Catalog::new();
 
     catalog
-        .create_table(
-            "test".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     for i in 0..10 {
@@ -140,10 +131,7 @@ fn test_catalog_empty_table() {
     let catalog = Catalog::new();
 
     catalog
-        .create_table(
-            "empty".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("empty".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     assert_eq!(catalog.row_count("empty"), 0);

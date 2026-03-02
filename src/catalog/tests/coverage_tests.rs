@@ -20,10 +20,7 @@ mod tests {
     fn test_row_count() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         assert_eq!(catalog.row_count("t"), 0);
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
@@ -40,10 +37,7 @@ mod tests {
     fn test_insert_type_mismatch() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         let result = catalog.insert("t", vec![Expr::String("text".to_string())]);
         assert!(result.is_err());
@@ -53,10 +47,7 @@ mod tests {
     fn test_insert_wrong_column_count() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         let result = catalog.insert("t", vec![Expr::Number(1), Expr::Number(2)]);
         assert!(result.is_err());
@@ -66,10 +57,7 @@ mod tests {
     fn test_select_nonexistent_column() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
         let result = catalog.select(
@@ -90,10 +78,7 @@ mod tests {
     fn test_update_nonexistent_column() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
         let result = catalog.update("t", vec![("nonexistent".to_string(), Expr::Number(1))], None);
@@ -104,10 +89,7 @@ mod tests {
     fn test_update_type_mismatch() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
         let result =
@@ -155,10 +137,7 @@ mod tests {
     fn test_insert_text_type() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("desc".to_string(), DataType::Text)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
         let result = catalog.insert("t", vec![Expr::String("description".to_string())]);
         assert!(result.is_ok());
@@ -168,10 +147,7 @@ mod tests {
     fn test_update_text_type() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("desc".to_string(), DataType::Text)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
         catalog.insert("t", vec![Expr::String("old".to_string())]).unwrap();
         let result =
@@ -183,10 +159,7 @@ mod tests {
     fn test_insert_invalid_expr() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         let result = catalog.insert("t", vec![Expr::Column("col".to_string())]);
         assert!(result.is_err());
@@ -196,10 +169,7 @@ mod tests {
     fn test_update_invalid_expr() {
         let catalog = Catalog::new();
         catalog
-            .create_table(
-                "t".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
         let result =

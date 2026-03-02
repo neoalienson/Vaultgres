@@ -96,8 +96,7 @@ impl ParallelHashAgg {
         for hash_table in &self.hash_tables {
             let local_map = hash_table.lock().unwrap();
             for (key, state) in local_map.iter() {
-                let global_state =
-                    global_map.entry(key.clone()).or_default();
+                let global_state = global_map.entry(key.clone()).or_default();
                 global_state.merge(state);
             }
         }

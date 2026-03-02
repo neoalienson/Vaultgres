@@ -26,15 +26,13 @@ pub struct Function {
     pub rows: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
 pub enum FunctionVolatility {
     Immutable,
     Stable,
     #[default]
     Volatile,
 }
-
 
 pub struct FunctionRegistry {
     functions: HashMap<String, Vec<Function>>,

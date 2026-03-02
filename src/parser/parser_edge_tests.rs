@@ -412,7 +412,7 @@ fn test_parse_mixed_case_keywords() {
 fn test_parse_primary_key_column_level() {
     let mut parser = Parser::new("CREATE TABLE users (id INT PRIMARY KEY, name TEXT)").unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "users");
@@ -426,9 +426,10 @@ fn test_parse_primary_key_column_level() {
 
 #[test]
 fn test_parse_primary_key_table_level() {
-    let mut parser = Parser::new("CREATE TABLE users (id INT, name TEXT, PRIMARY KEY (id))").unwrap();
+    let mut parser =
+        Parser::new("CREATE TABLE users (id INT, name TEXT, PRIMARY KEY (id))").unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "users");
@@ -440,9 +441,12 @@ fn test_parse_primary_key_table_level() {
 
 #[test]
 fn test_parse_composite_primary_key() {
-    let mut parser = Parser::new("CREATE TABLE orders (user_id INT, product_id INT, PRIMARY KEY (user_id, product_id))").unwrap();
+    let mut parser = Parser::new(
+        "CREATE TABLE orders (user_id INT, product_id INT, PRIMARY KEY (user_id, product_id))",
+    )
+    .unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "orders");
@@ -454,9 +458,11 @@ fn test_parse_composite_primary_key() {
 
 #[test]
 fn test_parse_foreign_key_column_level() {
-    let mut parser = Parser::new("CREATE TABLE orders (id INT, customer_id INT REFERENCES customers(id))").unwrap();
+    let mut parser =
+        Parser::new("CREATE TABLE orders (id INT, customer_id INT REFERENCES customers(id))")
+            .unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "orders");
@@ -474,7 +480,7 @@ fn test_parse_foreign_key_column_level() {
 fn test_parse_foreign_key_table_level() {
     let mut parser = Parser::new("CREATE TABLE orders (id INT, customer_id INT, FOREIGN KEY (customer_id) REFERENCES customers(id))").unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "orders");
@@ -489,9 +495,12 @@ fn test_parse_foreign_key_table_level() {
 
 #[test]
 fn test_parse_pk_and_fk_combined() {
-    let mut parser = Parser::new("CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT REFERENCES customers(id))").unwrap();
+    let mut parser = Parser::new(
+        "CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT REFERENCES customers(id))",
+    )
+    .unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "orders");
@@ -506,7 +515,7 @@ fn test_parse_pk_and_fk_combined() {
 fn test_parse_multiple_foreign_keys() {
     let mut parser = Parser::new("CREATE TABLE order_items (order_id INT REFERENCES orders(id), product_id INT REFERENCES products(id))").unwrap();
     let stmt = parser.parse().unwrap();
-    
+
     match stmt {
         Statement::CreateTable(s) => {
             assert_eq!(s.table, "order_items");

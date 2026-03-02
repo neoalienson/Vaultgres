@@ -38,10 +38,7 @@ mod tests {
     fn test_parallel_seq_scan() {
         let catalog = Arc::new(Catalog::new());
         catalog
-            .create_table(
-                "test".to_string(),
-                vec![ColumnDef::new("id".to_string(), DataType::Int)],
-            )
+            .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..10 {

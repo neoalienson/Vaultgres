@@ -2,14 +2,12 @@ use super::error::{Result, StatisticsError};
 use super::histogram::Histogram;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TableStats {
     pub row_count: u64,
     pub page_count: u64,
     pub avg_row_size: u32,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct ColumnStats {

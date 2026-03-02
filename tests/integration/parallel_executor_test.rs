@@ -12,10 +12,7 @@ use std::sync::Arc;
 fn test_parallel_seq_scan_integration() {
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "test".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     for i in 0..1000 {
@@ -88,10 +85,7 @@ fn test_parallel_hash_join_integration() {
 fn test_parallel_aggregation_integration() {
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "agg_test".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("agg_test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     for i in 0..500 {
@@ -175,10 +169,7 @@ fn test_empty_table_parallel_scan() {
 fn test_single_worker_execution() {
     let catalog = Arc::new(Catalog::new());
     catalog
-        .create_table(
-            "single".to_string(),
-            vec![ColumnDef::new("id".to_string(), DataType::Int)],
-        )
+        .create_table("single".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
     for i in 0..50 {
