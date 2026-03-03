@@ -133,7 +133,7 @@ VaultGres development roadmap with planned features and milestones.
 
 **SQL Features**
 - ✅ Views (CREATE VIEW, DROP VIEW)
-- Materialized views with REFRESH
+- ✅ Materialized views with REFRESH
 - User-defined functions (SQL functions)
 - Aggregate functions (custom aggregates)
 - String functions (CONCAT, SUBSTRING, UPPER, LOWER)

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/neoalienson/vaultgres/workflows/CI/badge.svg)](https://github.com/neoalienson/vaultgres/actions/workflows/ci.yml)
 [![Integration Tests](https://github.com/neoalienson/vaultgres/workflows/Integration%20Tests/badge.svg)](https://github.com/neoalienson/vaultgres/actions/workflows/integration.yml)
-[![codecov](https://codecov.io/gh/neoalienson/vaultgres/branch/main/graph/badge.svg)](https://codecov.io/gh/neoalienson/vaultgres)
+[![codecov](https://codecov.io/gh/neoalienson/Vaultgres/branch/main/graph/badge.svg)](https://codecov.io/gh/neoalienson/Vaultgres)
 [![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
