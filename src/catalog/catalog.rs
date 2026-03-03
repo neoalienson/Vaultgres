@@ -20,11 +20,11 @@ pub struct Catalog {
     triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
     indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
-    data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
+    pub(crate) data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
     sequences: Arc<RwLock<HashMap<String, i64>>>,
     active_txn: Arc<RwLock<Option<Transaction>>>,
     savepoints: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
-    txn_mgr: Arc<TransactionManager>,
+    pub(crate) txn_mgr: Arc<TransactionManager>,
     data_dir: Option<String>,
     save_tx: Option<Sender<()>>,
 }

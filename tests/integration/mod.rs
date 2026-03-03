@@ -25,6 +25,7 @@ mod index_test;
 mod integration_test;
 mod isolation_test;
 mod join_order_test;
+mod join_test;
 mod lateral_test;
 mod lock_timeout_test;
 mod materialized_view_test;

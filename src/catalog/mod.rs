@@ -6,7 +6,7 @@ mod check;
 mod datetime_functions;
 mod function;
 mod persistence;
-mod predicate;
+pub(crate) mod predicate;
 mod schema;
 mod string_functions;
 mod tuple;

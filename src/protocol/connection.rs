@@ -215,6 +215,10 @@ impl<S: Read + Write> Connection<S> {
                 Ok(ExecutionResult::CommandComplete("INSERT 0 1".to_string()))
             }
             Statement::Select(select) => {
+                if !select.joins.is_empty() {
+                    return self.execute_join_query(select);
+                }
+
                 let columns: Vec<String> = select
                     .columns
                     .iter()
@@ -268,6 +272,199 @@ impl<S: Read + Write> Connection<S> {
             }
             _ => Ok(ExecutionResult::CommandComplete("SELECT 0".to_string())),
         }
+    }
+
+    fn execute_join_query(
+        &self,
+        select: crate::parser::ast::SelectStmt,
+    ) -> Result<ExecutionResult, String> {
+        use crate::catalog::predicate::PredicateEvaluator;
+        use crate::parser::ast::{Expr, JoinType};
+
+        log::info!(
+            "[JOIN] Executing JOIN query. From: {}, Joins: {}",
+            select.from,
+            select.joins.len()
+        );
+
+        let left_table = &select.from;
+        let left_schema = self
+            .catalog
+            .get_table(left_table)
+            .ok_or_else(|| format!("Table '{}' not found", left_table))?;
+        let left_alias = select.table_alias.as_ref().unwrap_or(left_table);
+
+        let mut all_schemas = vec![(left_alias.clone(), left_schema.clone())];
+        for join in &select.joins {
+            let schema = self
+                .catalog
+                .get_table(&join.table)
+                .ok_or_else(|| format!("Table '{}' not found", join.table))?;
+            let alias = join.alias.as_ref().unwrap_or(&join.table);
+            all_schemas.push((alias.clone(), schema));
+        }
+
+        log::info!(
+            "[JOIN] Schema map: {:?}",
+            all_schemas.iter().map(|(a, s)| (a.clone(), s.name.clone())).collect::<Vec<_>>()
+        );
+
+        let snapshot = self.catalog.txn_mgr.get_snapshot();
+        let data = self.catalog.data.read().unwrap();
+        let left_tuples =
+            data.get(left_table).ok_or_else(|| format!("Table '{}' has no data", left_table))?;
+
+        let mut results = Vec::new();
+        for left_tuple in left_tuples {
+            if !left_tuple.header.is_visible(&snapshot, &self.catalog.txn_mgr) {
+                continue;
+            }
+
+            let mut current_row = left_tuple.data.clone();
+            let mut matched = true;
+
+            for (join_idx, join) in select.joins.iter().enumerate() {
+                let right_tuples = data
+                    .get(&join.table)
+                    .ok_or_else(|| format!("Table '{}' has no data", join.table))?;
+
+                let mut join_matched = false;
+                for right_tuple in right_tuples {
+                    if !right_tuple.header.is_visible(&snapshot, &self.catalog.txn_mgr) {
+                        continue;
+                    }
+
+                    let combined = [current_row.clone(), right_tuple.data.clone()].concat();
+                    let combined_schema =
+                        self.build_combined_schema(&all_schemas[..=join_idx + 1])?;
+                    if PredicateEvaluator::evaluate(&join.on, &combined, &combined_schema)? {
+                        current_row.extend_from_slice(&right_tuple.data);
+                        join_matched = true;
+                        break;
+                    }
+                }
+
+                if !join_matched && join.join_type == JoinType::Inner {
+                    matched = false;
+                    break;
+                }
+            }
+
+            if matched {
+                if let Some(ref where_clause) = select.where_clause {
+                    let combined_schema = self.build_combined_schema(&all_schemas)?;
+                    if !PredicateEvaluator::evaluate(where_clause, &current_row, &combined_schema)?
+                    {
+                        continue;
+                    }
+                }
+                results.push(current_row);
+            }
+        }
+
+        let column_names = self.extract_column_names(&select.columns, &all_schemas)?;
+        let projected = self.project_columns(&results, &select.columns, &all_schemas)?;
+        let result_set = self.build_result_set(&column_names, projected)?;
+        Ok(ExecutionResult::ResultSet(result_set))
+    }
+
+    fn build_combined_schema(
+        &self,
+        schemas: &[(String, crate::catalog::TableSchema)],
+    ) -> Result<crate::catalog::TableSchema, String> {
+        let mut combined_cols = Vec::new();
+        for (_, schema) in schemas {
+            combined_cols.extend(schema.columns.clone());
+        }
+        Ok(crate::catalog::TableSchema::new("combined".to_string(), combined_cols))
+    }
+
+    fn extract_column_names(
+        &self,
+        exprs: &[crate::parser::ast::Expr],
+        schemas: &[(String, crate::catalog::TableSchema)],
+    ) -> Result<Vec<String>, String> {
+        use crate::parser::ast::Expr;
+        exprs
+            .iter()
+            .map(|expr| match expr {
+                Expr::Star => Ok("*".to_string()),
+                Expr::Column(name) => Ok(name.clone()),
+                Expr::QualifiedColumn { table: _, column } => Ok(column.clone()),
+                _ => Ok("?".to_string()),
+            })
+            .collect()
+    }
+
+    fn project_columns(
+        &self,
+        rows: &[Vec<crate::catalog::Value>],
+        exprs: &[crate::parser::ast::Expr],
+        schemas: &[(String, crate::catalog::TableSchema)],
+    ) -> Result<Vec<Vec<crate::catalog::Value>>, String> {
+        use crate::parser::ast::Expr;
+        if exprs.is_empty() || (exprs.len() == 1 && matches!(exprs[0], Expr::Star)) {
+            return Ok(rows.to_vec());
+        }
+
+        let mut result = Vec::new();
+        for row in rows {
+            let mut projected = Vec::new();
+            for expr in exprs {
+                match expr {
+                    Expr::QualifiedColumn { table, column } => {
+                        let mut offset = 0;
+                        let mut found = false;
+                        for (tbl_alias, schema) in schemas {
+                            log::info!(
+                                "[PROJ] Checking alias '{}' for '{}.{}', schema has {} cols",
+                                tbl_alias,
+                                table,
+                                column,
+                                schema.columns.len()
+                            );
+                            if tbl_alias == table {
+                                log::info!(
+                                    "[PROJ] Alias matched! Looking for column '{}' in {:?}",
+                                    column,
+                                    schema.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
+                                );
+                                if let Some(idx) =
+                                    schema.columns.iter().position(|c| &c.name == column)
+                                {
+                                    log::info!("[PROJ] Found at offset {} + idx {}", offset, idx);
+                                    projected.push(row[offset + idx].clone());
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            offset += schema.columns.len();
+                        }
+                        if !found {
+                            return Err(format!("Column '{}.{}' not found", table, column));
+                        }
+                    }
+                    Expr::Column(name) => {
+                        let mut offset = 0;
+                        let mut found = false;
+                        for (_, schema) in schemas {
+                            if let Some(idx) = schema.columns.iter().position(|c| &c.name == name) {
+                                projected.push(row[offset + idx].clone());
+                                found = true;
+                                break;
+                            }
+                            offset += schema.columns.len();
+                        }
+                        if !found {
+                            return Err(format!("Column '{}' not found", name));
+                        }
+                    }
+                    _ => return Err("Unsupported expression in SELECT".to_string()),
+                }
+            }
+            result.push(projected);
+        }
+        Ok(result)
     }
 
     pub fn run(&mut self) -> Result<(), ProtocolError> {
