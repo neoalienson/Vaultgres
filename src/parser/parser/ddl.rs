@@ -236,7 +236,14 @@ fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
 
     parser.expect(Token::RightParen)?;
 
-    Ok(Statement::CreateIndex(CreateIndexStmt { name, table, columns, unique }))
+    let where_clause = if parser.current_token() == &Token::Where {
+        parser.advance();
+        Some(super::expr::parse_expr(parser)?)
+    } else {
+        None
+    };
+
+    Ok(Statement::CreateIndex(CreateIndexStmt { name, table, columns, unique, where_clause }))
 }
 
 pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {

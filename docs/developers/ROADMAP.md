@@ -125,7 +125,7 @@ VaultGres development roadmap with planned features and milestones.
 
 **Advanced Indexes**
 - ✅ Hash indexes for equality lookups
-- Partial indexes with WHERE clause
+- ✅ Partial indexes with WHERE clause
 - Expression indexes (functional indexes)
 - Multi-column indexes
 - Index-only scans

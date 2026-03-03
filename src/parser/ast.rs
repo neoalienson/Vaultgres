@@ -186,6 +186,7 @@ pub struct CreateIndexStmt {
     pub table: String,
     pub columns: Vec<String>,
     pub unique: bool,
+    pub where_clause: Option<Expr>,
 }
 
 /// DROP INDEX statement

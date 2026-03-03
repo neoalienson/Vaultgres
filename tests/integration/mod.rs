@@ -32,6 +32,7 @@ mod parallel_ops_test;
 mod parallel_scan_test;
 mod parallel_test;
 mod parser_test;
+mod partial_index_test;
 mod persistence_test;
 mod plan_cache_test;
 mod prepared_test;
