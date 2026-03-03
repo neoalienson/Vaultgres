@@ -30,6 +30,8 @@ pub fn parse_select_stmt(parser: &mut Parser) -> Result<SelectStmt> {
     let table_alias = if parser.current_token() == &Token::As {
         parser.advance();
         Some(parser.expect_identifier()?)
+    } else if matches!(parser.current_token(), Token::Identifier(_)) {
+        Some(parser.expect_identifier()?)
     } else {
         None
     };
@@ -153,6 +155,10 @@ fn parse_join(parser: &mut Parser) -> Result<JoinClause> {
 
     let alias = if parser.current_token() == &Token::As {
         parser.advance();
+        Some(parser.expect_identifier()?)
+    } else if matches!(parser.current_token(), Token::Identifier(_))
+        && parser.current_token() != &Token::On
+    {
         Some(parser.expect_identifier()?)
     } else {
         None

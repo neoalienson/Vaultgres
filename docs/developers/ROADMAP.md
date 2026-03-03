@@ -106,14 +106,13 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ Recursive CTEs (WITH RECURSIVE)
 - ✅ Lateral joins (LATERAL)
 - ✅ Table aliases and column aliases
-- ✅ Qualified column references (table.column syntax in WHERE, CREATE VIEW)
-- 🚧 JOIN execution integration
+- ✅ Qualified column references (table.column syntax)
+- ✅ JOIN execution integration
   - ✅ Hash join, merge join, nested loop join executors implemented
   - ✅ Protocol layer integration implemented for JOIN queries
   - ✅ Multi-table schema resolution for qualified columns in SELECT
-  - ❌ Parser does not parse JOIN syntax (FROM table alias, JOIN clauses)
-  - Missing: Parser support for table aliases in FROM clause
-  - Missing: Parser support for JOIN clauses (INNER JOIN, LEFT JOIN, etc.)
+  - ✅ Parser support for table aliases in FROM clause (with and without AS)
+  - ✅ Parser support for JOIN clauses (INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN)
 
 **Query Optimization**
 - ✅ Prepared statements
