@@ -50,9 +50,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_simple() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();
         outer1.insert("id".to_string(), Value::Int(1));
@@ -81,9 +81,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_multiple_results() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer = HashMap::new();
         outer.insert("id".to_string(), Value::Int(1));
@@ -104,9 +104,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_empty_subquery() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer = HashMap::new();
         outer.insert("id".to_string(), Value::Int(1));
@@ -119,9 +119,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_preserves_outer_columns() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer = HashMap::new();
         outer.insert("id".to_string(), Value::Int(1));
@@ -142,9 +142,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_dependent_subquery() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();
         outer1.insert("limit".to_string(), Value::Int(2));
@@ -175,9 +175,9 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_cross_product() {
+        use std::collections::HashMap;
         use vaultgres::catalog::Value;
         use vaultgres::executor::LateralSubqueryExecutor;
-        use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();
         outer1.insert("x".to_string(), Value::Int(1));

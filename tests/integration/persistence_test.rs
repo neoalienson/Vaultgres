@@ -1,6 +1,6 @@
+use tempfile::TempDir;
 use vaultgres::catalog::Catalog;
 use vaultgres::parser::{Parser, Statement};
-use tempfile::TempDir;
 
 #[test]
 fn test_view_persistence() {

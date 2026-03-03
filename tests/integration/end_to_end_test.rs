@@ -1,10 +1,10 @@
+use std::sync::Arc;
 use vaultgres::executor::{Executor, SeqScan};
 use vaultgres::parser::parse;
 use vaultgres::storage::heap::HeapFile;
 use vaultgres::storage::{BufferPool, PageId};
 use vaultgres::transaction::TransactionManager;
 use vaultgres::wal::WALWriter;
-use std::sync::Arc;
 
 #[test]
 fn test_end_to_end_transaction_flow() {

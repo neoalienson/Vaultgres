@@ -1,7 +1,7 @@
-use vaultgres::catalog::Catalog;
-use vaultgres::protocol::{Connection, Message, Response, Server};
 use std::io::Cursor;
 use std::sync::Arc;
+use vaultgres::catalog::Catalog;
+use vaultgres::protocol::{Connection, Message, Response, Server};
 
 #[test]
 fn test_message_parsing() {

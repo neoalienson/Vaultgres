@@ -492,12 +492,12 @@ fn test_unnest_integration() {
 
 #[cfg(test)]
 mod advanced_sql_new_tests {
+    use std::collections::HashMap;
     use vaultgres::catalog::{FunctionRegistry, Value};
     use vaultgres::executor::{
         ArraySubqueryExecutor, BuiltinFunctions, DerivedTableExecutor, MultipleCTEExecutor,
     };
     use vaultgres::parser::ast::BinaryOperator;
-    use std::collections::HashMap;
 
     #[test]
     fn test_extract_function() {
@@ -814,9 +814,11 @@ mod advanced_sql_new_tests2 {
             Ok(vec![row])
         };
 
-        let results =
-            vaultgres::executor::LateralSubqueryExecutor::execute(vec![outer1, outer2], subquery_fn)
-                .unwrap();
+        let results = vaultgres::executor::LateralSubqueryExecutor::execute(
+            vec![outer1, outer2],
+            subquery_fn,
+        )
+        .unwrap();
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].get("y"), Some(&Value::Int(2)));

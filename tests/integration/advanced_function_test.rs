@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use vaultgres::catalog::{
     Function, FunctionLanguage, FunctionRegistry, FunctionVolatility, Parameter,
 };
@@ -7,7 +8,6 @@ use vaultgres::executor::{
 };
 use vaultgres::parser::ast::{FetchDirection, FunctionReturnType, ParameterMode, Statement};
 use vaultgres::parser::Parser;
-use std::collections::HashMap;
 
 fn make_tuple(val: i64) -> HashMap<String, Vec<u8>> {
     let mut map = HashMap::new();

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use vaultgres::transaction::{LockKey, LockManager, LockMode};
     use std::time::Duration;
+    use vaultgres::transaction::{LockKey, LockManager, LockMode};
 
     #[test]
     fn test_lock_timeout_default() {

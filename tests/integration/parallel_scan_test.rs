@@ -1,8 +1,8 @@
+use std::sync::Arc;
 use vaultgres::catalog::Catalog;
 use vaultgres::executor::parallel::config::ParallelConfig;
 use vaultgres::executor::parallel::seq_scan::ParallelSeqScan;
 use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
-use std::sync::Arc;
 
 #[test]
 fn test_parallel_scan_small_table() {

@@ -25,7 +25,7 @@ tempfile = "3.8"
 
 [[test]]
 name = "persistence_tests"
-path = "e2e/persistence_tests.rs"
+path = "tests/e2e/persistence_tests.rs"
 
 [[bench]]
 name = "storage_bench"

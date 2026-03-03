@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use vaultgres::executor::parallel::config::ParallelConfig;
 use vaultgres::executor::parallel::hash_agg::ParallelHashAgg;
 use vaultgres::executor::parallel::hash_join::ParallelHashJoin;
@@ -5,7 +6,6 @@ use vaultgres::executor::parallel::morsel::Morsel;
 use vaultgres::executor::parallel::operator::ParallelOperator;
 use vaultgres::executor::parallel::sort::ParallelSort;
 use vaultgres::executor::{ExecutorError, SimpleTuple};
-use std::sync::Arc;
 
 struct MockOperator {
     tuples: Vec<SimpleTuple>,

@@ -1,7 +1,7 @@
+use std::sync::Arc;
 use vaultgres::storage::{BufferPool, PageId};
 use vaultgres::transaction::TransactionManager;
 use vaultgres::wal::{CheckpointManager, RecordType, RecoveryManager, WALWriter};
-use std::sync::Arc;
 
 #[test]
 fn test_wal_write_and_flush() {

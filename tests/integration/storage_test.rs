@@ -1,7 +1,7 @@
+use std::sync::Arc;
 use vaultgres::storage::btree::{BTree, TupleId};
 use vaultgres::storage::heap::HeapFile;
 use vaultgres::storage::{BufferPool, PageId};
-use std::sync::Arc;
 
 #[test]
 fn test_storage_integration() {

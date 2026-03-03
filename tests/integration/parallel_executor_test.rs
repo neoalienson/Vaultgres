@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use vaultgres::catalog::Catalog;
 use vaultgres::executor::parallel::coordinator::ParallelCoordinator;
 use vaultgres::executor::parallel::hash_agg::ParallelHashAgg;
@@ -6,7 +7,6 @@ use vaultgres::executor::parallel::morsel::MorselGenerator;
 use vaultgres::executor::parallel::seq_scan::ParallelSeqScan;
 use vaultgres::executor::parallel::sort::ParallelSort;
 use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
-use std::sync::Arc;
 
 #[test]
 fn test_parallel_seq_scan_integration() {

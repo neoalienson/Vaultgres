@@ -1,9 +1,9 @@
-use vaultgres::config::Config;
-use vaultgres::protocol::Server;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::thread;
+use vaultgres::config::Config;
+use vaultgres::protocol::Server;
 
 fn main() -> std::io::Result<()> {
     // Load config from file or use default

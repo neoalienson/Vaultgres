@@ -1,6 +1,6 @@
+use tempfile::TempDir;
 use vaultgres::storage::{DiskManager, Page, PageId};
 use vaultgres::wal::{RecordType, WALDiskWriter, WALRecord};
-use tempfile::TempDir;
 
 #[test]
 fn test_disk_manager_write_read() {

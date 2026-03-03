@@ -1,7 +1,7 @@
-use vaultgres::storage::PageId;
-use vaultgres::wal::{RecordType, WALDiskWriter, WALWriter};
 use std::sync::Arc;
 use tempfile::TempDir;
+use vaultgres::storage::PageId;
+use vaultgres::wal::{RecordType, WALDiskWriter, WALWriter};
 
 #[test]
 fn test_wal_writer_with_disk() {

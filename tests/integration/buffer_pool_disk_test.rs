@@ -1,6 +1,6 @@
-use vaultgres::storage::{BufferPool, DiskManager, Page, PageId};
 use std::sync::Arc;
 use tempfile::TempDir;
+use vaultgres::storage::{BufferPool, DiskManager, Page, PageId};
 
 #[test]
 fn test_buffer_pool_with_disk() {

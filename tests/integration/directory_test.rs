@@ -1,8 +1,8 @@
+use std::fs;
+use tempfile::TempDir;
 use vaultgres::config::Config;
 use vaultgres::storage::{DiskManager, Page, PageId};
 use vaultgres::wal::{RecordType, WALDiskWriter, WALRecord};
-use std::fs;
-use tempfile::TempDir;
 
 #[test]
 fn test_config_creates_directories() {
