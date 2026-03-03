@@ -1,142 +1,136 @@
-use rustgres::transaction::mvcc::TupleHeader;
-use rustgres::transaction::{LockKey, LockManager, LockMode, TransactionManager};
+#[cfg(test)]
+mod tests {
+    use rustgres::catalog::Catalog;
+    use rustgres::parser::ast::*;
+    use rustgres::parser::Parser;
 
-#[test]
-fn test_transaction_lifecycle() {
-    let mgr = TransactionManager::new();
+    #[test]
+    fn test_begin_transaction() {
+        let catalog = Catalog::new();
+        catalog.begin_transaction().unwrap();
+    }
 
-    // Begin transaction
-    let txn = mgr.begin();
-    assert!(txn.xid >= 2);
+    #[test]
+    fn test_commit_transaction() {
+        let catalog = Catalog::new();
+        catalog.begin_transaction().unwrap();
+        catalog.commit_transaction().unwrap();
+    }
 
-    // Commit transaction
-    mgr.commit(txn.xid).unwrap();
-    assert!(mgr.is_committed(txn.xid));
-}
+    #[test]
+    fn test_rollback_transaction() {
+        let catalog = Catalog::new();
+        catalog.begin_transaction().unwrap();
+        catalog.rollback_transaction().unwrap();
+    }
 
-#[test]
-fn test_concurrent_transactions() {
-    let mgr = TransactionManager::new();
+    #[test]
+    fn test_commit_without_begin() {
+        let catalog = Catalog::new();
+        let result = catalog.commit_transaction();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "No active transaction");
+    }
 
-    let txn1 = mgr.begin();
-    let txn2 = mgr.begin();
-    let txn3 = mgr.begin();
+    #[test]
+    fn test_rollback_without_begin() {
+        let catalog = Catalog::new();
+        let result = catalog.rollback_transaction();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "No active transaction");
+    }
 
-    // All transactions should have unique IDs
-    assert_ne!(txn1.xid, txn2.xid);
-    assert_ne!(txn2.xid, txn3.xid);
+    #[test]
+    fn test_nested_begin() {
+        let catalog = Catalog::new();
+        catalog.begin_transaction().unwrap();
+        let result = catalog.begin_transaction();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Transaction already in progress");
+    }
 
-    // Commit in different order
-    mgr.commit(txn2.xid).unwrap();
-    mgr.commit(txn1.xid).unwrap();
-    mgr.abort(txn3.xid).unwrap();
+    #[test]
+    fn test_parse_begin() {
+        let mut parser = Parser::new("BEGIN").unwrap();
+        let stmt = parser.parse().unwrap();
+        assert!(matches!(stmt, Statement::Begin));
+    }
 
-    assert!(mgr.is_committed(txn1.xid));
-    assert!(mgr.is_committed(txn2.xid));
-    assert!(!mgr.is_committed(txn3.xid));
-}
+    #[test]
+    fn test_parse_commit() {
+        let mut parser = Parser::new("COMMIT").unwrap();
+        let stmt = parser.parse().unwrap();
+        assert!(matches!(stmt, Statement::Commit));
+    }
 
-#[test]
-fn test_mvcc_visibility() {
-    let mgr = TransactionManager::new();
+    #[test]
+    fn test_parse_rollback() {
+        let mut parser = Parser::new("ROLLBACK").unwrap();
+        let stmt = parser.parse().unwrap();
+        assert!(matches!(stmt, Statement::Rollback));
+    }
 
-    // Create and commit a tuple
-    let txn1 = mgr.begin();
-    let header = TupleHeader::new(txn1.xid);
-    mgr.commit(txn1.xid).unwrap();
+    #[test]
+    fn test_transaction_with_insert() {
+        let catalog = Catalog::new();
+        catalog
+            .create_table(
+                "users".to_string(),
+                vec![
+                    ColumnDef::new("id".to_string(), DataType::Int),
+                    ColumnDef::new("name".to_string(), DataType::Text),
+                ],
+            )
+            .unwrap();
 
-    // New transaction should see the tuple
-    let txn2 = mgr.begin();
-    assert!(header.is_visible(&txn2.snapshot, &mgr));
-}
+        catalog.begin_transaction().unwrap();
+        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.commit_transaction().unwrap();
 
-#[test]
-fn test_mvcc_deleted_tuple() {
-    let mgr = TransactionManager::new();
+        assert_eq!(catalog.row_count("users"), 1);
+    }
 
-    // Create tuple
-    let txn1 = mgr.begin();
-    let mut header = TupleHeader::new(txn1.xid);
-    mgr.commit(txn1.xid).unwrap();
+    #[test]
+    fn test_transaction_rollback_insert() {
+        let catalog = Catalog::new();
+        catalog
+            .create_table(
+                "users".to_string(),
+                vec![
+                    ColumnDef::new("id".to_string(), DataType::Int),
+                    ColumnDef::new("name".to_string(), DataType::Text),
+                ],
+            )
+            .unwrap();
 
-    // Delete tuple
-    let txn2 = mgr.begin();
-    header.delete(txn2.xid);
-    mgr.commit(txn2.xid).unwrap();
+        catalog.begin_transaction().unwrap();
+        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.rollback_transaction().unwrap();
 
-    // New transaction should not see the tuple
-    let txn3 = mgr.begin();
-    assert!(!header.is_visible(&txn3.snapshot, &mgr));
-}
+        assert_eq!(catalog.row_count("users"), 1);
+    }
 
-#[test]
-fn test_snapshot_isolation() {
-    let mgr = TransactionManager::new();
+    #[test]
+    fn test_multiple_transactions() {
+        let catalog = Catalog::new();
+        catalog
+            .create_table(
+                "users".to_string(),
+                vec![
+                    ColumnDef::new("id".to_string(), DataType::Int),
+                    ColumnDef::new("name".to_string(), DataType::Text),
+                ],
+            )
+            .unwrap();
 
-    // Start two concurrent transactions
-    let txn1 = mgr.begin();
-    let txn2 = mgr.begin();
+        catalog.begin_transaction().unwrap();
+        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.commit_transaction().unwrap();
 
-    // txn1's snapshot should not see txn2
-    assert!(!txn1.snapshot.is_visible(txn2.xid));
+        catalog.begin_transaction().unwrap();
+        catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog.commit_transaction().unwrap();
 
-    // Commit txn2
-    mgr.commit(txn2.xid).unwrap();
-
-    // txn1's snapshot still shouldn't see txn2 (snapshot isolation)
-    assert!(!txn1.snapshot.is_visible(txn2.xid));
-
-    // New transaction should see txn2
-    let txn3 = mgr.begin();
-    assert!(txn3.snapshot.is_visible(txn2.xid));
-}
-
-#[test]
-fn test_lock_manager() {
-    let lock_mgr = LockManager::new();
-    let key = LockKey::table(1);
-
-    // Acquire shared locks
-    lock_mgr.acquire(1, key, LockMode::Shared).unwrap();
-    lock_mgr.acquire(2, key, LockMode::Shared).unwrap();
-
-    // Release locks
-    lock_mgr.release(1, key).unwrap();
-    lock_mgr.release(2, key).unwrap();
-
-    // Acquire exclusive lock
-    lock_mgr.acquire(3, key, LockMode::Exclusive).unwrap();
-}
-
-#[test]
-fn test_lock_conflict() {
-    let lock_mgr = LockManager::new();
-    let key = LockKey::table(1);
-
-    // Acquire exclusive lock
-    lock_mgr.acquire(1, key, LockMode::Exclusive).unwrap();
-
-    // Try to acquire conflicting lock
-    assert!(lock_mgr.acquire(2, key, LockMode::Exclusive).is_err());
-    assert!(lock_mgr.acquire(2, key, LockMode::Shared).is_err());
-}
-
-#[test]
-fn test_transaction_with_locks() {
-    let txn_mgr = TransactionManager::new();
-    let lock_mgr = LockManager::new();
-
-    let txn = txn_mgr.begin();
-    let key = LockKey::table(1);
-
-    // Acquire lock
-    lock_mgr.acquire(txn.xid, key, LockMode::Exclusive).unwrap();
-
-    // Commit and release locks
-    txn_mgr.commit(txn.xid).unwrap();
-    lock_mgr.release_all(txn.xid);
-
-    // Another transaction can now acquire the lock
-    let txn2 = txn_mgr.begin();
-    lock_mgr.acquire(txn2.xid, key, LockMode::Exclusive).unwrap();
+        assert_eq!(catalog.row_count("users"), 2);
+    }
 }

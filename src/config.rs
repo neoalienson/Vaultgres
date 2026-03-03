@@ -51,6 +51,7 @@ pub struct WalConfig {
 pub struct PerformanceConfig {
     pub worker_threads: usize,
     pub query_cache: bool,
+    pub max_parallel_workers: usize,
 }
 
 impl Config {
@@ -80,7 +81,11 @@ impl Config {
             },
             transaction: TransactionConfig { timeout: 300, mvcc_enabled: true },
             wal: WalConfig { segment_size: 16, compression: false, sync_on_commit: true },
-            performance: PerformanceConfig { worker_threads: 4, query_cache: false },
+            performance: PerformanceConfig {
+                worker_threads: 4,
+                query_cache: false,
+                max_parallel_workers: 4,
+            },
         }
     }
 }

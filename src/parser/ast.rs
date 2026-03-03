@@ -26,6 +26,38 @@ pub enum Statement {
     DeclareCursor(DeclareCursorStmt),
     FetchCursor(FetchCursorStmt),
     CloseCursor(CloseCursorStmt),
+    Begin,
+    Commit,
+    Rollback,
+    SetTransaction(IsolationLevel),
+    Savepoint(String),
+    RollbackTo(String),
+    ReleaseSavepoint(String),
+    Prepare(PrepareStmt),
+    Execute(ExecuteStmt),
+    Deallocate(String),
+}
+
+/// Isolation level
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum IsolationLevel {
+    ReadCommitted,
+    RepeatableRead,
+    Serializable,
+}
+
+/// PREPARE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PrepareStmt {
+    pub name: String,
+    pub statement: Box<Statement>,
+}
+
+/// EXECUTE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ExecuteStmt {
+    pub name: String,
+    pub params: Vec<Expr>,
 }
 
 /// UNION statement
@@ -53,6 +85,7 @@ pub struct ExceptStmt {
 /// WITH (CTE) statement
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WithStmt {
+    pub recursive: bool,
     pub ctes: Vec<CTE>,
     pub query: Box<SelectStmt>,
 }
@@ -263,6 +296,8 @@ pub struct CreateTableStmt {
     pub columns: Vec<ColumnDef>,
     pub primary_key: Option<Vec<String>>,
     pub foreign_keys: Vec<ForeignKeyDef>,
+    pub check_constraints: Vec<CheckConstraint>,
+    pub unique_constraints: Vec<UniqueConstraint>,
 }
 
 /// Column definition
@@ -271,12 +306,25 @@ pub struct ColumnDef {
     pub name: String,
     pub data_type: DataType,
     pub is_primary_key: bool,
+    pub is_unique: bool,
+    pub is_auto_increment: bool,
+    pub is_not_null: bool,
+    pub default_value: Option<Expr>,
     pub foreign_key: Option<ForeignKeyRef>,
 }
 
 impl ColumnDef {
     pub fn new(name: String, data_type: DataType) -> Self {
-        Self { name, data_type, is_primary_key: false, foreign_key: None }
+        Self {
+            name,
+            data_type,
+            is_primary_key: false,
+            is_unique: false,
+            is_auto_increment: false,
+            is_not_null: false,
+            default_value: None,
+            foreign_key: None,
+        }
     }
 }
 
@@ -287,18 +335,43 @@ pub struct ForeignKeyRef {
     pub column: String,
 }
 
+/// Foreign key action
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ForeignKeyAction {
+    Cascade,
+    SetNull,
+    Restrict,
+}
+
 /// Foreign key definition (table-level)
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ForeignKeyDef {
     pub columns: Vec<String>,
     pub ref_table: String,
     pub ref_columns: Vec<String>,
+    pub on_delete: ForeignKeyAction,
+    pub on_update: ForeignKeyAction,
+}
+
+/// CHECK constraint definition
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CheckConstraint {
+    pub name: Option<String>,
+    pub expr: Expr,
+}
+
+/// UNIQUE constraint definition
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct UniqueConstraint {
+    pub name: Option<String>,
+    pub columns: Vec<String>,
 }
 
 /// Data type
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DataType {
     Int,
+    Serial,
     Text,
     Varchar(u32),
 }
@@ -309,6 +382,7 @@ pub struct SelectStmt {
     pub distinct: bool,
     pub columns: Vec<Expr>,
     pub from: String,
+    pub table_alias: Option<String>,
     pub joins: Vec<JoinClause>,
     pub where_clause: Option<Expr>,
     pub group_by: Option<Vec<String>>,
@@ -322,7 +396,9 @@ pub struct SelectStmt {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct JoinClause {
     pub join_type: JoinType,
+    pub lateral: bool,
     pub table: String,
+    pub alias: Option<String>,
     pub on: Expr,
 }
 
@@ -371,6 +447,11 @@ pub enum Expr {
     Number(i64),
     String(String),
     Star,
+    Parameter(usize),
+    Alias {
+        expr: Box<Expr>,
+        alias: String,
+    },
     BinaryOp {
         left: Box<Expr>,
         op: BinaryOperator,
@@ -459,6 +540,7 @@ mod tests {
             distinct: false,
             columns: vec![Expr::Star],
             from: "users".to_string(),
+            table_alias: None,
             joins: vec![],
             where_clause: None,
             group_by: None,

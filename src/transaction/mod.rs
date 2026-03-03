@@ -14,7 +14,9 @@ pub mod snapshot;
 
 pub use error::{Result, TransactionError};
 pub use lock::{LockKey, LockManager, LockMode};
-pub use manager::{Transaction, TransactionId, TransactionManager, TransactionState};
+pub use manager::{
+    IsolationLevel, Transaction, TransactionId, TransactionManager, TransactionState,
+};
 pub use mvcc::TupleHeader;
 pub use snapshot::Snapshot;
 

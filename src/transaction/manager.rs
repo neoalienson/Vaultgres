@@ -20,17 +20,37 @@ pub enum TransactionState {
     Aborted,
 }
 
+/// Transaction isolation level
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IsolationLevel {
+    ReadCommitted,
+    RepeatableRead,
+    Serializable,
+}
+
 /// Transaction context
 pub struct Transaction {
     pub xid: TransactionId,
     pub snapshot: Snapshot,
     pub state: TransactionState,
+    pub isolation_level: IsolationLevel,
+}
+
+impl From<crate::parser::ast::IsolationLevel> for IsolationLevel {
+    fn from(level: crate::parser::ast::IsolationLevel) -> Self {
+        match level {
+            crate::parser::ast::IsolationLevel::ReadCommitted => IsolationLevel::ReadCommitted,
+            crate::parser::ast::IsolationLevel::RepeatableRead => IsolationLevel::RepeatableRead,
+            crate::parser::ast::IsolationLevel::Serializable => IsolationLevel::Serializable,
+        }
+    }
 }
 
 /// Transaction manager
 pub struct TransactionManager {
     next_xid: Arc<AtomicU64>,
     active_txns: Arc<DashMap<TransactionId, TransactionState>>,
+    default_isolation: IsolationLevel,
 }
 
 impl TransactionManager {
@@ -39,19 +59,28 @@ impl TransactionManager {
         Self {
             next_xid: Arc::new(AtomicU64::new(FIRST_NORMAL_XID)),
             active_txns: Arc::new(DashMap::new()),
+            default_isolation: IsolationLevel::ReadCommitted,
         }
     }
 
-    /// Begins a new transaction
+    /// Begins a new transaction with default isolation level
     pub fn begin(&self) -> Transaction {
+        self.begin_with_isolation(self.default_isolation)
+    }
+
+    /// Begins a new transaction with specified isolation level
+    pub fn begin_with_isolation(&self, isolation_level: IsolationLevel) -> Transaction {
         let xid = self.next_xid.fetch_add(1, Ordering::SeqCst);
         self.active_txns.insert(xid, TransactionState::InProgress);
 
-        let snapshot = self.get_snapshot();
+        let snapshot = match isolation_level {
+            IsolationLevel::ReadCommitted => Snapshot::new(xid, xid + 1, vec![]),
+            IsolationLevel::RepeatableRead | IsolationLevel::Serializable => self.get_snapshot(),
+        };
 
-        log::debug!("Transaction {} started", xid);
+        log::debug!("Transaction {} started with {:?}", xid, isolation_level);
 
-        Transaction { xid, snapshot, state: TransactionState::InProgress }
+        Transaction { xid, snapshot, state: TransactionState::InProgress, isolation_level }
     }
 
     /// Commits a transaction

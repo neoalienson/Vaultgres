@@ -4,9 +4,9 @@ use crate::parser::ast::{
     CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
     CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
     DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
-    DropViewStmt, FetchCursorStmt, FetchDirection, ForeignKeyDef, ForeignKeyRef, FunctionParameter,
-    FunctionReturnType, FunctionVolatility, ParameterMode, Statement, TriggerEvent, TriggerFor,
-    TriggerTiming,
+    DropViewStmt, FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
+    FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, Statement,
+    TriggerEvent, TriggerFor, TriggerTiming,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -42,6 +42,8 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     let mut columns = Vec::new();
     let mut primary_key = None;
     let mut foreign_keys = Vec::new();
+    let check_constraints = Vec::new();
+    let unique_constraints = Vec::new();
 
     loop {
         // Check for table-level constraints
@@ -75,7 +77,13 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
                 ref_cols.push(parser.expect_identifier()?);
             }
             parser.expect(Token::RightParen)?;
-            foreign_keys.push(ForeignKeyDef { columns: fk_cols, ref_table, ref_columns: ref_cols });
+            foreign_keys.push(ForeignKeyDef {
+                columns: fk_cols,
+                ref_table,
+                ref_columns: ref_cols,
+                on_delete: ForeignKeyAction::Restrict,
+                on_update: ForeignKeyAction::Restrict,
+            });
         } else {
             columns.push(parse_column_def(parser)?);
         }
@@ -88,7 +96,14 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
 
     parser.expect(Token::RightParen)?;
 
-    Ok(Statement::CreateTable(CreateTableStmt { table, columns, primary_key, foreign_keys }))
+    Ok(Statement::CreateTable(CreateTableStmt {
+        table,
+        columns,
+        primary_key,
+        foreign_keys,
+        check_constraints,
+        unique_constraints,
+    }))
 }
 
 fn parse_create_view(parser: &mut Parser) -> Result<Statement> {
@@ -343,13 +358,28 @@ fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
     let data_type = parse_data_type(parser)?;
 
     let mut is_primary_key = false;
+    let is_unique = false;
+    let mut is_auto_increment = data_type == DataType::Serial;
+    let mut default_value = None;
     let mut foreign_key = None;
+
+    // Check for AUTO_INCREMENT
+    if parser.current_token() == &Token::AutoIncrement {
+        parser.advance();
+        is_auto_increment = true;
+    }
 
     // Check for column-level PRIMARY KEY
     if parser.current_token() == &Token::Primary {
         parser.advance();
         parser.expect(Token::Key)?;
         is_primary_key = true;
+    }
+
+    // Check for DEFAULT
+    if parser.current_token() == &Token::Default {
+        parser.advance();
+        default_value = Some(super::expr::parse_expr(parser)?);
     }
 
     // Check for column-level REFERENCES
@@ -362,7 +392,16 @@ fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
         foreign_key = Some(ForeignKeyRef { table: ref_table, column: ref_column });
     }
 
-    Ok(ColumnDef { name, data_type, is_primary_key, foreign_key })
+    Ok(ColumnDef {
+        name,
+        data_type,
+        is_primary_key,
+        is_unique,
+        is_auto_increment,
+        is_not_null: false,
+        default_value,
+        foreign_key,
+    })
 }
 
 fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
@@ -370,6 +409,10 @@ fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
         Token::Int => {
             parser.advance();
             Ok(DataType::Int)
+        }
+        Token::Serial => {
+            parser.advance();
+            Ok(DataType::Serial)
         }
         Token::Text => {
             parser.advance();

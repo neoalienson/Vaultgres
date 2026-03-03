@@ -123,12 +123,6 @@ Note: Distroless images don't have a shell. For debugging, use a debug variant:
 FROM gcr.io/distroless/static:debug-nonroot
 ```
 
-## Image Size Comparison
-
-- **Alpine + Rust**: ~500MB
-- **Debian + Rust**: ~1.2GB
-- **Distroless + Static Binary**: ~15MB ✓
-
 ## Security Scan
 
 ```bash

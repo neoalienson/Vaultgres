@@ -119,6 +119,10 @@ pub fn parse_primary(parser: &mut Parser) -> Result<Expr> {
         Token::RowNumber | Token::Rank | Token::DenseRank | Token::Lag | Token::Lead => {
             parse_window(parser)
         }
+        Token::Parameter(n) => {
+            parser.advance();
+            Ok(Expr::Parameter(n))
+        }
         Token::LeftParen => {
             parser.advance();
             if parser.current_token() == &Token::Select {
@@ -272,11 +276,25 @@ fn parse_case(parser: &mut Parser) -> Result<Expr> {
 }
 
 pub fn parse_expr_list(parser: &mut Parser) -> Result<Vec<Expr>> {
-    let mut exprs = vec![parse_expr(parser)?];
+    let mut exprs = vec![];
 
-    while parser.current_token() == &Token::Comma {
+    loop {
+        let expr = parse_expr(parser)?;
+
+        let final_expr = if parser.current_token() == &Token::As {
+            parser.advance();
+            let alias = parser.expect_identifier()?;
+            Expr::Alias { expr: Box::new(expr), alias }
+        } else {
+            expr
+        };
+
+        exprs.push(final_expr);
+
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
         parser.advance();
-        exprs.push(parse_expr(parser)?);
     }
 
     Ok(exprs)

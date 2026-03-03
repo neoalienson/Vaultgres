@@ -180,7 +180,7 @@ impl Persistence {
                 let header = TupleHeader::new(txn.xid);
                 txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
 
-                tuples.push(Tuple { header, data: values });
+                tuples.push(Tuple { header, data: values, column_map: HashMap::new() });
             }
 
             tables.insert(table_name.clone(), schema);
@@ -217,6 +217,7 @@ fn read_string<R: Read>(reader: &mut R) -> Result<String, String> {
 fn write_data_type<W: Write>(writer: &mut W, dt: &DataType) -> Result<(), String> {
     match dt {
         DataType::Int => writer.write_all(&[0]).map_err(|e| format!("Write error: {}", e))?,
+        DataType::Serial => writer.write_all(&[0]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Text => writer.write_all(&[1]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Varchar(len) => {
             writer.write_all(&[2]).map_err(|e| format!("Write error: {}", e))?;
@@ -350,8 +351,16 @@ mod tests {
         txn_mgr.commit(txn.xid).unwrap();
 
         let tuples = vec![
-            Tuple { header, data: vec![Value::Int(1), Value::Text("Alice".to_string())] },
-            Tuple { header, data: vec![Value::Int(2), Value::Text("Bob".to_string())] },
+            Tuple {
+                header,
+                data: vec![Value::Int(1), Value::Text("Alice".to_string())],
+                column_map: HashMap::new(),
+            },
+            Tuple {
+                header,
+                data: vec![Value::Int(2), Value::Text("Bob".to_string())],
+                column_map: HashMap::new(),
+            },
         ];
 
         tables.insert("users".to_string(), schema);
@@ -391,7 +400,11 @@ mod tests {
         let header = TupleHeader::new(txn.xid);
         txn_mgr.commit(txn.xid).unwrap();
 
-        let tuples = vec![Tuple { header, data: vec![Value::Int(1), Value::Null] }];
+        let tuples = vec![Tuple {
+            header,
+            data: vec![Value::Int(1), Value::Null],
+            column_map: HashMap::new(),
+        }];
 
         tables.insert("test".to_string(), schema);
         data.insert("test".to_string(), tuples);

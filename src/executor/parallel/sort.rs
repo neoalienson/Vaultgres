@@ -1,6 +1,9 @@
 use crate::executor::executor::{ExecutorError, SimpleTuple};
+use crate::executor::parallel::config::ParallelConfig;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
+use crate::executor::parallel::worker_pool::WorkerPool;
+use crossbeam::channel::bounded;
 use std::sync::Arc;
 
 pub struct ParallelSort {
@@ -11,6 +14,52 @@ pub struct ParallelSort {
 impl ParallelSort {
     pub fn new(child: Arc<dyn ParallelOperator>, ascending: bool) -> Self {
         Self { child, ascending }
+    }
+
+    pub fn execute(
+        &self,
+        config: &ParallelConfig,
+        row_count: usize,
+    ) -> Result<Vec<SimpleTuple>, ExecutorError> {
+        if row_count == 0 {
+            return Ok(vec![]);
+        }
+
+        let num_workers = config.max_workers();
+        let pool = WorkerPool::new(num_workers);
+        let chunk_size = (row_count + num_workers - 1) / num_workers;
+
+        let (result_sender, result_receiver) = bounded(num_workers);
+
+        for i in 0..num_workers {
+            let start = i * chunk_size;
+            let end = ((i + 1) * chunk_size).min(row_count);
+            if start >= row_count {
+                break;
+            }
+            let morsel =
+                Morsel { tuples: vec![], start_offset: start, end_offset: end, partition_id: i };
+            pool.submit_task(morsel, Arc::clone(&self.child), result_sender.clone())?;
+        }
+        drop(result_sender);
+
+        let mut sorted_runs = Vec::new();
+        while let Ok(result) = result_receiver.recv() {
+            let morsel = result?;
+            let mut tuples = morsel.tuples;
+            tuples.sort_by(
+                |a, b| {
+                    if self.ascending {
+                        a.data.cmp(&b.data)
+                    } else {
+                        b.data.cmp(&a.data)
+                    }
+                },
+            );
+            sorted_runs.push(tuples);
+        }
+
+        Ok(self.merge_sorted_runs(sorted_runs))
     }
 
     pub fn local_sort(&self, morsel: Morsel) -> Result<Vec<SimpleTuple>, ExecutorError> {
@@ -49,7 +98,12 @@ impl ParallelSort {
             for (run_idx, run) in runs.iter().enumerate() {
                 if indices[run_idx] < run.len() {
                     let val = &run[indices[run_idx]];
-                    if min_val.is_none() || Some(&val.data) < min_val {
+                    let should_select = if self.ascending {
+                        min_val.is_none() || Some(&val.data) < min_val
+                    } else {
+                        min_val.is_none() || Some(&val.data) > min_val
+                    };
+                    if should_select {
                         min_val = Some(&val.data);
                         min_idx = Some(run_idx);
                     }

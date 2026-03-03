@@ -46,12 +46,26 @@ RustGres development roadmap with planned features and milestones.
 - ✅ Aggregation: COUNT, SUM, AVG, MIN, MAX with DISTINCT
 - ✅ CASE expressions
 - ✅ PRIMARY KEY and FOREIGN KEY constraints
+- ✅ CHECK constraints with expression validation
+- ✅ UNIQUE constraints (column and table-level)
+- ✅ DEFAULT values for columns
+- ✅ AUTO_INCREMENT/SERIAL columns
+- ✅ NOT NULL enforcement
+- ✅ Foreign key actions: ON DELETE/ON UPDATE (CASCADE, SET NULL, RESTRICT)
+
+**Transaction Management**
+- ✅ MVCC with snapshot isolation
+- ✅ BEGIN, COMMIT, ROLLBACK
+- ✅ Multi-statement transactions with full ACID support
+- ✅ Savepoints: SAVEPOINT, ROLLBACK TO, RELEASE SAVEPOINT
+- ✅ Transaction isolation levels: READ COMMITTED, REPEATABLE READ, SERIALIZABLE
+- ✅ Deadlock detection and resolution with wait-for graph
+- ✅ Lock timeout configuration with customizable duration
 
 **Testing Infrastructure**
-- ✅ 981 comprehensive tests (100% pass rate)
-- ✅ 496 unit tests across all modules
-- ✅ 104 edge case tests
-- ✅ Integration tests for cross-module features
+- ✅ Comprehensive tests (100% pass rate)
+- ✅ Unit tests across all modules
+- ✅ Integration tests
 - ✅ Docker-based E2E testing framework
 - ✅ Performance comparison tests (RustGres vs PostgreSQL)
 - ✅ Load and soak testing infrastructure
@@ -65,59 +79,49 @@ RustGres development roadmap with planned features and milestones.
 
 ## Version 0.2.0 (Current - Alpha)
 
-**In Progress**
-- 🚧 Query plan caching
-
-**Next Up**
-- ⏳ CHECK constraints
-- ⏳ UNIQUE constraints
-- ⏳ DEFAULT values
-- ⏳ AUTO_INCREMENT/SERIAL
-- ⏳ Transactions: BEGIN, COMMIT, ROLLBACK
-- ⏳ Savepoints
+**Completed**
+- ✅ Query plan caching with LRU eviction
+- ✅ CHECK constraints with expression validation
+- ✅ UNIQUE constraints with column and table-level support
+- ✅ DEFAULT values for columns
+- ✅ AUTO_INCREMENT/SERIAL for auto-incrementing integer columns
+- ✅ Transactions: BEGIN, COMMIT, ROLLBACK
+- ✅ Savepoints: SAVEPOINT, ROLLBACK TO, RELEASE SAVEPOINT
+- ✅ Multi-statement transactions with full ACID support
+- ✅ Transaction isolation levels: READ COMMITTED, REPEATABLE READ, SERIALIZABLE
+- ✅ Deadlock detection and resolution
+- ✅ Lock timeout configuration
+- ✅ NOT NULL enforcement
+- ✅ Foreign key actions: ON DELETE/ON UPDATE (CASCADE, SET NULL, RESTRICT)
+- ✅ Recursive CTEs (WITH RECURSIVE)
+- ✅ Lateral joins (LATERAL)
+- ✅ Table aliases and column aliases
+- ✅ Prepared statements
+- ✅ Bind parameter support
 
 
 ## Version 0.3.0 (Beta)
 
-**Transaction Enhancements**
-- Multi-statement transactions (BEGIN/COMMIT/ROLLBACK)
-- Savepoints (SAVEPOINT, ROLLBACK TO)
-- Transaction isolation levels (READ COMMITTED, REPEATABLE READ, SERIALIZABLE)
-- Deadlock detection and resolution
-- Lock timeout configuration
-
-**Constraint System**
-- CHECK constraints with expression validation
-- UNIQUE constraints with index enforcement
-- DEFAULT values for columns
-- NOT NULL enforcement
-- ON DELETE/ON UPDATE actions for foreign keys (CASCADE, SET NULL, RESTRICT)
-
 **Advanced SQL**
-- Correlated subqueries
-- EXISTS and NOT EXISTS
-- Recursive CTEs (WITH RECURSIVE)
-- Lateral joins (LATERAL)
-- Table aliases and column aliases
+- ✅ Recursive CTEs (WITH RECURSIVE)
+- ✅ Lateral joins (LATERAL)
+- ✅ Table aliases and column aliases
 
 **Query Optimization**
-- Index selection based on cost model
-- Merge join implementation
-- Query plan caching
-- Prepared statements
-- Bind parameter support
+- ✅ Prepared statements
+- ✅ Bind parameter support
 
 **Status**: Q2 2024
 
 ## Version 0.4.0 (Beta)
 
 **Parallel Execution**
-- Parallel sequential scan with worker threads
-- Parallel hash join
-- Parallel aggregation
-- Parallel sort with merge
-- Work-stealing scheduler
-- Configurable parallelism (max_parallel_workers)
+- ✅ Parallel sequential scan with worker threads
+- ✅ Parallel hash join
+- ✅ Parallel aggregation
+- ✅ Parallel sort with merge
+- ✅ Work-stealing scheduler
+- ✅ Configurable parallelism (max_parallel_workers)
 
 **Advanced Indexes**
 - Hash indexes for equality lookups
@@ -352,48 +356,6 @@ RustGres development roadmap with planned features and milestones.
 - Intelligent prefetching
 - Adaptive indexing
 
-**Status**: Research & Experimentation
-
-## Feature Requests
-
-Vote for features on GitHub Discussions:
-
-**Most Requested**:
-1. Distributed transactions (45 votes)
-2. Time-series optimizations (38 votes)
-3. GraphQL interface (32 votes)
-4. Change data capture (CDC) (28 votes)
-5. Multi-master replication (25 votes)
-
-## Contributing
-
-We welcome contributions! See [Contributing Guide](CONTRIBUTING.md) for:
-- How to pick up tasks from roadmap
-- Development workflow
-- Testing requirements
-- Code review process
-
-**Good First Issues**:
-- Implement additional SQL functions
-- Add more data types
-- Improve error messages
-- Write documentation
-- Add benchmarks
-
-## Release Schedule
-
-- **Alpha releases**: Monthly (0.1.x, 0.2.x, ...)
-- **Beta releases**: Quarterly (0.3.0, 0.4.0, ...)
-- **Release candidates**: As needed before 1.0
-- **Stable releases**: Quarterly after 1.0
-
-## Versioning
-
-RustGres follows Semantic Versioning (SemVer):
-- **Major**: Breaking changes
-- **Minor**: New features, backward compatible
-- **Patch**: Bug fixes, backward compatible
-
 ## Compatibility Promise
 
 **Before 1.0**:
@@ -416,15 +378,6 @@ RustGres follows Semantic Versioning (SemVer):
 - 30% lower CPU usage
 - Sub-millisecond P99 latency for point queries
 
-## Testing Goals
-
-**Coverage Targets**:
-- ✅ Unit tests: 90%+ coverage (474 tests, 100% pass)
-- ✅ Edge case testing: All modules covered (79 tests)
-- ❌ Integration tests: All major features
-- ❌ Fuzz testing: Parser, optimizer, executor
-- ❌ Performance tests: Regression detection
-- ❌ Compatibility tests: PostgreSQL test suite
 
 ## Documentation Goals
 
@@ -441,15 +394,6 @@ RustGres follows Semantic Versioning (SemVer):
 - API documentation
 - Contributing guide
 - Internals guide
-
-## Community Goals
-
-**By Version 1.0**:
-- 1,000+ GitHub stars
-- 50+ contributors
-- 10+ production deployments
-- Active Discord community
-- Monthly blog posts
 
 ## Long-Term Vision
 
@@ -475,59 +419,3 @@ RustGres aims to be:
 - Workload-aware tuning
 - Predictive prefetching
 - Intelligent caching
-
-## Feedback
-
-We value your feedback! Share your thoughts:
-- GitHub Issues: Bug reports and feature requests
-- GitHub Discussions: General questions and ideas
-- Discord: Real-time chat with maintainers
-- Email: rustgres@example.com
-
-## Updates
-
-Follow development progress:
-- GitHub: Watch repository for updates
-- Blog: https://rustgres.org/blog
-- Twitter: @rustgres
-- Newsletter: Monthly updates
-
----
-
-Last updated: 2024-02-28
-
-## Recent Achievements
-
-**Phase 2.11 - SQL Feature Completion** ✅
-- 553 comprehensive tests (100% pass rate)
-- Subqueries: Scalar and IN subqueries with result caching
-- CTEs: WITH clause with multiple CTEs and materialized execution
-- Window Functions: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD
-- Complete set operations: UNION/UNION ALL, INTERSECT, EXCEPT
-- All JOIN types: INNER, LEFT, RIGHT, FULL OUTER
-- Advanced aggregation: GROUP BY, HAVING, DISTINCT
-
-**Phase 2.12 - E2E Testing & Constraints** ✅
-- Docker-based E2E testing framework with 6 test modes
-- Performance comparison tests (RustGres vs PostgreSQL)
-- Load and soak testing with resource monitoring
-- Monitoring stack: Prometheus, Grafana, cAdvisor
-- PRIMARY KEY and FOREIGN KEY constraints
-- Referential integrity enforcement
-- PostgreSQL wire protocol result set serialization
-- Pre-commit hooks (secret scanning, formatting, linting)
-
-**Testing Infrastructure** ✅
-- 553 total tests (100% pass rate)
-- 474 unit tests across all modules
-- 79 edge case tests
-- 50 parser edge case tests
-- E2E test scenarios (pet store, referential integrity)
-- Test execution time: <0.12s
-
-**Code Quality** ✅
-- Minimal, focused implementations
-- Consistent error handling with Result types
-- Comprehensive edge case coverage
-- Clean separation of concerns
-- Automated code quality checks

@@ -1,7 +1,10 @@
 use crate::executor::executor::{ExecutorError, SimpleTuple};
+use crate::executor::parallel::config::ParallelConfig;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
 use crate::executor::parallel::partition::PartitionStrategy;
+use crate::executor::parallel::worker_pool::WorkerPool;
+use crossbeam::channel::bounded;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -43,6 +46,74 @@ impl ParallelHashJoin {
         let hash_table = Arc::new(ConcurrentHashTable::new(num_partitions));
 
         Self { build_side, probe_side, hash_table, partition_strategy }
+    }
+
+    pub fn execute(
+        &self,
+        config: &ParallelConfig,
+        build_rows: usize,
+        probe_rows: usize,
+    ) -> Result<Vec<SimpleTuple>, ExecutorError> {
+        let num_workers = config.max_workers();
+        let pool = WorkerPool::new(num_workers);
+
+        // Build phase
+        let build_chunk = (build_rows + num_workers - 1) / num_workers;
+        let (build_sender, build_receiver) = bounded(num_workers);
+
+        for i in 0..num_workers {
+            let start = i * build_chunk;
+            let end = ((i + 1) * build_chunk).min(build_rows);
+            if start >= build_rows {
+                break;
+            }
+            let morsel =
+                Morsel { tuples: vec![], start_offset: start, end_offset: end, partition_id: i };
+            pool.submit_task(morsel, Arc::clone(&self.build_side), build_sender.clone())?;
+        }
+        drop(build_sender);
+
+        while let Ok(result) = build_receiver.recv() {
+            let morsel = result?;
+            for tuple in morsel.tuples {
+                let key = tuple.data.clone();
+                let partition_id = self.partition_strategy.partition_key(&key);
+                self.hash_table.insert(partition_id, key, tuple);
+            }
+        }
+
+        // Probe phase
+        let probe_chunk = (probe_rows + num_workers - 1) / num_workers;
+        let (probe_sender, probe_receiver) = bounded(num_workers);
+
+        for i in 0..num_workers {
+            let start = i * probe_chunk;
+            let end = ((i + 1) * probe_chunk).min(probe_rows);
+            if start >= probe_rows {
+                break;
+            }
+            let morsel =
+                Morsel { tuples: vec![], start_offset: start, end_offset: end, partition_id: i };
+            pool.submit_task(morsel, Arc::clone(&self.probe_side), probe_sender.clone())?;
+        }
+        drop(probe_sender);
+
+        let mut all_tuples = Vec::new();
+        while let Ok(result) = probe_receiver.recv() {
+            let morsel = result?;
+            for tuple in morsel.tuples {
+                let key = &tuple.data;
+                let partition_id = self.partition_strategy.partition_key(key);
+                let matches = self.hash_table.probe(partition_id, key);
+                for matched in matches {
+                    let mut joined = SimpleTuple { data: matched.data.clone() };
+                    joined.data.extend_from_slice(&tuple.data);
+                    all_tuples.push(joined);
+                }
+            }
+        }
+
+        Ok(all_tuples)
     }
 
     pub fn build_phase(&self, morsel: Morsel) -> Result<(), ExecutorError> {

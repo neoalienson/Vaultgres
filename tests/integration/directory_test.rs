@@ -217,6 +217,7 @@ wal:
 performance:
   worker_threads: 4
   query_cache: false
+  max_parallel_workers: 4
 "#,
         temp_dir.path().display(),
         temp_dir.path().display()

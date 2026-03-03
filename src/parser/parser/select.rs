@@ -27,10 +27,17 @@ pub fn parse_select_stmt(parser: &mut Parser) -> Result<SelectStmt> {
         String::new()
     };
 
+    let table_alias = if parser.current_token() == &Token::As {
+        parser.advance();
+        Some(parser.expect_identifier()?)
+    } else {
+        None
+    };
+
     let mut joins = Vec::new();
     while matches!(
         parser.current_token(),
-        Token::Join | Token::Inner | Token::Left | Token::Right | Token::Full
+        Token::Join | Token::Lateral | Token::Inner | Token::Left | Token::Right | Token::Full
     ) {
         joins.push(parse_join(parser)?);
     }
@@ -95,6 +102,7 @@ pub fn parse_select_stmt(parser: &mut Parser) -> Result<SelectStmt> {
         distinct,
         columns,
         from,
+        table_alias,
         joins,
         where_clause,
         group_by,
@@ -106,6 +114,13 @@ pub fn parse_select_stmt(parser: &mut Parser) -> Result<SelectStmt> {
 }
 
 fn parse_join(parser: &mut Parser) -> Result<JoinClause> {
+    let lateral = if parser.current_token() == &Token::Lateral {
+        parser.advance();
+        true
+    } else {
+        false
+    };
+
     let join_type = match parser.current_token() {
         Token::Inner => {
             parser.advance();
@@ -135,10 +150,18 @@ fn parse_join(parser: &mut Parser) -> Result<JoinClause> {
     };
 
     let table = parser.expect_identifier()?;
+
+    let alias = if parser.current_token() == &Token::As {
+        parser.advance();
+        Some(parser.expect_identifier()?)
+    } else {
+        None
+    };
+
     parser.expect(Token::On)?;
     let on = super::expr::parse_expr(parser)?;
 
-    Ok(JoinClause { join_type, table, on })
+    Ok(JoinClause { join_type, lateral, table, alias, on })
 }
 
 fn parse_select_list(parser: &mut Parser) -> Result<Vec<crate::parser::ast::Expr>> {

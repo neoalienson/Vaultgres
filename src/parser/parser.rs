@@ -40,6 +40,90 @@ impl Parser {
             return ddl::parse_close_cursor(self);
         }
 
+        if self.current_token() == &Token::Begin {
+            self.advance();
+            return Ok(Statement::Begin);
+        }
+
+        if self.current_token() == &Token::Commit {
+            self.advance();
+            return Ok(Statement::Commit);
+        }
+
+        if self.current_token() == &Token::Rollback {
+            self.advance();
+            if self.current_token() == &Token::To {
+                self.advance();
+                if self.current_token() == &Token::Savepoint {
+                    self.advance();
+                }
+                let name = self.expect_identifier()?;
+                return Ok(Statement::RollbackTo(name));
+            }
+            return Ok(Statement::Rollback);
+        }
+
+        if self.current_token() == &Token::Set {
+            self.advance();
+            if self.current_token() == &Token::Transaction {
+                self.advance();
+                self.expect(Token::Isolation)?;
+                self.expect(Token::Level)?;
+
+                let level = match self.current_token() {
+                    Token::Read => {
+                        self.advance();
+                        self.expect(Token::Committed)?;
+                        IsolationLevel::ReadCommitted
+                    }
+                    Token::Repeatable => {
+                        self.advance();
+                        self.expect(Token::Read)?;
+                        IsolationLevel::RepeatableRead
+                    }
+                    Token::Serializable => {
+                        self.advance();
+                        IsolationLevel::Serializable
+                    }
+                    _ => {
+                        return Err(ParseError::InvalidSyntax(
+                            "Invalid isolation level".to_string(),
+                        ))
+                    }
+                };
+                return Ok(Statement::SetTransaction(level));
+            }
+        }
+
+        if self.current_token() == &Token::Savepoint {
+            self.advance();
+            let name = self.expect_identifier()?;
+            return Ok(Statement::Savepoint(name));
+        }
+
+        if self.current_token() == &Token::Release {
+            self.advance();
+            if self.current_token() == &Token::Savepoint {
+                self.advance();
+            }
+            let name = self.expect_identifier()?;
+            return Ok(Statement::ReleaseSavepoint(name));
+        }
+
+        if self.current_token() == &Token::Prepare {
+            return self.parse_prepare();
+        }
+
+        if self.current_token() == &Token::Execute {
+            return self.parse_execute();
+        }
+
+        if self.current_token() == &Token::Deallocate {
+            self.advance();
+            let name = self.expect_identifier()?;
+            return Ok(Statement::Deallocate(name));
+        }
+
         if self.current_token() == &Token::Select {
             let select = select::parse_select(self)?;
             // Check for set operations
@@ -179,6 +263,13 @@ impl Parser {
 
         self.expect(Token::With)?;
 
+        let recursive = if self.current_token() == &Token::Recursive {
+            self.advance();
+            true
+        } else {
+            false
+        };
+
         let mut ctes = Vec::new();
         loop {
             let name = self.expect_identifier()?;
@@ -197,7 +288,7 @@ impl Parser {
 
         let query = select::parse_select_stmt(self)?;
 
-        Ok(Statement::With(WithStmt { ctes, query: Box::new(query) }))
+        Ok(Statement::With(WithStmt { recursive, ctes, query: Box::new(query) }))
     }
 
     fn parse_refresh(&mut self) -> Result<Statement> {
@@ -210,6 +301,38 @@ impl Parser {
         let name = self.expect_identifier()?;
 
         Ok(Statement::RefreshMaterializedView(RefreshMaterializedViewStmt { name }))
+    }
+
+    fn parse_prepare(&mut self) -> Result<Statement> {
+        use crate::parser::ast::PrepareStmt;
+
+        self.expect(Token::Prepare)?;
+        let name = self.expect_identifier()?;
+        self.expect(Token::As)?;
+        let statement = Box::new(self.parse()?);
+
+        Ok(Statement::Prepare(PrepareStmt { name, statement }))
+    }
+
+    fn parse_execute(&mut self) -> Result<Statement> {
+        use crate::parser::ast::ExecuteStmt;
+
+        self.expect(Token::Execute)?;
+        let name = self.expect_identifier()?;
+
+        let params = if self.current_token() == &Token::LeftParen {
+            self.advance();
+            let mut params = vec![];
+            if self.current_token() != &Token::RightParen {
+                params = expr::parse_expr_list(self)?;
+            }
+            self.expect(Token::RightParen)?;
+            params
+        } else {
+            vec![]
+        };
+
+        Ok(Statement::Execute(ExecuteStmt { name, params }))
     }
 }
 

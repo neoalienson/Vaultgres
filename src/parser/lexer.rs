@@ -45,6 +45,7 @@ pub enum Token {
     Is,
     Null,
     Join,
+    Lateral,
     Inner,
     Left,
     Right,
@@ -55,6 +56,7 @@ pub enum Token {
     Intersect,
     Except,
     With,
+    Recursive,
     As,
     Over,
     Partition,
@@ -79,6 +81,21 @@ pub enum Token {
     Row,
     Statement,
     Begin,
+    Commit,
+    Rollback,
+    Savepoint,
+    Release,
+    To,
+    Transaction,
+    Isolation,
+    Level,
+    Read,
+    Committed,
+    Repeatable,
+    Serializable,
+    Prepare,
+    Execute,
+    Deallocate,
     Index,
     Unique,
     Function,
@@ -112,11 +129,15 @@ pub enum Token {
     Key,
     Foreign,
     References,
+    Default,
+    Serial,
+    AutoIncrement,
 
     // Identifiers and literals
     Identifier(String),
     Number(i64),
     String(String),
+    Parameter(usize),
 
     // Operators
     Star,
@@ -222,6 +243,7 @@ impl Lexer {
                 }
             }
             '\'' => self.read_string(),
+            '$' => self.read_parameter(),
             _ if ch.is_ascii_digit() => self.read_number(),
             _ if ch.is_ascii_alphabetic() => self.read_identifier(),
             _ => Err(ParseError::UnexpectedToken(ch.to_string())),
@@ -280,6 +302,7 @@ impl Lexer {
             "IS" => Token::Is,
             "NULL" => Token::Null,
             "JOIN" => Token::Join,
+            "LATERAL" => Token::Lateral,
             "INNER" => Token::Inner,
             "LEFT" => Token::Left,
             "RIGHT" => Token::Right,
@@ -290,6 +313,7 @@ impl Lexer {
             "INTERSECT" => Token::Intersect,
             "EXCEPT" => Token::Except,
             "WITH" => Token::With,
+            "RECURSIVE" => Token::Recursive,
             "AS" => Token::As,
             "OVER" => Token::Over,
             "PARTITION" => Token::Partition,
@@ -314,6 +338,21 @@ impl Lexer {
             "ROW" => Token::Row,
             "STATEMENT" => Token::Statement,
             "BEGIN" => Token::Begin,
+            "COMMIT" => Token::Commit,
+            "ROLLBACK" => Token::Rollback,
+            "SAVEPOINT" => Token::Savepoint,
+            "RELEASE" => Token::Release,
+            "TO" => Token::To,
+            "TRANSACTION" => Token::Transaction,
+            "ISOLATION" => Token::Isolation,
+            "LEVEL" => Token::Level,
+            "READ" => Token::Read,
+            "COMMITTED" => Token::Committed,
+            "REPEATABLE" => Token::Repeatable,
+            "SERIALIZABLE" => Token::Serializable,
+            "PREPARE" => Token::Prepare,
+            "EXECUTE" => Token::Execute,
+            "DEALLOCATE" => Token::Deallocate,
             "INDEX" => Token::Index,
             "UNIQUE" => Token::Unique,
             "FUNCTION" => Token::Function,
@@ -347,6 +386,9 @@ impl Lexer {
             "KEY" => Token::Key,
             "FOREIGN" => Token::Foreign,
             "REFERENCES" => Token::References,
+            "DEFAULT" => Token::Default,
+            "SERIAL" => Token::Serial,
+            "AUTO_INCREMENT" => Token::AutoIncrement,
             _ => Token::Identifier(ident),
         };
 
@@ -383,6 +425,26 @@ impl Lexer {
 
         self.advance(); // Skip closing quote
         Ok(Token::String(s))
+    }
+
+    fn read_parameter(&mut self) -> Result<Token> {
+        self.advance(); // Skip $
+        let mut num = String::new();
+
+        while !self.is_eof() && self.current_char().is_ascii_digit() {
+            num.push(self.current_char());
+            self.advance();
+        }
+
+        if num.is_empty() {
+            return Err(ParseError::InvalidSyntax("Expected number after $".to_string()));
+        }
+
+        let value = num
+            .parse::<usize>()
+            .map_err(|_| ParseError::InvalidSyntax(format!("invalid parameter: ${}", num)))?;
+
+        Ok(Token::Parameter(value))
     }
 
     fn skip_whitespace(&mut self) {

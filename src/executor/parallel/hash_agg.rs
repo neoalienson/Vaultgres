@@ -1,6 +1,9 @@
 use crate::executor::executor::{ExecutorError, SimpleTuple};
+use crate::executor::parallel::config::ParallelConfig;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
+use crate::executor::parallel::worker_pool::WorkerPool;
+use crossbeam::channel::bounded;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -75,6 +78,45 @@ impl ParallelHashAgg {
         let hash_tables = (0..num_workers).map(|_| Mutex::new(HashMap::new())).collect();
 
         Self { child, hash_tables }
+    }
+
+    pub fn execute(
+        &self,
+        config: &ParallelConfig,
+        row_count: usize,
+    ) -> Result<Vec<SimpleTuple>, ExecutorError> {
+        let num_workers = config.max_workers();
+        let pool = WorkerPool::new(num_workers);
+        let chunk_size = (row_count + num_workers - 1) / num_workers;
+
+        let (result_sender, result_receiver) = bounded(num_workers);
+
+        for i in 0..num_workers {
+            let start = i * chunk_size;
+            let end = ((i + 1) * chunk_size).min(row_count);
+            if start >= row_count {
+                break;
+            }
+            let morsel =
+                Morsel { tuples: vec![], start_offset: start, end_offset: end, partition_id: i };
+            pool.submit_task(morsel, Arc::clone(&self.child), result_sender.clone())?;
+        }
+        drop(result_sender);
+
+        let mut worker_id = 0;
+        while let Ok(result) = result_receiver.recv() {
+            let morsel = result?;
+            let mut hash_table =
+                self.hash_tables[worker_id % self.hash_tables.len()].lock().unwrap();
+            for tuple in morsel.tuples {
+                let key = tuple.data.clone();
+                let state = hash_table.entry(key.clone()).or_default();
+                state.update(&key);
+            }
+            worker_id += 1;
+        }
+
+        self.global_combine()
     }
 
     pub fn local_aggregate(&self, morsel: Morsel, worker_id: usize) -> Result<(), ExecutorError> {

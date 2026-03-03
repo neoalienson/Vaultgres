@@ -1,12 +1,12 @@
 use super::aggregation::Aggregator;
 use super::persistence::Persistence;
 use super::predicate::PredicateEvaluator;
-use super::{Function, TableSchema, Tuple, Value};
+use super::{Function, TableSchema, Tuple, UniqueValidator, Value};
 use crate::parser::ast::{
-    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, Expr, ForeignKeyDef, OrderByExpr,
-    SelectStmt,
+    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, Expr, ForeignKeyAction, ForeignKeyDef,
+    OrderByExpr, SelectStmt, UniqueConstraint,
 };
-use crate::transaction::{TransactionManager, TupleHeader};
+use crate::transaction::{IsolationLevel, Transaction, TransactionManager, TupleHeader};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -18,6 +18,9 @@ pub struct Catalog {
     indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
     data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
+    sequences: Arc<RwLock<HashMap<String, i64>>>,
+    active_txn: Arc<RwLock<Option<Transaction>>>,
+    savepoints: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
     txn_mgr: Arc<TransactionManager>,
     data_dir: Option<String>,
 }
@@ -32,6 +35,9 @@ impl Catalog {
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
+            sequences: Arc::new(RwLock::new(HashMap::new())),
+            active_txn: Arc::new(RwLock::new(None)),
+            savepoints: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: None,
         }
@@ -46,6 +52,9 @@ impl Catalog {
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
+            sequences: Arc::new(RwLock::new(HashMap::new())),
+            active_txn: Arc::new(RwLock::new(None)),
+            savepoints: Arc::new(RwLock::new(HashMap::new())),
             txn_mgr: Arc::new(TransactionManager::new()),
             data_dir: Some(data_dir.to_string()),
         };
@@ -143,6 +152,8 @@ impl Catalog {
                     columns: vec![col.name.clone()],
                     ref_table: fk_ref.table.clone(),
                     ref_columns: vec![fk_ref.column.clone()],
+                    on_delete: ForeignKeyAction::Restrict,
+                    on_update: ForeignKeyAction::Restrict,
                 });
             }
         }
@@ -339,29 +350,63 @@ impl Catalog {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
-        if values.len() != schema.columns.len() {
-            return Err(format!("Expected {} values, got {}", schema.columns.len(), values.len()));
-        }
-
         let txn = self.txn_mgr.begin();
         let header = TupleHeader::new(txn.xid);
 
         let mut tuple_data = Vec::new();
-        for (i, expr) in values.iter().enumerate() {
-            let value = match expr {
-                Expr::Number(n) => Value::Int(*n),
-                Expr::String(s) => Value::Text(s.clone()),
-                _ => return Err("Invalid value expression".to_string()),
+
+        // Handle partial inserts with DEFAULT values and AUTO_INCREMENT
+        let num_provided = values.len();
+        let num_columns = schema.columns.len();
+
+        if num_provided > num_columns {
+            return Err(format!("Too many values: expected {}, got {}", num_columns, num_provided));
+        }
+
+        for (i, col) in schema.columns.iter().enumerate() {
+            let value = if i < num_provided {
+                // Use provided value
+                let val = match &values[i] {
+                    Expr::Number(n) => Value::Int(*n),
+                    Expr::String(s) => Value::Text(s.clone()),
+                    _ => return Err("Invalid value expression".to_string()),
+                };
+
+                // Type check
+                match (&col.data_type, &val) {
+                    (DataType::Int, Value::Int(_)) => {}
+                    (DataType::Serial, Value::Int(_)) => {}
+                    (DataType::Text, Value::Text(_)) => {}
+                    (DataType::Varchar(_), Value::Text(_)) => {}
+                    _ => return Err(format!("Type mismatch for column '{}'", col.name)),
+                }
+                val
+            } else if col.is_auto_increment || col.data_type == DataType::Serial {
+                // Generate next sequence value
+                let seq_key = format!("{}_{}", table, col.name);
+                let mut sequences = self.sequences.write().unwrap();
+                let next_val = sequences.entry(seq_key).or_insert(0);
+                *next_val += 1;
+                Value::Int(*next_val)
+            } else if let Some(ref default_expr) = col.default_value {
+                // Use default value
+                match default_expr {
+                    Expr::Number(n) => Value::Int(*n),
+                    Expr::String(s) => Value::Text(s.clone()),
+                    _ => return Err("Invalid default value expression".to_string()),
+                }
+            } else {
+                return Err(format!("Column '{}' has no default value", col.name));
             };
 
-            match (&schema.columns[i].data_type, &value) {
-                (DataType::Int, Value::Int(_)) => {}
-                (DataType::Text, Value::Text(_)) => {}
-                (DataType::Varchar(_), Value::Text(_)) => {}
-                _ => return Err(format!("Type mismatch for column '{}'", schema.columns[i].name)),
-            }
-
             tuple_data.push(value);
+        }
+
+        // Validate NOT NULL constraints
+        for (i, col) in schema.columns.iter().enumerate() {
+            if (col.is_not_null || col.is_primary_key) && tuple_data[i] == Value::Null {
+                return Err(format!("Column '{}' cannot be NULL", col.name));
+            }
         }
 
         // Validate PRIMARY KEY uniqueness
@@ -455,7 +500,45 @@ impl Catalog {
             }
         }
 
-        let tuple = Tuple { header, data: tuple_data };
+        // Validate UNIQUE constraints
+        let data = self.data.read().unwrap();
+        if let Some(tuples) = data.get(table) {
+            let snapshot = self.txn_mgr.get_snapshot();
+            let visible_tuples: Vec<Tuple> = tuples
+                .iter()
+                .filter(|t| t.header.is_visible(&snapshot, &self.txn_mgr))
+                .cloned()
+                .collect();
+
+            // Check column-level UNIQUE constraints
+            for (i, col) in schema.columns.iter().enumerate() {
+                if col.is_unique {
+                    let constraint = UniqueConstraint {
+                        name: Some(format!("{}_{}_unique", table, col.name)),
+                        columns: vec![col.name.clone()],
+                    };
+                    UniqueValidator::validate(&constraint, &tuple_data, &visible_tuples, &[i])?;
+                }
+            }
+
+            // Check table-level UNIQUE constraints
+            for unique_constraint in &schema.unique_constraints {
+                let indices: Vec<usize> = unique_constraint
+                    .columns
+                    .iter()
+                    .map(|col| schema.columns.iter().position(|c| &c.name == col).unwrap())
+                    .collect();
+                UniqueValidator::validate(
+                    unique_constraint,
+                    &tuple_data,
+                    &visible_tuples,
+                    &indices,
+                )?;
+            }
+        }
+        drop(data);
+
+        let tuple = Tuple { header, data: tuple_data, column_map: HashMap::new() };
 
         let mut data = self.data.write().unwrap();
         data.get_mut(table).unwrap().push(tuple);
@@ -664,6 +747,101 @@ impl Catalog {
         let mut tables = self.tables.write().unwrap();
         let mut data = self.data.write().unwrap();
         Persistence::load(data_dir, &mut tables, &mut data, &self.txn_mgr)
+    }
+
+    pub fn begin_transaction(&self) -> Result<(), String> {
+        self.begin_transaction_with_isolation(IsolationLevel::ReadCommitted)
+    }
+
+    pub fn begin_transaction_with_isolation(&self, level: IsolationLevel) -> Result<(), String> {
+        let mut active = self.active_txn.write().unwrap();
+        if active.is_some() {
+            return Err("Transaction already in progress".to_string());
+        }
+        *active = Some(self.txn_mgr.begin_with_isolation(level));
+        Ok(())
+    }
+
+    pub fn set_transaction_isolation(&self, level: IsolationLevel) -> Result<(), String> {
+        let mut active = self.active_txn.write().unwrap();
+        if let Some(ref mut txn) = *active {
+            txn.isolation_level = level;
+            if level == IsolationLevel::RepeatableRead || level == IsolationLevel::Serializable {
+                txn.snapshot = self.txn_mgr.get_snapshot();
+            }
+            Ok(())
+        } else {
+            Err("No active transaction".to_string())
+        }
+    }
+
+    pub fn commit_transaction(&self) -> Result<(), String> {
+        let mut active = self.active_txn.write().unwrap();
+        let txn = active.take().ok_or("No active transaction")?;
+        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn rollback_transaction(&self) -> Result<(), String> {
+        let mut active = self.active_txn.write().unwrap();
+        let txn = active.take().ok_or("No active transaction")?;
+        self.txn_mgr.abort(txn.xid).map_err(|e| e.to_string())?;
+        self.savepoints.write().unwrap().clear();
+        Ok(())
+    }
+
+    pub fn savepoint(&self, name: String) -> Result<(), String> {
+        let active = self.active_txn.read().unwrap();
+        if active.is_none() {
+            return Err("No active transaction".to_string());
+        }
+        drop(active);
+
+        let data = self.data.read().unwrap();
+        let snapshot: Vec<Tuple> = data.values().flat_map(|v| v.clone()).collect();
+        self.savepoints.write().unwrap().insert(name, snapshot);
+        Ok(())
+    }
+
+    pub fn rollback_to_savepoint(&self, name: &str) -> Result<(), String> {
+        let active = self.active_txn.read().unwrap();
+        if active.is_none() {
+            return Err("No active transaction".to_string());
+        }
+        drop(active);
+
+        let snapshot = {
+            let savepoints = self.savepoints.read().unwrap();
+            savepoints.get(name).ok_or("Savepoint does not exist")?.clone()
+        };
+
+        let mut data = self.data.write().unwrap();
+        data.clear();
+        for tuple in &snapshot {
+            let table_name = self
+                .tables
+                .read()
+                .unwrap()
+                .iter()
+                .find(|(_, schema)| schema.columns.len() == tuple.data.len())
+                .map(|(name, _)| name.clone());
+
+            if let Some(table) = table_name {
+                data.entry(table).or_insert_with(Vec::new).push(tuple.clone());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn release_savepoint(&self, name: &str) -> Result<(), String> {
+        let active = self.active_txn.read().unwrap();
+        if active.is_none() {
+            return Err("No active transaction".to_string());
+        }
+        drop(active);
+
+        self.savepoints.write().unwrap().remove(name).ok_or("Savepoint does not exist")?;
+        Ok(())
     }
 }
 

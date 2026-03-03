@@ -120,6 +120,7 @@ mod tests {
     use super::*;
     use crate::parser::ast::{ColumnDef, DataType};
     use crate::transaction::TupleHeader;
+    use std::collections::HashMap;
 
     fn create_test_data() -> (TableSchema, Vec<Tuple>, Arc<TransactionManager>) {
         let schema = TableSchema::new(
@@ -136,9 +137,21 @@ mod tests {
         txn_mgr.commit(txn.xid).unwrap();
 
         let tuples = vec![
-            Tuple { header, data: vec![Value::Text("A".to_string()), Value::Int(10)] },
-            Tuple { header, data: vec![Value::Text("B".to_string()), Value::Int(20)] },
-            Tuple { header, data: vec![Value::Text("A".to_string()), Value::Int(30)] },
+            Tuple {
+                header,
+                data: vec![Value::Text("A".to_string()), Value::Int(10)],
+                column_map: HashMap::new(),
+            },
+            Tuple {
+                header,
+                data: vec![Value::Text("B".to_string()), Value::Int(20)],
+                column_map: HashMap::new(),
+            },
+            Tuple {
+                header,
+                data: vec![Value::Text("A".to_string()), Value::Int(30)],
+                column_map: HashMap::new(),
+            },
         ];
 
         (schema, tuples, txn_mgr)

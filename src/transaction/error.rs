@@ -14,6 +14,9 @@ pub enum TransactionError {
     #[error("deadlock detected")]
     Deadlock,
 
+    #[error("lock timeout exceeded")]
+    LockTimeout,
+
     #[error("serialization failure")]
     SerializationFailure,
 }

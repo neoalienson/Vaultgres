@@ -3,6 +3,7 @@ pub mod error;
 pub mod index_selection;
 pub mod join_order;
 pub mod plan;
+pub mod plan_cache;
 pub mod rules;
 pub mod selectivity;
 
@@ -14,6 +15,7 @@ pub use error::{OptimizerError, Result};
 pub use index_selection::{IndexInfo, IndexSelector};
 pub use join_order::{JoinOptimizer, JoinPlan, Relation};
 pub use plan::LogicalPlan;
+pub use plan_cache::PlanCache;
 pub use rules::{
     ConstantFolding, OptimizationRule, PredicatePushdown, ProjectionPruning, RuleOptimizer,
 };
