@@ -49,8 +49,32 @@ impl TestEnv {
             .status()
             .expect("Failed to cleanup");
         
-        // Wait for cleanup to complete
-        thread::sleep(Duration::from_secs(2));
+        // Poll until no containers exist for this project
+        eprintln!("[TestEnv] Waiting for cleanup to complete...");
+        for _ in 0..30 {
+            let output = Command::new("docker")
+                .args(&["ps", "-a", "-q", "--filter", &format!("name={}", self.compose_project)])
+                .output()
+                .expect("Failed to check containers");
+            
+            if output.stdout.is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+        
+        // Also check if port 5432 is free
+        for _ in 0..30 {
+            let output = Command::new("docker")
+                .args(&["ps", "-q", "--filter", "publish=5432"])
+                .output()
+                .expect("Failed to check port");
+            
+            if output.stdout.is_empty() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
 
         eprintln!("[TestEnv] Starting containers...");
         let mut services = vec![];
