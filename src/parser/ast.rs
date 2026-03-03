@@ -431,6 +431,7 @@ pub struct OrderByExpr {
 pub struct InsertStmt {
     pub table: String,
     pub values: Vec<Expr>,
+    pub batch_values: Vec<Vec<Expr>>,
 }
 
 /// UPDATE statement
@@ -567,6 +568,7 @@ mod tests {
         let stmt = InsertStmt {
             table: "users".to_string(),
             values: vec![Expr::Number(1), Expr::String("Alice".to_string())],
+            batch_values: vec![],
         };
 
         assert_eq!(stmt.table, "users");

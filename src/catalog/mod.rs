@@ -14,6 +14,8 @@ mod unique;
 mod value;
 
 #[cfg(test)]
+mod batch_insert_tests;
+#[cfg(test)]
 mod datatype_tests;
 
 // Re-export public types

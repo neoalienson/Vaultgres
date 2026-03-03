@@ -191,7 +191,7 @@ VaultGres development roadmap with planned features and milestones.
 - Query result caching
 - Prepared statement caching
 - Connection pooling (built-in PgBouncer-like)
-- Batch insert optimization
+- ✅ Batch insert optimization
 
 **Advanced SQL**
 - Full-text search with tsvector/tsquery

@@ -554,6 +554,86 @@ impl Catalog {
         data.get(table).map(|rows| rows.len()).unwrap_or(0)
     }
 
+    pub fn batch_insert(&self, table: &str, batch: Vec<Vec<Expr>>) -> Result<usize, String> {
+        if batch.is_empty() {
+            return Ok(0);
+        }
+
+        let schema =
+            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
+
+        let txn = self.txn_mgr.begin();
+        let header = TupleHeader::new(txn.xid);
+        let mut tuples = Vec::with_capacity(batch.len());
+
+        for values in batch {
+            let mut tuple_data = Vec::new();
+            let num_provided = values.len();
+            let num_columns = schema.columns.len();
+
+            if num_provided > num_columns {
+                let _ = self.txn_mgr.commit(txn.xid);
+                return Err(format!(
+                    "Too many values: expected {}, got {}",
+                    num_columns, num_provided
+                ));
+            }
+
+            for (i, col) in schema.columns.iter().enumerate() {
+                let value = if i < num_provided {
+                    let val = match &values[i] {
+                        Expr::Number(n) => Value::Int(*n),
+                        Expr::String(s) => Value::Text(s.clone()),
+                        _ => {
+                            let _ = self.txn_mgr.commit(txn.xid);
+                            return Err("Invalid value expression".to_string());
+                        }
+                    };
+                    match (&col.data_type, &val) {
+                        (DataType::Int, Value::Int(_)) => {}
+                        (DataType::Serial, Value::Int(_)) => {}
+                        (DataType::Text, Value::Text(_)) => {}
+                        (DataType::Varchar(_), Value::Text(_)) => {}
+                        _ => {
+                            let _ = self.txn_mgr.commit(txn.xid);
+                            return Err(format!("Type mismatch for column '{}'", col.name));
+                        }
+                    }
+                    val
+                } else if col.is_auto_increment || col.data_type == DataType::Serial {
+                    let seq_key = format!("{}_{}", table, col.name);
+                    let mut sequences = self.sequences.write().unwrap();
+                    let next_val = sequences.entry(seq_key).or_insert(0);
+                    *next_val += 1;
+                    Value::Int(*next_val)
+                } else if let Some(ref default_expr) = col.default_value {
+                    match default_expr {
+                        Expr::Number(n) => Value::Int(*n),
+                        Expr::String(s) => Value::Text(s.clone()),
+                        _ => {
+                            let _ = self.txn_mgr.commit(txn.xid);
+                            return Err("Invalid default value expression".to_string());
+                        }
+                    }
+                } else {
+                    let _ = self.txn_mgr.commit(txn.xid);
+                    return Err(format!("Column '{}' has no default value", col.name));
+                };
+                tuple_data.push(value);
+            }
+            tuples.push(Tuple { header, data: tuple_data, column_map: HashMap::new() });
+        }
+
+        let count = tuples.len();
+        let mut data = self.data.write().unwrap();
+        data.get_mut(table).unwrap().extend(tuples);
+        drop(data);
+
+        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
+        self.auto_save();
+        Ok(count)
+    }
+
     pub fn select(
         &self,
         table: &str,

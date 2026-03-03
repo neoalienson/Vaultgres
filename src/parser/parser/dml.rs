@@ -16,7 +16,15 @@ pub fn parse_insert(parser: &mut Parser) -> Result<Statement> {
 
     parser.expect(Token::RightParen)?;
 
-    Ok(Statement::Insert(InsertStmt { table, values }))
+    let mut batch_values = Vec::new();
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        parser.expect(Token::LeftParen)?;
+        batch_values.push(super::expr::parse_expr_list(parser)?);
+        parser.expect(Token::RightParen)?;
+    }
+
+    Ok(Statement::Insert(InsertStmt { table, values, batch_values }))
 }
 
 pub fn parse_update(parser: &mut Parser) -> Result<Statement> {
