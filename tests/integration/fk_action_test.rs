@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::catalog::Catalog;
-    use rustgres::parser::ast::*;
+    use vaultgres::catalog::Catalog;
+    use vaultgres::parser::ast::*;
 
     #[test]
     fn test_fk_action_restrict_default() {

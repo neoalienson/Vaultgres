@@ -1,9 +1,9 @@
-use rustgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
-use rustgres::executor::{
+use vaultgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
+use vaultgres::executor::{
     BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor,
 };
-use rustgres::parser::ast::{BinaryOperator, Expr};
-use rustgres::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
+use vaultgres::parser::ast::{BinaryOperator, Expr};
+use vaultgres::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
 
 #[test]
 fn test_udf_registration_and_execution() {
@@ -20,7 +20,7 @@ fn test_udf_registration_and_execution() {
         is_variadic: false,
         cost: 100.0,
         rows: 1,
-        volatility: rustgres::catalog::FunctionVolatility::Immutable,
+        volatility: vaultgres::catalog::FunctionVolatility::Immutable,
     };
 
     registry.register(func).unwrap();
@@ -216,7 +216,7 @@ fn test_function_overload_different_types() {
         is_variadic: false,
         cost: 100.0,
         rows: 1,
-        volatility: rustgres::catalog::FunctionVolatility::Immutable,
+        volatility: vaultgres::catalog::FunctionVolatility::Immutable,
     };
 
     let func_text = Function {
@@ -232,7 +232,7 @@ fn test_function_overload_different_types() {
         is_variadic: false,
         cost: 100.0,
         rows: 1,
-        volatility: rustgres::catalog::FunctionVolatility::Immutable,
+        volatility: vaultgres::catalog::FunctionVolatility::Immutable,
     };
 
     registry.register(func_int).unwrap();
@@ -492,11 +492,11 @@ fn test_unnest_integration() {
 
 #[cfg(test)]
 mod advanced_sql_new_tests {
-    use rustgres::catalog::{FunctionRegistry, Value};
-    use rustgres::executor::{
+    use vaultgres::catalog::{FunctionRegistry, Value};
+    use vaultgres::executor::{
         ArraySubqueryExecutor, BuiltinFunctions, DerivedTableExecutor, MultipleCTEExecutor,
     };
-    use rustgres::parser::ast::BinaryOperator;
+    use vaultgres::parser::ast::BinaryOperator;
     use std::collections::HashMap;
 
     #[test]
@@ -716,7 +716,7 @@ mod advanced_sql_new_tests {
 #[cfg(test)]
 mod advanced_sql_new_tests2 {
 
-    use rustgres::catalog::{FunctionRegistry, Value};
+    use vaultgres::catalog::{FunctionRegistry, Value};
 
     use std::collections::HashMap;
 
@@ -724,27 +724,27 @@ mod advanced_sql_new_tests2 {
     fn test_function_with_defaults() {
         let mut registry = FunctionRegistry::new();
 
-        let func = rustgres::catalog::Function {
+        let func = vaultgres::catalog::Function {
             name: "greet".to_string(),
             parameters: vec![
-                rustgres::catalog::Parameter {
+                vaultgres::catalog::Parameter {
                     name: "name".to_string(),
                     data_type: "TEXT".to_string(),
                     default: None,
                 },
-                rustgres::catalog::Parameter {
+                vaultgres::catalog::Parameter {
                     name: "greeting".to_string(),
                     data_type: "TEXT".to_string(),
                     default: Some("Hello".to_string()),
                 },
             ],
             return_type: "TEXT".to_string(),
-            language: rustgres::catalog::FunctionLanguage::Sql,
+            language: vaultgres::catalog::FunctionLanguage::Sql,
             body: "SELECT $2 || ' ' || $1".to_string(),
             is_variadic: false,
             cost: 100.0,
             rows: 1,
-            volatility: rustgres::catalog::FunctionVolatility::Immutable,
+            volatility: vaultgres::catalog::FunctionVolatility::Immutable,
         };
 
         registry.register(func).unwrap();
@@ -758,20 +758,20 @@ mod advanced_sql_new_tests2 {
     fn test_variadic_function() {
         let mut registry = FunctionRegistry::new();
 
-        let func = rustgres::catalog::Function {
+        let func = vaultgres::catalog::Function {
             name: "concat_all".to_string(),
-            parameters: vec![rustgres::catalog::Parameter {
+            parameters: vec![vaultgres::catalog::Parameter {
                 name: "values".to_string(),
                 data_type: "TEXT".to_string(),
                 default: None,
             }],
             return_type: "TEXT".to_string(),
-            language: rustgres::catalog::FunctionLanguage::Sql,
+            language: vaultgres::catalog::FunctionLanguage::Sql,
             body: "VARIADIC".to_string(),
             is_variadic: true,
             cost: 100.0,
             rows: 1,
-            volatility: rustgres::catalog::FunctionVolatility::Immutable,
+            volatility: vaultgres::catalog::FunctionVolatility::Immutable,
         };
 
         registry.register(func).unwrap();
@@ -783,10 +783,10 @@ mod advanced_sql_new_tests2 {
 
     #[test]
     fn test_function_cache() {
-        let cache = rustgres::executor::FunctionCache::new();
+        let cache = vaultgres::executor::FunctionCache::new();
 
         let key =
-            rustgres::executor::FunctionCache::make_key("add", &[Value::Int(5), Value::Int(3)]);
+            vaultgres::executor::FunctionCache::make_key("add", &[Value::Int(5), Value::Int(3)]);
         cache.set(key.clone(), Value::Int(8));
 
         assert_eq!(cache.get(&key), Some(Value::Int(8)));
@@ -815,7 +815,7 @@ mod advanced_sql_new_tests2 {
         };
 
         let results =
-            rustgres::executor::LateralSubqueryExecutor::execute(vec![outer1, outer2], subquery_fn)
+            vaultgres::executor::LateralSubqueryExecutor::execute(vec![outer1, outer2], subquery_fn)
                 .unwrap();
 
         assert_eq!(results.len(), 2);

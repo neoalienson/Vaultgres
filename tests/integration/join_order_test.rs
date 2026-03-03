@@ -1,4 +1,4 @@
-use rustgres::optimizer::{JoinOptimizer, Relation};
+use vaultgres::optimizer::{JoinOptimizer, Relation};
 
 #[test]
 fn test_join_optimizer_single_table() {

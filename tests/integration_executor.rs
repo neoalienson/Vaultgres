@@ -1,5 +1,5 @@
 // Integration tests for executor operators
-use rustgres::executor::{
+use vaultgres::executor::{
     Except, Intersect, Join, JoinType, MockExecutor, SimpleExecutor, SimpleTuple, Union,
 };
 

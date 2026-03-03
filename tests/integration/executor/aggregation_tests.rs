@@ -1,4 +1,4 @@
-use rustgres::executor::{Distinct, GroupBy, Having, MockExecutor, SimpleExecutor, SimpleTuple};
+use vaultgres::executor::{Distinct, GroupBy, Having, MockExecutor, SimpleExecutor, SimpleTuple};
 
 #[test]
 fn test_group_by() {

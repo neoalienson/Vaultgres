@@ -1,6 +1,6 @@
 // E2E tests for parser and SQL features
-use rustgres::parser::ast::Statement;
-use rustgres::parser::Parser;
+use vaultgres::parser::ast::Statement;
+use vaultgres::parser::Parser;
 
 #[test]
 fn test_join_parsing() {

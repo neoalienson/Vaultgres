@@ -3,11 +3,11 @@ use e2e::*;
 #[test]
 fn test_crash_recovery_basic() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
-    let db = env.rustgres();
+    let db = env.vaultgres();
     db.execute("CREATE TABLE crash_test (id INT, data TEXT)").unwrap();
     db.execute("INSERT INTO crash_test VALUES (1, 'before crash')").unwrap();
     
@@ -21,11 +21,11 @@ fn test_crash_recovery_basic() {
 #[test]
 fn test_wal_recovery() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
-    let db = env.rustgres();
+    let db = env.vaultgres();
     db.execute("CREATE TABLE wal_test (id INT)").unwrap();
     
     for i in 0..1000 {
@@ -42,11 +42,11 @@ fn test_wal_recovery() {
 #[test]
 fn test_multiple_crash_recovery() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
-    let db = env.rustgres();
+    let db = env.vaultgres();
     db.execute("CREATE TABLE multi_crash (id INT, value INT)").unwrap();
     
     for cycle in 0..5 {

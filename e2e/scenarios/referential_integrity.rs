@@ -3,8 +3,8 @@ use e2e::*;
 #[test]
 fn test_primary_key_uniqueness() {
     eprintln!("\n=== Test: PRIMARY KEY Uniqueness ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create table with PRIMARY KEY
     db.execute("CREATE TABLE users_pk (id INT PRIMARY KEY, name TEXT)").unwrap();
@@ -29,8 +29,8 @@ fn test_primary_key_uniqueness() {
 #[test]
 fn test_foreign_key_reference() {
     eprintln!("\n=== Test: FOREIGN KEY Reference ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create parent table
     db.execute("CREATE TABLE customers_fk (id INT PRIMARY KEY, name TEXT)").unwrap();
@@ -59,8 +59,8 @@ fn test_foreign_key_reference() {
 #[test]
 fn test_composite_primary_key() {
     eprintln!("\n=== Test: Composite PRIMARY KEY ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create table with composite PRIMARY KEY
     db.execute("CREATE TABLE order_items_cpk (order_id INT, product_id INT, quantity INT, PRIMARY KEY (order_id, product_id))").unwrap();
@@ -84,8 +84,8 @@ fn test_composite_primary_key() {
 #[test]
 fn test_referential_integrity_workflow() {
     eprintln!("\n=== Test: Complete Referential Integrity Workflow ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create schema with multiple FK relationships
     db.execute("CREATE TABLE customers_ri (id INT PRIMARY KEY, name TEXT)").unwrap();
@@ -115,8 +115,8 @@ fn test_referential_integrity_workflow() {
 #[test]
 fn test_null_primary_key_rejected() {
     eprintln!("\n=== Test: NULL PRIMARY KEY Rejected ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create table with PRIMARY KEY
     db.execute("CREATE TABLE test_null_pk (id INT PRIMARY KEY, value INT)").unwrap();

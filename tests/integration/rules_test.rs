@@ -1,8 +1,8 @@
-use rustgres::optimizer::{
+use vaultgres::optimizer::{
     ConstantFolding, LogicalPlan, OptimizationRule, PredicatePushdown, ProjectionPruning,
     RuleOptimizer,
 };
-use rustgres::parser::{BinaryOperator, Expr};
+use vaultgres::parser::{BinaryOperator, Expr};
 
 #[test]
 fn test_predicate_pushdown_to_scan() {

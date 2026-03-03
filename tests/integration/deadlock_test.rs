@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::transaction::{LockKey, LockManager, LockMode};
+    use vaultgres::transaction::{LockKey, LockManager, LockMode};
 
     #[test]
     fn test_deadlock_detection_simple() {

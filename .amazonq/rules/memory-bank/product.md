@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-RustGres is a high-performance, PostgreSQL-compatible relational database management system (RDBMS) written entirely in Rust. It aims to deliver ACID compliance, advanced query optimization, and modern concurrency control while leveraging Rust's memory safety guarantees to eliminate entire classes of bugs common in traditional database systems.
+VaultGres is a high-performance, PostgreSQL-compatible relational database management system (RDBMS) written entirely in Rust. It aims to deliver ACID compliance, advanced query optimization, and modern concurrency control while leveraging Rust's memory safety guarantees to eliminate entire classes of bugs common in traditional database systems.
 
 ## Value Proposition
 

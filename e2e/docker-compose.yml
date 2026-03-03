@@ -1,16 +1,16 @@
 services:
-  rustgres:
-    image: rustgres:latest
+  vaultgres:
+    image: vaultgres:latest
     ports:
       - "5432:5432"
     volumes:
-      - rustgres-data:/var/lib/rustgres/data
-      - rustgres-wal:/var/lib/rustgres/wal
-      - ./rustgres-config.yaml:/etc/rustgres/config.yaml:ro
+      - vaultgres-data:/var/lib/vaultgres/data
+      - vaultgres-wal:/var/lib/vaultgres/wal
+      - ./vaultgres-config.yaml:/etc/vaultgres/config.yaml:ro
     environment:
       - RUST_LOG=info
-      - RUSTGRES_CONFIG=/etc/rustgres/config.yaml
-    command: ["start", "--config", "/etc/rustgres/config.yaml"]
+      - VAULTGRES_CONFIG=/etc/vaultgres/config.yaml
+    command: ["start", "--config", "/etc/vaultgres/config.yaml"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 || exit 1"]
       interval: 5s
@@ -91,8 +91,8 @@ services:
       - test-network
 
 volumes:
-  rustgres-data:
-  rustgres-wal:
+  vaultgres-data:
+  vaultgres-wal:
   postgres-data:
   prometheus-data:
   grafana-data:

@@ -1,5 +1,5 @@
-use rustgres::catalog::Catalog;
-use rustgres::parser::ast::{ColumnDef, DataType, Expr};
+use vaultgres::catalog::Catalog;
+use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 
 #[test]
 fn test_default_value_integer() {

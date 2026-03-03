@@ -1,18 +1,18 @@
-# RustGres Configuration Guide
+# VaultGres Configuration Guide
 
 ## Configuration File
 
-RustGres uses YAML for configuration. By default, it looks for `config.yaml` in the current directory.
+VaultGres uses YAML for configuration. By default, it looks for `config.yaml` in the current directory.
 
 ### Specify Custom Config
 
 ```bash
 # Using environment variable
-RUSTGRES_CONFIG=config.prod.yaml ./target/release/rustgres
+VAULTGRES_CONFIG=config.prod.yaml ./target/release/vaultgres
 
 # Or copy your config to default location
 cp config.prod.yaml config.yaml
-./target/release/rustgres
+./target/release/vaultgres
 ```
 
 ## Configuration Sections
@@ -145,14 +145,14 @@ server:
   max_connections: 200
 
 storage:
-  data_dir: "/var/lib/rustgres/data"
-  wal_dir: "/var/lib/rustgres/wal"
+  data_dir: "/var/lib/vaultgres/data"
+  wal_dir: "/var/lib/vaultgres/wal"
   buffer_pool_size: 10000
 
 logging:
   level: "warn"
   scope: "*"
-  file: "/var/log/rustgres/rustgres.log"
+  file: "/var/log/vaultgres/vaultgres.log"
 
 wal:
   sync_on_commit: true
@@ -182,15 +182,15 @@ Environment variables take precedence over config file:
 
 ```bash
 # Override config file settings
-RUSTGRES_CONFIG=config.prod.yaml \
-RUSTGRES_LOG_LEVEL=debug \
-RUSTGRES_LOG_SCOPE=protocol \
-./target/release/rustgres
+VAULTGRES_CONFIG=config.prod.yaml \
+VAULTGRES_LOG_LEVEL=debug \
+VAULTGRES_LOG_SCOPE=protocol \
+./target/release/vaultgres
 ```
 
 ## Validation
 
-RustGres validates the configuration on startup:
+VaultGres validates the configuration on startup:
 - Creates directories if they don't exist
 - Checks port availability
 - Validates numeric ranges
@@ -199,7 +199,7 @@ Invalid configurations will show an error and use defaults.
 
 ## Default Configuration
 
-If no config file is found, RustGres uses these defaults:
+If no config file is found, VaultGres uses these defaults:
 - Host: 127.0.0.1
 - Port: 5433
 - Data dir: ./data

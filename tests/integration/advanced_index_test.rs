@@ -1,5 +1,5 @@
-use rustgres::storage::index::*;
-use rustgres::storage::page::PageId;
+use vaultgres::storage::index::*;
+use vaultgres::storage::page::PageId;
 
 #[test]
 fn test_hash_index_integration() {

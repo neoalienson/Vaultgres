@@ -81,8 +81,8 @@ Cache key: `${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}`
 ## Badges Added to README
 
 ```markdown
-[![CI](https://github.com/rustgres/rustgres/workflows/CI/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/ci.yml)
-[![Integration Tests](https://github.com/rustgres/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/rustgres/rustgres/actions/workflows/integration.yml)
+[![CI](https://github.com/vaultgres/vaultgres/workflows/CI/badge.svg)](https://github.com/vaultgres/vaultgres/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/vaultgres/vaultgres/workflows/Integration%20Tests/badge.svg)](https://github.com/vaultgres/vaultgres/actions/workflows/integration.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 ```
@@ -118,9 +118,9 @@ git push origin v0.2.0
 
 ### Viewing Results
 
-- **Actions tab**: https://github.com/YOUR_USERNAME/rustgres/actions
-- **Coverage**: https://codecov.io/gh/YOUR_USERNAME/rustgres (after setup)
-- **Releases**: https://github.com/YOUR_USERNAME/rustgres/releases
+- **Actions tab**: https://github.com/YOUR_USERNAME/vaultgres/actions
+- **Coverage**: https://codecov.io/gh/YOUR_USERNAME/vaultgres (after setup)
+- **Releases**: https://github.com/YOUR_USERNAME/vaultgres/releases
 
 ### Local Testing
 

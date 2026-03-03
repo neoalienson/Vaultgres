@@ -1,4 +1,4 @@
-# RustGres Configuration File
+# VaultGres Configuration File
 
 # Server settings
 server:
@@ -35,7 +35,7 @@ logging:
   scope: "*"
   
   # Log to file (optional, if not set logs to stderr)
-  # file: "./logs/rustgres.log"
+  # file: "./logs/vaultgres.log"
 
 # Transaction settings
 transaction:

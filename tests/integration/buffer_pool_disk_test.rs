@@ -1,4 +1,4 @@
-use rustgres::storage::{BufferPool, DiskManager, Page, PageId};
+use vaultgres::storage::{BufferPool, DiskManager, Page, PageId};
 use std::sync::Arc;
 use tempfile::TempDir;
 

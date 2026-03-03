@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::parser::ast::Statement;
-    use rustgres::parser::Parser;
+    use vaultgres::parser::ast::Statement;
+    use vaultgres::parser::Parser;
 
     #[test]
     fn test_parse_recursive_cte() {
@@ -53,8 +53,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_simple() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -75,8 +75,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_with_cycle() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -95,8 +95,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_empty_base() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base: Vec<Vec<Value>> = vec![];
         let recursive_fn =
@@ -108,8 +108,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_no_recursion() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
         let recursive_fn = |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![]) };
@@ -120,8 +120,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_tree_traversal() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1), Value::Int(0)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -143,8 +143,8 @@ mod tests {
 
     #[test]
     fn test_recursive_cte_executor_fibonacci() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::RecursiveCTEExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::RecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(0), Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {

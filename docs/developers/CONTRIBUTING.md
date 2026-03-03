@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to RustGres! This guide will help you get started.
+Thank you for your interest in contributing to VaultGres! This guide will help you get started.
 
 ## Code of Conduct
 
@@ -10,16 +10,16 @@ We are committed to providing a welcoming and inclusive environment. Please read
 
 ### 1. Report Bugs
 
-Found a bug? Please [open an issue](https://github.com/rustgres/rustgres/issues/new) with:
+Found a bug? Please [open an issue](https://github.com/vaultgres/vaultgres/issues/new) with:
 - Clear description of the problem
 - Steps to reproduce
 - Expected vs actual behavior
-- RustGres version and OS
+- VaultGres version and OS
 - Relevant logs or error messages
 
 ### 2. Suggest Features
 
-Have an idea? [Open a feature request](https://github.com/rustgres/rustgres/issues/new) with:
+Have an idea? [Open a feature request](https://github.com/vaultgres/vaultgres/issues/new) with:
 - Use case and motivation
 - Proposed solution
 - Alternative approaches considered
@@ -61,11 +61,11 @@ brew install openssl pkg-config
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/rustgres.git
-cd rustgres
+git clone https://github.com/YOUR_USERNAME/vaultgres.git
+cd vaultgres
 
 # Add upstream remote
-git remote add upstream https://github.com/rustgres/rustgres.git
+git remote add upstream https://github.com/vaultgres/vaultgres.git
 
 # Build
 cargo build
@@ -80,7 +80,7 @@ RUST_LOG=debug cargo run
 ### Project Structure
 
 ```
-rustgres/
+vaultgres/
 ├── src/
 │   ├── main.rs              # Entry point
 │   ├── protocol/            # PostgreSQL wire protocol
@@ -100,7 +100,7 @@ rustgres/
 
 ### 1. Pick an Issue
 
-- Browse [good first issues](https://github.com/rustgres/rustgres/labels/good%20first%20issue)
+- Browse [good first issues](https://github.com/vaultgres/vaultgres/labels/good%20first%20issue)
 - Comment on the issue to claim it
 - Ask questions if anything is unclear
 
@@ -359,7 +359,7 @@ mod tests {
 
 // Integration tests in tests/
 // tests/integration_test.rs
-use rustgres::*;
+use vaultgres::*;
 
 #[test]
 fn test_end_to_end() {
@@ -376,7 +376,7 @@ fn test_end_to_end() {
 ```rust
 // benches/my_benchmark.rs
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rustgres::*;
+use vaultgres::*;
 
 fn benchmark_query(c: &mut Criterion) {
     let db = setup_database();
@@ -406,7 +406,7 @@ criterion_main!(benches);
 /// # Examples
 ///
 /// ```
-/// use rustgres::optimizer::optimize;
+/// use vaultgres::optimizer::optimize;
 /// let plan = optimize(query)?;
 /// ```
 pub fn optimize(query: Query) -> Result<Plan> { }
@@ -437,12 +437,12 @@ cargo doc --no-deps 2>&1 | grep warning
 ```bash
 # CPU profiling with perf
 cargo build --release
-perf record --call-graph=dwarf ./target/release/rustgres
+perf record --call-graph=dwarf ./target/release/vaultgres
 perf report
 
 # Memory profiling with valgrind
 cargo build
-valgrind --tool=massif ./target/debug/rustgres
+valgrind --tool=massif ./target/debug/vaultgres
 ms_print massif.out.*
 
 # Flamegraph
@@ -484,10 +484,10 @@ Follow [Semantic Versioning](https://semver.org/):
 
 ## Getting Help
 
-- **Discord**: Join our [Discord server](https://discord.gg/rustgres)
-- **Discussions**: Use [GitHub Discussions](https://github.com/rustgres/rustgres/discussions)
-- **Issues**: Search [existing issues](https://github.com/rustgres/rustgres/issues)
-- **Email**: rustgres-dev@example.com
+- **Discord**: Join our [Discord server](https://discord.gg/vaultgres)
+- **Discussions**: Use [GitHub Discussions](https://github.com/vaultgres/vaultgres/discussions)
+- **Issues**: Search [existing issues](https://github.com/vaultgres/vaultgres/issues)
+- **Email**: vaultgres-dev@example.com
 
 ## Recognition
 
@@ -496,4 +496,4 @@ Contributors are recognized in:
 - Release notes
 - Project website
 
-Thank you for contributing to RustGres! 🦀
+Thank you for contributing to VaultGres! 🦀

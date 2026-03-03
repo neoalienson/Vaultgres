@@ -1,6 +1,6 @@
-# RustGres Docker Deployment
+# VaultGres Docker Deployment
 
-Minimal and secure Docker image for RustGres database.
+Minimal and secure Docker image for VaultGres database.
 
 ## Image Features
 
@@ -19,17 +19,17 @@ Minimal and secure Docker image for RustGres database.
 
 ```bash
 # From project root
-docker build -f docker/Dockerfile -t rustgres:latest .
+docker build -f docker/Dockerfile -t vaultgres:latest .
 ```
 
 ### Run Container
 
 ```bash
 docker run -d \
-  --name rustgres \
+  --name vaultgres \
   -p 5432:5432 \
-  -v rustgres-data:/var/lib/rustgres/data \
-  rustgres:latest
+  -v vaultgres-data:/var/lib/vaultgres/data \
+  vaultgres:latest
 ```
 
 ### Using Docker Compose
@@ -47,8 +47,8 @@ docker-compose up -d
 
 ### Volumes
 
-- `/var/lib/rustgres/data`: Database data directory
-- `/var/lib/rustgres/wal`: Write-ahead log directory
+- `/var/lib/vaultgres/data`: Database data directory
+- `/var/lib/vaultgres/wal`: Write-ahead log directory
 
 ### Ports
 
@@ -61,13 +61,13 @@ docker-compose up -d
 psql -h localhost -p 5432 -U postgres
 
 # Using Docker exec
-docker exec -it rustgres rustgres --help
+docker exec -it vaultgres vaultgres --help
 ```
 
 ## Health Check
 
 ```bash
-docker inspect --format='{{.State.Health.Status}}' rustgres
+docker inspect --format='{{.State.Health.Status}}' vaultgres
 ```
 
 ## Security Best Practices
@@ -81,13 +81,13 @@ docker inspect --format='{{.State.Health.Status}}' rustgres
 
 ```bash
 # Build optimized image
-docker build -f docker/Dockerfile -t rustgres:0.2.0 .
+docker build -f docker/Dockerfile -t vaultgres:0.2.0 .
 
 # Run with resource limits
 docker run -d \
-  --name rustgres \
+  --name vaultgres \
   -p 5432:5432 \
-  -v rustgres-data:/var/lib/rustgres/data \
+  -v vaultgres-data:/var/lib/vaultgres/data \
   --memory="2g" \
   --cpus="2" \
   --restart=unless-stopped \
@@ -96,7 +96,7 @@ docker run -d \
   --cap-add=NET_BIND_SERVICE \
   --read-only \
   --tmpfs /tmp:noexec,nosuid,size=100m \
-  rustgres:0.2.0
+  vaultgres:0.2.0
 ```
 
 ## Troubleshooting
@@ -104,15 +104,15 @@ docker run -d \
 ### View Logs
 
 ```bash
-docker logs rustgres
-docker logs -f rustgres  # Follow logs
+docker logs vaultgres
+docker logs -f vaultgres  # Follow logs
 ```
 
 ### Check Container Status
 
 ```bash
-docker ps -a | grep rustgres
-docker inspect rustgres
+docker ps -a | grep vaultgres
+docker inspect vaultgres
 ```
 
 ### Access Container (Debug)
@@ -127,8 +127,8 @@ FROM gcr.io/distroless/static:debug-nonroot
 
 ```bash
 # Scan for vulnerabilities
-docker scan rustgres:latest
+docker scan vaultgres:latest
 
 # Using trivy
-trivy image rustgres:latest
+trivy image vaultgres:latest
 ```

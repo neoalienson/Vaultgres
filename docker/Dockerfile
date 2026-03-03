@@ -22,10 +22,10 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 FROM gcr.io/distroless/static:nonroot
 
 # Copy binary from builder
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/rustgres /usr/local/bin/rustgres
+COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/vaultgres /usr/local/bin/vaultgres
 
 # Create data directory
-WORKDIR /var/lib/rustgres
+WORKDIR /var/lib/vaultgres
 
 # Use non-root user (from distroless)
 USER nonroot:nonroot
@@ -35,8 +35,8 @@ EXPOSE 5432
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD ["/usr/local/bin/rustgres", "--version"]
+  CMD ["/usr/local/bin/vaultgres", "--version"]
 
 # Run the database
-ENTRYPOINT ["/usr/local/bin/rustgres"]
-CMD ["start", "-D", "/var/lib/rustgres/data", "-p", "5432"]
+ENTRYPOINT ["/usr/local/bin/vaultgres"]
+CMD ["start", "-D", "/var/lib/vaultgres/data", "-p", "5432"]

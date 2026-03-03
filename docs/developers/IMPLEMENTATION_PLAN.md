@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Detailed implementation plan for RustGres, organized by version milestones from the roadmap.
+Detailed implementation plan for VaultGres, organized by version milestones from the roadmap.
 
 ## Phase 1: Version 0.1.0 (Alpha) - Foundation ✅ COMPLETE
 

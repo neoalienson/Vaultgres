@@ -1,6 +1,6 @@
 # Installation Guide
 
-Complete guide to installing and configuring RustGres.
+Complete guide to installing and configuring VaultGres.
 
 ## System Requirements
 
@@ -27,66 +27,66 @@ Complete guide to installing and configuring RustGres.
 
 **Linux (x86_64)**:
 ```bash
-curl -L https://github.com/rustgres/rustgres/releases/latest/download/rustgres-linux-x64.tar.gz | tar xz
-sudo mv rustgres /usr/local/bin/
-sudo chmod +x /usr/local/bin/rustgres
+curl -L https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-linux-x64.tar.gz | tar xz
+sudo mv vaultgres /usr/local/bin/
+sudo chmod +x /usr/local/bin/vaultgres
 ```
 
 **macOS (Apple Silicon)**:
 ```bash
-curl -L https://github.com/rustgres/rustgres/releases/latest/download/rustgres-macos-arm64.tar.gz | tar xz
-sudo mv rustgres /usr/local/bin/
-sudo chmod +x /usr/local/bin/rustgres
+curl -L https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-macos-arm64.tar.gz | tar xz
+sudo mv vaultgres /usr/local/bin/
+sudo chmod +x /usr/local/bin/vaultgres
 ```
 
 **macOS (Intel)**:
 ```bash
-curl -L https://github.com/rustgres/rustgres/releases/latest/download/rustgres-macos-x64.tar.gz | tar xz
-sudo mv rustgres /usr/local/bin/
-sudo chmod +x /usr/local/bin/rustgres
+curl -L https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-macos-x64.tar.gz | tar xz
+sudo mv vaultgres /usr/local/bin/
+sudo chmod +x /usr/local/bin/vaultgres
 ```
 
 **Windows**:
 ```powershell
 # Download from GitHub releases
-Invoke-WebRequest -Uri https://github.com/rustgres/rustgres/releases/latest/download/rustgres-windows-x64.zip -OutFile rustgres.zip
-Expand-Archive rustgres.zip -DestinationPath C:\rustgres
-# Add C:\rustgres to PATH
+Invoke-WebRequest -Uri https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-windows-x64.zip -OutFile vaultgres.zip
+Expand-Archive vaultgres.zip -DestinationPath C:\vaultgres
+# Add C:\vaultgres to PATH
 ```
 
 ### 2. Package Managers
 
 **Homebrew (macOS/Linux)**:
 ```bash
-brew tap rustgres/tap
-brew install rustgres
+brew tap vaultgres/tap
+brew install vaultgres
 ```
 
 **APT (Debian/Ubuntu)**:
 ```bash
-curl -fsSL https://packages.rustgres.org/gpg | sudo gpg --dearmor -o /usr/share/keyrings/rustgres.gpg
-echo "deb [signed-by=/usr/share/keyrings/rustgres.gpg] https://packages.rustgres.org/apt stable main" | sudo tee /etc/apt/sources.list.d/rustgres.list
+curl -fsSL https://packages.vaultgres.org/gpg | sudo gpg --dearmor -o /usr/share/keyrings/vaultgres.gpg
+echo "deb [signed-by=/usr/share/keyrings/vaultgres.gpg] https://packages.vaultgres.org/apt stable main" | sudo tee /etc/apt/sources.list.d/vaultgres.list
 sudo apt update
-sudo apt install rustgres
+sudo apt install vaultgres
 ```
 
 **YUM/DNF (RHEL/CentOS/Fedora)**:
 ```bash
-sudo dnf config-manager --add-repo https://packages.rustgres.org/rpm/rustgres.repo
-sudo dnf install rustgres
+sudo dnf config-manager --add-repo https://packages.vaultgres.org/rpm/vaultgres.repo
+sudo dnf install vaultgres
 ```
 
 **Arch Linux (AUR)**:
 ```bash
-yay -S rustgres
+yay -S vaultgres
 # or
-paru -S rustgres
+paru -S vaultgres
 ```
 
 **Docker**:
 ```bash
-docker pull rustgres/rustgres:latest
-docker run -d -p 5432:5432 --name rustgres rustgres/rustgres:latest
+docker pull vaultgres/vaultgres:latest
+docker run -d -p 5432:5432 --name vaultgres vaultgres/vaultgres:latest
 ```
 
 ### 3. Build from Source
@@ -112,18 +112,18 @@ sudo dnf install gcc openssl-devel pkg-config
 **Build**:
 ```bash
 # Clone repository
-git clone https://github.com/rustgres/rustgres.git
-cd rustgres
+git clone https://github.com/vaultgres/vaultgres.git
+cd vaultgres
 
 # Build release binary
 cargo build --release
 
 # Install
-sudo cp target/release/rustgres /usr/local/bin/
-sudo cp target/release/rustgres-ctl /usr/local/bin/
+sudo cp target/release/vaultgres /usr/local/bin/
+sudo cp target/release/vaultgres-ctl /usr/local/bin/
 
 # Verify installation
-rustgres --version
+vaultgres --version
 ```
 
 **Build with optimizations**:
@@ -144,28 +144,28 @@ cargo build --release --config profile.release.opt-level='z'
 
 ```bash
 # Linux
-sudo useradd -r -s /bin/bash -d /var/lib/rustgres rustgres
-sudo mkdir -p /var/lib/rustgres
-sudo chown rustgres:rustgres /var/lib/rustgres
+sudo useradd -r -s /bin/bash -d /var/lib/vaultgres vaultgres
+sudo mkdir -p /var/lib/vaultgres
+sudo chown vaultgres:vaultgres /var/lib/vaultgres
 
 # macOS
-sudo dscl . -create /Users/rustgres
-sudo dscl . -create /Users/rustgres UserShell /bin/bash
-sudo dscl . -create /Users/rustgres RealName "RustGres Server"
-sudo dscl . -create /Users/rustgres NFSHomeDirectory /var/lib/rustgres
-sudo mkdir -p /var/lib/rustgres
-sudo chown rustgres:staff /var/lib/rustgres
+sudo dscl . -create /Users/vaultgres
+sudo dscl . -create /Users/vaultgres UserShell /bin/bash
+sudo dscl . -create /Users/vaultgres RealName "VaultGres Server"
+sudo dscl . -create /Users/vaultgres NFSHomeDirectory /var/lib/vaultgres
+sudo mkdir -p /var/lib/vaultgres
+sudo chown vaultgres:staff /var/lib/vaultgres
 ```
 
 ### 2. Initialize Database
 
 ```bash
-# As rustgres user
-sudo -u rustgres rustgres init -D /var/lib/rustgres/data
+# As vaultgres user
+sudo -u vaultgres vaultgres init -D /var/lib/vaultgres/data
 
 # Or with custom options
-sudo -u rustgres rustgres init \
-    -D /var/lib/rustgres/data \
+sudo -u vaultgres vaultgres init \
+    -D /var/lib/vaultgres/data \
     --encoding=UTF8 \
     --locale=en_US.UTF-8 \
     --auth=scram-sha-256
@@ -173,13 +173,13 @@ sudo -u rustgres rustgres init \
 
 **Output**:
 ```
-The files belonging to this database system will be owned by user "rustgres".
+The files belonging to this database system will be owned by user "vaultgres".
 This user must also own the server process.
 
 The database cluster will be initialized with locale "en_US.UTF-8".
 The default database encoding has accordingly been set to "UTF8".
 
-creating directory /var/lib/rustgres/data ... ok
+creating directory /var/lib/vaultgres/data ... ok
 creating subdirectories ... ok
 selecting default max_connections ... 100
 selecting default shared_buffers ... 128MB
@@ -190,12 +190,12 @@ syncing data to disk ... ok
 
 Success. You can now start the database server using:
 
-    rustgres start -D /var/lib/rustgres/data
+    vaultgres start -D /var/lib/vaultgres/data
 ```
 
 ### 3. Configure Server
 
-Edit `/var/lib/rustgres/data/rustgres.conf`:
+Edit `/var/lib/vaultgres/data/vaultgres.conf`:
 
 ```ini
 # Connection settings
@@ -219,12 +219,12 @@ checkpoint_timeout = 5min
 log_destination = 'stderr'
 logging_collector = on
 log_directory = 'log'
-log_filename = 'rustgres-%Y-%m-%d_%H%M%S.log'
+log_filename = 'vaultgres-%Y-%m-%d_%H%M%S.log'
 log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
 log_min_duration_statement = 1000  # Log queries > 1s
 ```
 
-Edit `/var/lib/rustgres/data/pg_hba.conf` for authentication:
+Edit `/var/lib/vaultgres/data/pg_hba.conf` for authentication:
 
 ```
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
@@ -246,29 +246,29 @@ host    all             all             ::1/128                 scram-sha-256
 
 **Foreground (for testing)**:
 ```bash
-sudo -u rustgres rustgres start -D /var/lib/rustgres/data
+sudo -u vaultgres vaultgres start -D /var/lib/vaultgres/data
 ```
 
 **Background (daemon)**:
 ```bash
-sudo -u rustgres rustgres start -D /var/lib/rustgres/data -l /var/lib/rustgres/data/log/server.log &
+sudo -u vaultgres vaultgres start -D /var/lib/vaultgres/data -l /var/lib/vaultgres/data/log/server.log &
 ```
 
 **Using systemd (Linux)**:
 
-Create `/etc/systemd/system/rustgres.service`:
+Create `/etc/systemd/system/vaultgres.service`:
 ```ini
 [Unit]
-Description=RustGres Database Server
+Description=VaultGres Database Server
 After=network.target
 
 [Service]
 Type=forking
-User=rustgres
-Group=rustgres
-ExecStart=/usr/local/bin/rustgres start -D /var/lib/rustgres/data -l /var/lib/rustgres/data/log/server.log
-ExecStop=/usr/local/bin/rustgres stop -D /var/lib/rustgres/data
-ExecReload=/usr/local/bin/rustgres reload -D /var/lib/rustgres/data
+User=vaultgres
+Group=vaultgres
+ExecStart=/usr/local/bin/vaultgres start -D /var/lib/vaultgres/data -l /var/lib/vaultgres/data/log/server.log
+ExecStop=/usr/local/bin/vaultgres stop -D /var/lib/vaultgres/data
+ExecReload=/usr/local/bin/vaultgres reload -D /var/lib/vaultgres/data
 Restart=on-failure
 RestartSec=5s
 
@@ -279,65 +279,65 @@ WantedBy=multi-user.target
 Enable and start:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable rustgres
-sudo systemctl start rustgres
-sudo systemctl status rustgres
+sudo systemctl enable vaultgres
+sudo systemctl start vaultgres
+sudo systemctl status vaultgres
 ```
 
 **Using launchd (macOS)**:
 
-Create `/Library/LaunchDaemons/org.rustgres.server.plist`:
+Create `/Library/LaunchDaemons/org.vaultgres.server.plist`:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>org.rustgres.server</string>
+    <string>org.vaultgres.server</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/rustgres</string>
+        <string>/usr/local/bin/vaultgres</string>
         <string>start</string>
         <string>-D</string>
-        <string>/var/lib/rustgres/data</string>
+        <string>/var/lib/vaultgres/data</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>UserName</key>
-    <string>rustgres</string>
+    <string>vaultgres</string>
 </dict>
 </plist>
 ```
 
 Load and start:
 ```bash
-sudo launchctl load /Library/LaunchDaemons/org.rustgres.server.plist
-sudo launchctl start org.rustgres.server
+sudo launchctl load /Library/LaunchDaemons/org.vaultgres.server.plist
+sudo launchctl start org.vaultgres.server
 ```
 
 ### 5. Create Database and User
 
 ```bash
 # Create database
-rustgres createdb mydb
+vaultgres createdb mydb
 
 # Create user
-rustgres createuser myuser
+vaultgres createuser myuser
 
 # Set password
-rustgres psql -c "ALTER USER myuser WITH PASSWORD 'mypassword';"
+vaultgres psql -c "ALTER USER myuser WITH PASSWORD 'mypassword';"
 
 # Grant privileges
-rustgres psql -c "GRANT ALL PRIVILEGES ON DATABASE mydb TO myuser;"
+vaultgres psql -c "GRANT ALL PRIVILEGES ON DATABASE mydb TO myuser;"
 ```
 
 ### 6. Verify Installation
 
 ```bash
 # Check server status
-rustgres status -D /var/lib/rustgres/data
+vaultgres status -D /var/lib/vaultgres/data
 
 # Connect with psql
 psql -h localhost -p 5432 -U postgres -d postgres
@@ -395,11 +395,11 @@ brew install --cask pgadmin4
 ```bash
 # Run container
 docker run -d \
-    --name rustgres \
+    --name vaultgres \
     -p 5432:5432 \
     -e POSTGRES_PASSWORD=mypassword \
-    -v rustgres-data:/var/lib/rustgres/data \
-    rustgres/rustgres:latest
+    -v vaultgres-data:/var/lib/vaultgres/data \
+    vaultgres/vaultgres:latest
 
 # Connect
 psql -h localhost -p 5432 -U postgres
@@ -412,9 +412,9 @@ Create `docker-compose.yml`:
 version: '3.8'
 
 services:
-  rustgres:
-    image: rustgres/rustgres:latest
-    container_name: rustgres
+  vaultgres:
+    image: vaultgres/vaultgres:latest
+    container_name: vaultgres
     environment:
       POSTGRES_PASSWORD: mypassword
       POSTGRES_USER: postgres
@@ -422,12 +422,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - rustgres-data:/var/lib/rustgres/data
-      - ./rustgres.conf:/var/lib/rustgres/data/rustgres.conf
+      - vaultgres-data:/var/lib/vaultgres/data
+      - ./vaultgres.conf:/var/lib/vaultgres/data/vaultgres.conf
     restart: unless-stopped
 
 volumes:
-  rustgres-data:
+  vaultgres-data:
 ```
 
 Start:
@@ -439,48 +439,48 @@ docker-compose up -d
 
 ### StatefulSet
 
-Create `rustgres-statefulset.yaml`:
+Create `vaultgres-statefulset.yaml`:
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: rustgres
+  name: vaultgres
 spec:
   ports:
   - port: 5432
   clusterIP: None
   selector:
-    app: rustgres
+    app: vaultgres
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: rustgres
+  name: vaultgres
 spec:
-  serviceName: rustgres
+  serviceName: vaultgres
   replicas: 1
   selector:
     matchLabels:
-      app: rustgres
+      app: vaultgres
   template:
     metadata:
       labels:
-        app: rustgres
+        app: vaultgres
     spec:
       containers:
-      - name: rustgres
-        image: rustgres/rustgres:latest
+      - name: vaultgres
+        image: vaultgres/vaultgres:latest
         ports:
         - containerPort: 5432
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: rustgres-secret
+              name: vaultgres-secret
               key: password
         volumeMounts:
         - name: data
-          mountPath: /var/lib/rustgres/data
+          mountPath: /var/lib/vaultgres/data
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -493,7 +493,7 @@ spec:
 
 Deploy:
 ```bash
-kubectl apply -f rustgres-statefulset.yaml
+kubectl apply -f vaultgres-statefulset.yaml
 ```
 
 ## Troubleshooting
@@ -502,11 +502,11 @@ kubectl apply -f rustgres-statefulset.yaml
 
 **Check logs**:
 ```bash
-tail -f /var/lib/rustgres/data/log/rustgres-*.log
+tail -f /var/lib/vaultgres/data/log/vaultgres-*.log
 ```
 
 **Common issues**:
-- Port already in use: Change `port` in rustgres.conf
+- Port already in use: Change `port` in vaultgres.conf
 - Permission denied: Check file ownership and permissions
 - Insufficient memory: Reduce `shared_buffers`
 
@@ -514,12 +514,12 @@ tail -f /var/lib/rustgres/data/log/rustgres-*.log
 
 **Check server is running**:
 ```bash
-rustgres status -D /var/lib/rustgres/data
+vaultgres status -D /var/lib/vaultgres/data
 ```
 
 **Check listen address**:
 ```bash
-grep listen_addresses /var/lib/rustgres/data/rustgres.conf
+grep listen_addresses /var/lib/vaultgres/data/vaultgres.conf
 ```
 
 **Check firewall**:
@@ -528,19 +528,19 @@ grep listen_addresses /var/lib/rustgres/data/rustgres.conf
 sudo ufw allow 5432/tcp
 
 # macOS
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/local/bin/rustgres
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/local/bin/vaultgres
 ```
 
 ### Authentication failed
 
 **Check pg_hba.conf**:
 ```bash
-cat /var/lib/rustgres/data/pg_hba.conf
+cat /var/lib/vaultgres/data/pg_hba.conf
 ```
 
 **Reset password**:
 ```bash
-rustgres psql -c "ALTER USER postgres WITH PASSWORD 'newpassword';"
+vaultgres psql -c "ALTER USER postgres WITH PASSWORD 'newpassword';"
 ```
 
 ## Uninstallation
@@ -549,38 +549,38 @@ rustgres psql -c "ALTER USER postgres WITH PASSWORD 'newpassword';"
 
 ```bash
 # Systemd
-sudo systemctl stop rustgres
-sudo systemctl disable rustgres
+sudo systemctl stop vaultgres
+sudo systemctl disable vaultgres
 
 # Manual
-rustgres stop -D /var/lib/rustgres/data
+vaultgres stop -D /var/lib/vaultgres/data
 ```
 
 ### Remove files
 
 ```bash
 # Remove binaries
-sudo rm /usr/local/bin/rustgres*
+sudo rm /usr/local/bin/vaultgres*
 
 # Remove data (WARNING: deletes all data)
-sudo rm -rf /var/lib/rustgres
+sudo rm -rf /var/lib/vaultgres
 
 # Remove user
-sudo userdel rustgres
+sudo userdel vaultgres
 ```
 
 ### Remove packages
 
 ```bash
 # APT
-sudo apt remove rustgres
+sudo apt remove vaultgres
 
 # Homebrew
-brew uninstall rustgres
+brew uninstall vaultgres
 
 # Docker
-docker rm -f rustgres
-docker rmi rustgres/rustgres
+docker rm -f vaultgres
+docker rmi vaultgres/vaultgres
 ```
 
 ## Next Steps

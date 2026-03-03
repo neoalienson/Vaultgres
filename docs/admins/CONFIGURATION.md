@@ -1,16 +1,16 @@
 # Configuration Guide
 
-Complete reference for RustGres configuration options.
+Complete reference for VaultGres configuration options.
 
 ## Configuration Files
 
-### rustgres.conf
+### vaultgres.conf
 
-Main configuration file located at `$PGDATA/rustgres.conf`.
+Main configuration file located at `$PGDATA/vaultgres.conf`.
 
 **Reload configuration without restart**:
 ```bash
-rustgres reload -D /var/lib/rustgres/data
+vaultgres reload -D /var/lib/vaultgres/data
 # Or
 SELECT pg_reload_conf();
 ```
@@ -200,7 +200,7 @@ min_parallel_index_scan_size = 512kB
 log_destination = 'stderr'        # stderr, csvlog, syslog, eventlog
 logging_collector = on
 log_directory = 'log'
-log_filename = 'rustgres-%Y-%m-%d_%H%M%S.log'
+log_filename = 'vaultgres-%Y-%m-%d_%H%M%S.log'
 log_file_mode = 0600
 log_rotation_age = 1d
 log_rotation_size = 10MB
@@ -489,7 +489,7 @@ checkpoint_completion_target = 0.9
 
 ```bash
 # Generate optimized config
-rustgres-tune --db-type=oltp --total-memory=32GB --cpus=8 > rustgres.conf.new
+vaultgres-tune --db-type=oltp --total-memory=32GB --cpus=8 > vaultgres.conf.new
 ```
 
 ### View Current Settings

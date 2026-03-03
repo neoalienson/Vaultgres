@@ -1,5 +1,5 @@
-use rustgres::config::{Config, PerformanceConfig};
-use rustgres::executor::{ParallelConfig, ParallelExecutor};
+use vaultgres::config::{Config, PerformanceConfig};
+use vaultgres::executor::{ParallelConfig, ParallelExecutor};
 
 #[test]
 fn test_config_max_parallel_workers() {

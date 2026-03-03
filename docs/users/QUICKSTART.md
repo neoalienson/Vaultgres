@@ -1,6 +1,6 @@
 # Quick Start Tutorial
 
-Get started with RustGres in 5 minutes.
+Get started with VaultGres in 5 minutes.
 
 ## Installation
 
@@ -9,13 +9,13 @@ Get started with RustGres in 5 minutes.
 ```bash
 # Pull and run
 docker run -d \
-  --name rustgres \
+  --name vaultgres \
   -p 5432:5432 \
-  -v rustgres-data:/var/lib/rustgres/data \
-  rustgres:latest
+  -v vaultgres-data:/var/lib/vaultgres/data \
+  vaultgres:latest
 
 # Check logs
-docker logs rustgres
+docker logs vaultgres
 
 # Connect
 psql -h localhost -p 5432 -U postgres
@@ -36,17 +36,17 @@ See [docker/README.md](../../docker/README.md) for more details.
 
 ```bash
 # Download and install
-curl -L https://github.com/rustgres/rustgres/releases/latest/download/rustgres-linux-x64.tar.gz | tar xz
-sudo mv rustgres /usr/local/bin/
+curl -L https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-linux-x64.tar.gz | tar xz
+sudo mv vaultgres /usr/local/bin/
 ```
 
 ### Option 3: Build from Source
 
 ```bash
-git clone https://github.com/rustgres/rustgres.git
-cd rustgres
+git clone https://github.com/vaultgres/vaultgres.git
+cd vaultgres
 cargo build --release
-sudo cp target/release/rustgres /usr/local/bin/
+sudo cp target/release/vaultgres /usr/local/bin/
 ```
 
 ---
@@ -57,13 +57,13 @@ sudo cp target/release/rustgres /usr/local/bin/
 
 ```bash
 # Create data directory
-mkdir -p ~/rustgres-data
+mkdir -p ~/vaultgres-data
 
 # Initialize database cluster
-rustgres init -D ~/rustgres-data
+vaultgres init -D ~/vaultgres-data
 
 # Start server
-rustgres start -D ~/rustgres-data
+vaultgres start -D ~/vaultgres-data
 ```
 
 ## Connect to Database
@@ -314,23 +314,23 @@ result = cur.fetchall()
 
 ```bash
 # Dump database
-rustgres pg_dump mydb > mydb_backup.sql
+vaultgres pg_dump mydb > mydb_backup.sql
 
 # Dump specific table
-rustgres pg_dump -t users mydb > users_backup.sql
+vaultgres pg_dump -t users mydb > users_backup.sql
 
 # Binary format (faster)
-rustgres pg_dump -Fc mydb > mydb_backup.dump
+vaultgres pg_dump -Fc mydb > mydb_backup.dump
 ```
 
 ### Restore
 
 ```bash
 # Restore from SQL dump
-rustgres psql mydb < mydb_backup.sql
+vaultgres psql mydb < mydb_backup.sql
 
 # Restore from binary dump
-rustgres pg_restore -d mydb mydb_backup.dump
+vaultgres pg_restore -d mydb mydb_backup.dump
 ```
 
 ## Monitoring
@@ -384,7 +384,7 @@ FROM pg_statio_user_tables;
 
 ### Basic Tuning
 
-Edit `~/rustgres-data/rustgres.conf`:
+Edit `~/vaultgres-data/vaultgres.conf`:
 
 ```ini
 # Memory (adjust based on available RAM)
@@ -402,7 +402,7 @@ log_line_prefix = '%t [%p]: '
 
 Reload configuration:
 ```bash
-rustgres reload -D ~/rustgres-data
+vaultgres reload -D ~/vaultgres-data
 ```
 
 ## Stop Server
@@ -411,10 +411,10 @@ rustgres reload -D ~/rustgres-data
 
 ```bash
 # Stop container
-docker stop rustgres
+docker stop vaultgres
 
 # Remove container
-docker rm rustgres
+docker rm vaultgres
 
 # Or with docker-compose
 cd docker && docker-compose down
@@ -424,13 +424,13 @@ cd docker && docker-compose down
 
 ```bash
 # Graceful shutdown
-rustgres stop -D ~/rustgres-data
+vaultgres stop -D ~/vaultgres-data
 
 # Fast shutdown
-rustgres stop -D ~/rustgres-data -m fast
+vaultgres stop -D ~/vaultgres-data -m fast
 
 # Immediate shutdown (not recommended)
-rustgres stop -D ~/rustgres-data -m immediate
+vaultgres stop -D ~/vaultgres-data -m immediate
 ```
 
 ## Next Steps
@@ -439,27 +439,27 @@ rustgres stop -D ~/rustgres-data -m immediate
 - Learn about [Configuration](CONFIGURATION.md) options
 - Explore [Architecture](ARCHITECTURE.md) to understand internals
 - Check the [Roadmap](ROADMAP.md) for upcoming features
-- Join our [Discord](https://discord.gg/rustgres) community
+- Join our [Discord](https://discord.gg/vaultgres) community
 
 ## Common Issues
 
 ### Port Already in Use
 
 ```bash
-# Change port in rustgres.conf
+# Change port in vaultgres.conf
 port = 5433
 
 # Or specify when starting
-rustgres start -D ~/rustgres-data -o "-p 5433"
+vaultgres start -D ~/vaultgres-data -o "-p 5433"
 ```
 
 ### Connection Refused
 
 ```bash
 # Check if server is running
-rustgres status -D ~/rustgres-data
+vaultgres status -D ~/vaultgres-data
 
-# Check listen address in rustgres.conf
+# Check listen address in vaultgres.conf
 listen_addresses = '*'  # Allow all connections
 
 # Update pg_hba.conf to allow connections
@@ -469,16 +469,16 @@ host    all    all    0.0.0.0/0    scram-sha-256
 ### Out of Memory
 
 ```bash
-# Reduce memory settings in rustgres.conf
+# Reduce memory settings in vaultgres.conf
 shared_buffers = 128MB
 work_mem = 2MB
 ```
 
 ## Getting Help
 
-- **Documentation**: https://rustgres.org/docs
-- **Discord**: https://discord.gg/rustgres
-- **GitHub Issues**: https://github.com/rustgres/rustgres/issues
-- **Stack Overflow**: Tag questions with `rustgres`
+- **Documentation**: https://vaultgres.org/docs
+- **Discord**: https://discord.gg/vaultgres
+- **GitHub Issues**: https://github.com/vaultgres/vaultgres/issues
+- **Stack Overflow**: Tag questions with `vaultgres`
 
 Happy querying! 🚀

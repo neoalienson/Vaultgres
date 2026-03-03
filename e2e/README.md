@@ -1,6 +1,6 @@
 # E2E Testing Framework ✅
 
-Comprehensive end-to-end testing for RustGres using Docker containers.
+Comprehensive end-to-end testing for VaultGres using Docker containers.
 
 **Status**: Working! 3/3 smoke tests passing.
 
@@ -33,7 +33,7 @@ cd e2e
 ```
 === Test: Basic CREATE TABLE ===
 [TestEnv] Starting containers...
-[TestEnv] Services: ["rustgres"]
+[TestEnv] Services: ["vaultgres"]
 [TestEnv] Waiting 10s for containers to be ready...
 [TestEnv] Ready!
 [DB] Executing: CREATE TABLE test (id INT, name TEXT)
@@ -58,7 +58,7 @@ e2e/
 ├── scenarios/               # Real-world workload tests
 ├── load/                    # Load testing (ramp-up, spike)
 ├── soak/                    # Long-running stability tests
-├── comparison/              # RustGres vs PostgreSQL benchmarks
+├── comparison/              # VaultGres vs PostgreSQL benchmarks
 └── run_all.sh              # Test runner script
 ```
 
@@ -69,9 +69,9 @@ e2e/
 - Rust toolchain
 - psql client
 
-### Build RustGres Image
+### Build VaultGres Image
 ```bash
-docker build -f docker/Dockerfile -t rustgres:latest .
+docker build -f docker/Dockerfile -t vaultgres:latest .
 ```
 
 ### Run Tests
@@ -172,7 +172,7 @@ Access Grafana at `http://localhost:3000` (admin/admin) after running:
 ### TestEnv Builder
 ```rust
 let env = TestEnv::new()
-    .with_rustgres()      // Start RustGres container
+    .with_vaultgres()      // Start VaultGres container
     .with_postgres()      // Start PostgreSQL for comparison
     .with_monitoring()    // Enable Prometheus/Grafana
     .with_persistence()   // Keep data between restarts
@@ -181,7 +181,7 @@ let env = TestEnv::new()
 
 ### Database Operations
 ```rust
-let db = env.rustgres();
+let db = env.vaultgres();
 db.execute("CREATE TABLE users (id INT, name TEXT)").unwrap();
 db.execute("INSERT INTO users VALUES (1, 'Alice')").unwrap();
 let count: i32 = db.query_scalar("SELECT COUNT(*) FROM users");
@@ -199,7 +199,7 @@ assert!(metrics.memory_growth_mb < 100.0);
 ## Success Criteria
 
 ### Performance
-- ✓ RustGres >= 80% of PostgreSQL throughput
+- ✓ VaultGres >= 80% of PostgreSQL throughput
 - ✓ p99 latency < 100ms (simple queries)
 - ✓ p99 latency < 5s (complex queries)
 
@@ -237,7 +237,7 @@ assert!(metrics.memory_growth_mb < 100.0);
 
 ### Containers won't start
 ```bash
-docker-compose logs rustgres
+docker-compose logs vaultgres
 docker-compose logs postgres
 ```
 

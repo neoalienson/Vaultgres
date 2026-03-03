@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use rustgres::storage::btree::{BTree, TupleId};
-use rustgres::storage::{BufferPool, PageId};
+use vaultgres::storage::btree::{BTree, TupleId};
+use vaultgres::storage::{BufferPool, PageId};
 
 fn bench_buffer_pool_fetch(c: &mut Criterion) {
     let pool = BufferPool::new(100);

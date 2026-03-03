@@ -1,8 +1,8 @@
-//! RustGres - A PostgreSQL-compatible RDBMS written in Rust
+//! VaultGres - A PostgreSQL-compatible RDBMS written in Rust
 //!
 //! # Architecture
 //!
-//! RustGres is organized into layers:
+//! VaultGres is organized into layers:
 //! - Storage: Page-based storage, buffer pool, indexes
 //! - Transaction: MVCC, locking, snapshots
 //! - WAL: Write-ahead logging and recovery

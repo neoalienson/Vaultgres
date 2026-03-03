@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# RustGres Server Startup Script
+# VaultGres Server Startup Script
 
-echo "🦀 RustGres v0.1.0 - PostgreSQL-compatible RDBMS"
+echo "🦀 VaultGres v0.1.0 - PostgreSQL-compatible RDBMS"
 echo "================================================"
 echo ""
 
 # Build if needed
-if [ ! -f "target/release/rustgres" ]; then
-    echo "📦 Building RustGres..."
+if [ ! -f "target/release/vaultgres" ]; then
+    echo "📦 Building VaultGres..."
     cargo build --release
     echo ""
 fi
 
 # Start server
 echo "🚀 Starting server..."
-./target/release/rustgres
+./target/release/vaultgres

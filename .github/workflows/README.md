@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD
 
-This document describes the GitHub Actions workflows for RustGres.
+This document describes the GitHub Actions workflows for VaultGres.
 
 ## Workflows
 
@@ -53,9 +53,9 @@ Triggered on version tags (e.g., `v0.2.0`).
 Add these badges to your README.md:
 
 ```markdown
-[![CI](https://github.com/YOUR_USERNAME/rustgres/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/rustgres/actions/workflows/ci.yml)
-[![Integration Tests](https://github.com/YOUR_USERNAME/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/YOUR_USERNAME/rustgres/actions/workflows/integration.yml)
-[![codecov](https://codecov.io/gh/YOUR_USERNAME/rustgres/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/rustgres)
+[![CI](https://github.com/YOUR_USERNAME/vaultgres/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/vaultgres/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/YOUR_USERNAME/vaultgres/workflows/Integration%20Tests/badge.svg)](https://github.com/YOUR_USERNAME/vaultgres/actions/workflows/integration.yml)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/vaultgres/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/vaultgres)
 ```
 
 ## Setup

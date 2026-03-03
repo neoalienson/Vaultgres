@@ -1,5 +1,5 @@
-use rustgres::storage::PageId;
-use rustgres::wal::{RecordType, WALDiskWriter, WALWriter};
+use vaultgres::storage::PageId;
+use vaultgres::wal::{RecordType, WALDiskWriter, WALWriter};
 use std::sync::Arc;
 use tempfile::TempDir;
 

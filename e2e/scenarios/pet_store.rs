@@ -4,8 +4,8 @@ use std::time::Instant;
 #[test]
 fn test_pet_store_basic_operations() {
     eprintln!("\n=== Test: Pet Store - Basic Operations ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create schema
     eprintln!("[PetStore] Creating tables...");
@@ -52,8 +52,8 @@ fn test_pet_store_basic_operations() {
 #[test]
 fn test_pet_store_concurrent_orders() {
     eprintln!("\n=== Test: Pet Store - Concurrent Orders ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Setup
     db.execute("CREATE TABLE pets_concurrent (id INT, name TEXT, stock INT)").unwrap();
@@ -92,8 +92,8 @@ fn test_pet_store_concurrent_orders() {
 #[test]
 fn test_pet_store_inventory_management() {
     eprintln!("\n=== Test: Pet Store - Inventory Management ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     db.execute("CREATE TABLE inventory (id INT, item TEXT, quantity INT, price INT)").unwrap();
 
@@ -139,8 +139,8 @@ fn test_pet_store_inventory_management() {
 #[test]
 fn test_pet_store_customer_orders_workflow() {
     eprintln!("\n=== Test: Pet Store - Complete Order Workflow ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     // Create tables
     eprintln!("[PetStore] Setting up database schema...");
@@ -194,8 +194,8 @@ fn test_pet_store_customer_orders_workflow() {
 #[test]
 fn test_pet_store_high_volume_sales() {
     eprintln!("\n=== Test: Pet Store - High Volume Sales ===");
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     db.execute("CREATE TABLE sales (id INT, product TEXT, amount INT, timestamp INT)").unwrap();
 

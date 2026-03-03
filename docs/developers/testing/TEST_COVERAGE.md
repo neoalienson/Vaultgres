@@ -1,4 +1,4 @@
-# RustGres Test Coverage Report
+# VaultGres Test Coverage Report
 
 ## Summary
 

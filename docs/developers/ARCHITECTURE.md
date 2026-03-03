@@ -1,6 +1,6 @@
 # Architecture Overview
 
-RustGres is designed as a modular, layered database system with clear separation of concerns and modern Rust idioms throughout.
+VaultGres is designed as a modular, layered database system with clear separation of concerns and modern Rust idioms throughout.
 
 ## System Layers
 

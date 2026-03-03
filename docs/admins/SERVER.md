@@ -1,4 +1,4 @@
-# RustGres Server
+# VaultGres Server
 
 ## Quick Start
 
@@ -12,7 +12,7 @@
 cargo run --release
 
 # Option 3: Run the binary directly
-./target/release/rustgres
+./target/release/vaultgres
 ```
 
 The server will start on `127.0.0.1:5433` by default.
@@ -20,7 +20,7 @@ The server will start on `127.0.0.1:5433` by default.
 ### Connect with psql
 
 ```bash
-# Connect to RustGres
+# Connect to VaultGres
 psql -h 127.0.0.1 -p 5433 -U postgres -d testdb
 
 # Run queries
@@ -39,7 +39,7 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d testdb -c "SELECT 1"
 
 When started, you'll see:
 ```
-🚀 RustGres v0.1.0 starting...
+🚀 VaultGres v0.1.0 starting...
 📡 Listening on 127.0.0.1:5433
 ✅ Ready for connections
 
@@ -102,7 +102,7 @@ kill -9 <PID>
 - Verify the port number
 
 **Parse errors:**
-- RustGres supports basic SQL only
+- VaultGres supports basic SQL only
 - Check the SQL syntax matches supported features
 
 ## Next Steps

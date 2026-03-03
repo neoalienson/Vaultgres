@@ -1,4 +1,4 @@
-use rustgres::parser::{Expr, Parser, Statement};
+use vaultgres::parser::{Expr, Parser, Statement};
 
 #[test]
 fn test_parse_select_star() {

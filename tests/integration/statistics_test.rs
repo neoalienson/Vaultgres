@@ -1,4 +1,4 @@
-use rustgres::statistics::Analyzer;
+use vaultgres::statistics::Analyzer;
 
 #[test]
 fn test_analyzer_with_valid_sample_rate() {

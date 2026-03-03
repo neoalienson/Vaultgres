@@ -1,5 +1,5 @@
-use rustgres::catalog::Catalog;
-use rustgres::protocol::{Connection, Message, Response, Server};
+use vaultgres::catalog::Catalog;
+use vaultgres::protocol::{Connection, Message, Response, Server};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -123,7 +123,7 @@ fn test_connection_handle_query_drop_table() {
 
 #[test]
 fn test_connection_handle_query_insert() {
-    use rustgres::parser::ast::{ColumnDef, DataType};
+    use vaultgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog
@@ -146,7 +146,7 @@ fn test_connection_handle_query_select() {
 
 #[test]
 fn test_connection_handle_query_update() {
-    use rustgres::parser::ast::{ColumnDef, DataType};
+    use vaultgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog
@@ -169,7 +169,7 @@ fn test_connection_handle_query_delete() {
 
 #[test]
 fn test_connection_handle_query_describe() {
-    use rustgres::parser::ast::{ColumnDef, DataType};
+    use vaultgres::parser::ast::{ColumnDef, DataType};
     let stream = Cursor::new(Vec::new());
     let catalog = Arc::new(Catalog::new());
     catalog

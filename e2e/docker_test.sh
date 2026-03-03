@@ -7,13 +7,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${GREEN}RustGres E2E Tests with Docker${NC}"
+echo -e "${GREEN}VaultGres E2E Tests with Docker${NC}"
 
 # Configuration
-CONTAINER_NAME="rustgres-e2e-test"
-IMAGE_NAME="rustgres:latest"
+CONTAINER_NAME="vaultgres-e2e-test"
+IMAGE_NAME="vaultgres:latest"
 PORT=15432
-DATA_DIR="/tmp/rustgres-e2e-data"
+DATA_DIR="/tmp/vaultgres-e2e-data"
 
 # Cleanup function
 cleanup() {
@@ -27,13 +27,13 @@ cleanup() {
 trap cleanup EXIT
 
 # Build image if not exists
-if ! docker images $IMAGE_NAME | grep -q rustgres; then
+if ! docker images $IMAGE_NAME | grep -q vaultgres; then
     echo -e "${YELLOW}Building Docker image...${NC}"
     docker build -f docker/Dockerfile -t $IMAGE_NAME .
 fi
 
 # Start container
-echo -e "${YELLOW}Starting RustGres container...${NC}"
+echo -e "${YELLOW}Starting VaultGres container...${NC}"
 docker run -d \
     --name $CONTAINER_NAME \
     -p $PORT:5432 \

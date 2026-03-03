@@ -1,5 +1,5 @@
-use rustgres::optimizer::{IndexInfo, IndexSelector};
-use rustgres::statistics::TableStats;
+use vaultgres::optimizer::{IndexInfo, IndexSelector};
+use vaultgres::statistics::TableStats;
 
 #[test]
 fn test_index_selection_small_table() {

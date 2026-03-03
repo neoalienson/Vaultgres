@@ -22,13 +22,13 @@ e2e/
 ├── soak/
 │   └── memory_leak.rs            # Long-running stability tests
 └── comparison/
-    └── benchmark.rs              # RustGres vs PostgreSQL
+    └── benchmark.rs              # VaultGres vs PostgreSQL
 ```
 
 ## Key Features
 
 ### 1. Docker-Based Testing
-- **Multi-container**: RustGres + PostgreSQL + monitoring stack
+- **Multi-container**: VaultGres + PostgreSQL + monitoring stack
 - **Isolated**: Each test gets clean environment
 - **Reproducible**: Consistent across dev/CI environments
 - **Monitored**: Prometheus + Grafana + cAdvisor
@@ -60,7 +60,7 @@ e2e/
 **TestEnv Builder Pattern:**
 ```rust
 TestEnv::new()
-    .with_rustgres()      // Start RustGres
+    .with_vaultgres()      // Start VaultGres
     .with_postgres()      // Start PostgreSQL
     .with_monitoring()    // Enable metrics
     .with_persistence()   // Keep data between restarts
@@ -132,8 +132,8 @@ cargo test --package e2e --test load -- --ignored
 ```rust
 #[test]
 fn test_oltp_workload() {
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
     // Test logic...
 }
 ```
@@ -143,7 +143,7 @@ fn test_oltp_workload() {
 #[test]
 fn test_crash_recovery() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
@@ -159,11 +159,11 @@ fn test_crash_recovery() {
 #[test]
 fn test_performance() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_postgres()
         .start();
     
-    let rustgres_time = env.rustgres().time_query(SQL);
+    let vaultgres_time = env.vaultgres().time_query(SQL);
     let postgres_time = env.postgres().time_query(SQL);
     // Compare performance...
 }
@@ -175,7 +175,7 @@ fn test_performance() {
 #[ignore]
 fn test_memory_leak_24h() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_monitoring()
         .start();
     
@@ -189,7 +189,7 @@ fn test_memory_leak_24h() {
 ## Success Criteria
 
 ### Performance
-- ✓ RustGres >= 80% of PostgreSQL throughput
+- ✓ VaultGres >= 80% of PostgreSQL throughput
 - ✓ p99 latency < 100ms (simple queries)
 
 ### Stability
@@ -219,7 +219,7 @@ fn test_memory_leak_24h() {
 
 ## Next Steps
 
-1. **Build Docker image**: `docker build -f docker/Dockerfile -t rustgres:latest .`
+1. **Build Docker image**: `docker build -f docker/Dockerfile -t vaultgres:latest .`
 2. **Run quick test**: `./e2e/run_all.sh quick`
 3. **Add more scenarios**: Create new test files in `scenarios/`
 4. **Configure monitoring**: Customize Grafana dashboards

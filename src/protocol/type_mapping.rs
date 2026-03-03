@@ -12,7 +12,7 @@ pub mod pg_types {
     pub const VARCHAR: i32 = 1043;
 }
 
-/// Map RustGres Value to PostgreSQL type OID and size
+/// Map VaultGres Value to PostgreSQL type OID and size
 pub fn value_to_pg_type(value: &Value) -> (i32, i16) {
     match value {
         Value::Int(_) => (pg_types::INT8, 8),

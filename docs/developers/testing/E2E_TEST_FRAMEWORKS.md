@@ -1,4 +1,4 @@
-# Better E2E Test Frameworks for RustGres
+# Better E2E Test Frameworks for VaultGres
 
 ## Current Issues
 
@@ -17,7 +17,7 @@ use testcontainers::*;
 #[test]
 fn test_with_container() {
     let docker = clients::Cli::default();
-    let container = docker.run(RustGresImage::default());
+    let container = docker.run(VaultGresImage::default());
     let port = container.get_host_port_ipv4(5433);
     
     // Each test gets isolated container with unique port
@@ -66,7 +66,7 @@ async fn test_create_table(pool: PgPool) -> sqlx::Result<()> {
 
 **Cons:**
 - Requires PostgreSQL installed
-- Need to adapt for RustGres protocol
+- Need to adapt for VaultGres protocol
 
 ### 3. **rstest** with fixtures (Best for current setup)
 
@@ -131,7 +131,7 @@ async fn execute_sql(world: &mut World, sql: String) {
 - More boilerplate
 - Overkill for unit-style E2E tests
 
-### 5. **Custom Test Harness with Port Pool** (Recommended for RustGres)
+### 5. **Custom Test Harness with Port Pool** (Recommended for VaultGres)
 
 ```rust
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -150,9 +150,9 @@ impl TestServer {
         let port = PORT_COUNTER.fetch_add(1, Ordering::SeqCst);
         let data_dir = TempDir::new().unwrap();
         
-        let process = Command::new("./target/release/rustgres")
-            .env("RUSTGRES_PORT", port.to_string())
-            .env("RUSTGRES_DATA_DIR", data_dir.path())
+        let process = Command::new("./target/release/vaultgres")
+            .env("VAULTGRES_PORT", port.to_string())
+            .env("VAULTGRES_DATA_DIR", data_dir.path())
             .spawn()
             .unwrap();
         
@@ -198,10 +198,10 @@ impl Drop for TestServer {
 - Works with current code
 
 **Cons:**
-- Need to make RustGres port configurable
+- Need to make VaultGres port configurable
 - Need to make data directory configurable
 
-## Recommended Approach for RustGres
+## Recommended Approach for VaultGres
 
 **Short term (Quick fix):**
 1. Use **rstest** with random ports
@@ -210,7 +210,7 @@ impl Drop for TestServer {
 
 **Medium term (Better isolation):**
 1. Implement **custom test harness** with port pool
-2. Make RustGres configurable via env vars
+2. Make VaultGres configurable via env vars
 3. Add proper async test support
 
 **Long term (Production-ready):**
@@ -220,16 +220,16 @@ impl Drop for TestServer {
 
 ## Implementation Plan
 
-### Phase 1: Make RustGres Configurable (1 hour)
+### Phase 1: Make VaultGres Configurable (1 hour)
 
 ```rust
 // src/main.rs
-let port = env::var("RUSTGRES_PORT")
+let port = env::var("VAULTGRES_PORT")
     .unwrap_or_else(|_| "5433".to_string())
     .parse()
     .unwrap();
 
-let data_dir = env::var("RUSTGRES_DATA_DIR")
+let data_dir = env::var("VAULTGRES_DATA_DIR")
     .unwrap_or_else(|_| "./data".to_string());
 ```
 
@@ -278,7 +278,7 @@ cargo test --test e2e_tests -- --test-threads=4
 
 **Fix current tests in 30 minutes:**
 
-1. Add port configuration to RustGres
+1. Add port configuration to VaultGres
 2. Use atomic counter for port allocation
 3. Use tempfile for data directories
 4. Tests will run in parallel successfully

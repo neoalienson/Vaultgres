@@ -1,5 +1,5 @@
-use rustgres::optimizer::{CostModel, SelectivityEstimator};
-use rustgres::statistics::{ColumnStats, Histogram, TableStats};
+use vaultgres::optimizer::{CostModel, SelectivityEstimator};
+use vaultgres::statistics::{ColumnStats, Histogram, TableStats};
 
 #[test]
 fn test_cost_model_creation() {

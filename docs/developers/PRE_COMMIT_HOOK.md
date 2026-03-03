@@ -2,7 +2,7 @@
 
 ## Overview
 
-RustGres uses a pre-commit hook to ensure code quality before commits. The hook performs:
+VaultGres uses a pre-commit hook to ensure code quality before commits. The hook performs:
 
 1. **Secret scanning** - Detects credentials and sensitive information
 2. **Code formatting** - Ensures consistent code style with `rustfmt`
@@ -165,8 +165,8 @@ Add this to your onboarding checklist:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/rustgres/rustgres.git
-cd rustgres
+git clone https://github.com/vaultgres/vaultgres.git
+cd vaultgres
 
 # 2. Install pre-commit hook
 cp scripts/pre-commit .git/hooks/pre-commit

@@ -6,7 +6,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}RustGres E2E Test Suite${NC}"
+echo -e "${GREEN}VaultGres E2E Test Suite${NC}"
 echo "================================"
 
 cd "$(dirname "$0")"
@@ -72,7 +72,7 @@ case $MODE in
     
     compare)
         echo -e "${GREEN}Running comparison benchmarks${NC}"
-        docker compose up -d rustgres postgres
+        docker compose up -d vaultgres postgres
         sleep 10
         cargo test --package e2e --test comparison -- --nocapture
         ;;

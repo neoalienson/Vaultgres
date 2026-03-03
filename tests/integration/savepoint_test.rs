@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::catalog::Catalog;
-    use rustgres::parser::ast::*;
-    use rustgres::parser::Parser;
+    use vaultgres::catalog::Catalog;
+    use vaultgres::parser::ast::*;
+    use vaultgres::parser::Parser;
 
     #[test]
     fn test_parse_savepoint() {

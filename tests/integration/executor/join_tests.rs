@@ -1,4 +1,4 @@
-use rustgres::executor::{Join, JoinType, MockExecutor, SimpleExecutor, SimpleTuple};
+use vaultgres::executor::{Join, JoinType, MockExecutor, SimpleExecutor, SimpleTuple};
 
 #[test]
 fn test_inner_join() {

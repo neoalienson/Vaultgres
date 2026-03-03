@@ -1,6 +1,6 @@
 # SQL Reference
 
-RustGres implements SQL:2016 standard with PostgreSQL compatibility.
+VaultGres implements SQL:2016 standard with PostgreSQL compatibility.
 
 **Legend:**
 - ✅ Fully supported

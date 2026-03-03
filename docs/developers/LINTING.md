@@ -1,6 +1,6 @@
 # Linting Guide
 
-This guide explains how to use Clippy, Rust's official linter, to maintain code quality in RustGres.
+This guide explains how to use Clippy, Rust's official linter, to maintain code quality in VaultGres.
 
 ## What is Clippy?
 
@@ -54,7 +54,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Configuration
 
-RustGres uses `.clippy.toml` for configuration:
+VaultGres uses `.clippy.toml` for configuration:
 
 ```toml
 # .clippy.toml
@@ -67,7 +67,7 @@ type-complexity-threshold = 500
 - `too-many-arguments-threshold`: Maximum function parameters (default: 7)
 - `type-complexity-threshold`: Maximum type complexity (default: 250)
 
-## Common Lints in RustGres
+## Common Lints in VaultGres
 
 ### 1. Unused Imports
 
@@ -289,7 +289,7 @@ cargo watch -x clippy
 
 ## Current Status
 
-RustGres Clippy status:
+VaultGres Clippy status:
 - ✅ **Errors**: 0 (all fixed)
 - ⚠️ **Warnings**: ~95 (mostly minor style issues)
 - 📝 **Configuration**: `.clippy.toml` with adjusted thresholds
@@ -344,7 +344,7 @@ cargo clippy --fix --all-targets --all-features
 
 ## Summary
 
-Clippy is now set up and running for RustGres:
+Clippy is now set up and running for VaultGres:
 
 ```bash
 # Quick check

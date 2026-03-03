@@ -1,6 +1,6 @@
 # Transaction Management
 
-RustGres implements ACID transactions with Multi-Version Concurrency Control (MVCC) for high concurrency and isolation.
+VaultGres implements ACID transactions with Multi-Version Concurrency Control (MVCC) for high concurrency and isolation.
 
 ## ACID Properties
 

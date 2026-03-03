@@ -14,12 +14,12 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: rustgres
-            asset_name: rustgres-linux-x64
+            artifact_name: vaultgres
+            asset_name: vaultgres-linux-x64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: rustgres
-            asset_name: rustgres-macos-x64
+            artifact_name: vaultgres
+            asset_name: vaultgres-macos-x64
     
     steps:
       - uses: actions/checkout@v4

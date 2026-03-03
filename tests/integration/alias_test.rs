@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::parser::ast::{Expr, Statement};
-    use rustgres::parser::Parser;
+    use vaultgres::parser::ast::{Expr, Statement};
+    use vaultgres::parser::Parser;
 
     #[test]
     fn test_parse_table_alias() {

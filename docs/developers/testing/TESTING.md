@@ -1,4 +1,4 @@
-# RustGres Test Organization
+# VaultGres Test Organization
 
 ## Test Structure
 

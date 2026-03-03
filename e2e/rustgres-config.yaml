@@ -4,8 +4,8 @@ server:
   max_connections: 200
 
 storage:
-  data_dir: "/var/lib/rustgres/data"
-  wal_dir: "/var/lib/rustgres/wal"
+  data_dir: "/var/lib/vaultgres/data"
+  wal_dir: "/var/lib/vaultgres/wal"
   buffer_pool_size: 1000
   page_size: 8192
 

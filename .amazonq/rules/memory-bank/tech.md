@@ -42,7 +42,7 @@ tempfile = "3.8"           # Temporary file/directory creation for tests
 ### Cargo
 - **Build Tool**: Cargo (Rust's package manager and build system)
 - **Edition**: 2021
-- **Package Name**: rustgres
+- **Package Name**: vaultgres
 - **Version**: 0.1.0
 
 ### Build Profiles
@@ -128,10 +128,10 @@ cargo run --release
 cargo run -- --config config.dev.yaml
 
 # Initialize database
-cargo run -- init -D /var/lib/rustgres/data
+cargo run -- init -D /var/lib/vaultgres/data
 
 # Start server
-cargo run -- start -D /var/lib/rustgres/data -p 5432
+cargo run -- start -D /var/lib/vaultgres/data -p 5432
 ```
 
 ### Cleaning
@@ -218,7 +218,7 @@ log_destination: stderr
 ```bash
 # Set log level
 export RUST_LOG=debug
-export RUST_LOG=rustgres=debug,storage=trace
+export RUST_LOG=vaultgres=debug,storage=trace
 
 # Run with logging
 RUST_LOG=info cargo run
@@ -261,10 +261,10 @@ RUST_LOG=info cargo run
 cargo build --release
 
 # Binary location
-target/release/rustgres
+target/release/vaultgres
 
 # Install system-wide
-sudo cp target/release/rustgres /usr/local/bin/
+sudo cp target/release/vaultgres /usr/local/bin/
 ```
 
 ### Docker (Planned)

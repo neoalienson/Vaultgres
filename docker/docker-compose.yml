@@ -1,17 +1,17 @@
 version: '3.8'
 
 services:
-  rustgres:
+  vaultgres:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: rustgres:latest
-    container_name: rustgres
+    image: vaultgres:latest
+    container_name: vaultgres
     ports:
       - "5432:5432"
     volumes:
-      - rustgres-data:/var/lib/rustgres/data
-      - rustgres-wal:/var/lib/rustgres/wal
+      - vaultgres-data:/var/lib/vaultgres/data
+      - vaultgres-wal:/var/lib/vaultgres/wal
     environment:
       - RUST_LOG=info
     restart: unless-stopped
@@ -26,7 +26,7 @@ services:
       - /tmp:noexec,nosuid,size=100m
 
 volumes:
-  rustgres-data:
+  vaultgres-data:
     driver: local
-  rustgres-wal:
+  vaultgres-wal:
     driver: local

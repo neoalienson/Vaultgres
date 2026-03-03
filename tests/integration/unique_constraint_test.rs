@@ -1,5 +1,5 @@
-use rustgres::catalog::{Catalog, Value};
-use rustgres::parser::ast::{ColumnDef, DataType, Expr, UniqueConstraint};
+use vaultgres::catalog::{Catalog, Value};
+use vaultgres::parser::ast::{ColumnDef, DataType, Expr, UniqueConstraint};
 
 #[test]
 fn test_unique_column_level() {

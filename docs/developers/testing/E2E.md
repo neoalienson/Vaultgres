@@ -2,7 +2,7 @@
 
 ## Running E2E Tests
 
-E2E tests start actual RustGres server instances and test them via psql. They must be run sequentially to avoid port conflicts.
+E2E tests start actual VaultGres server instances and test them via psql. They must be run sequentially to avoid port conflicts.
 
 ### Run All E2E Tests
 
@@ -18,7 +18,7 @@ cargo test --test e2e_tests test_create_table -- --nocapture
 
 ### Prerequisites
 
-- RustGres must be built in release mode: `cargo build --release`
+- VaultGres must be built in release mode: `cargo build --release`
 - PostgreSQL client (`psql`) must be installed
 - Port 5433 must be available
 
@@ -47,7 +47,7 @@ The `TEST_LOCK` mutex ensures only one test runs at a time.
 ## Test Structure
 
 Each test:
-1. Starts a RustGres server
+1. Starts a VaultGres server
 2. Executes SQL via psql
 3. Validates results
 4. Cleans up (server killed on drop)

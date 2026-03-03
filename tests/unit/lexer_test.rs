@@ -1,4 +1,4 @@
-use rustgres::parser::{Lexer, Token};
+use vaultgres::parser::{Lexer, Token};
 
 #[test]
 fn test_lexer_keywords() {

@@ -1,4 +1,4 @@
-use rustgres::config::{Config, LoggingConfig, ServerConfig, StorageConfig};
+use vaultgres::config::{Config, LoggingConfig, ServerConfig, StorageConfig};
 
 #[test]
 fn test_default_config_values() {
@@ -46,7 +46,7 @@ fn test_logging_config() {
     let logging = LoggingConfig {
         level: "debug".to_string(),
         scope: "protocol,parser".to_string(),
-        file: Some("/var/log/rustgres.log".to_string()),
+        file: Some("/var/log/vaultgres.log".to_string()),
     };
 
     assert_eq!(logging.level, "debug");

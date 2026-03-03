@@ -1,4 +1,4 @@
-use rustgres::optimizer::{LogicalPlan, PlanCache};
+use vaultgres::optimizer::{LogicalPlan, PlanCache};
 
 #[test]
 fn test_plan_cache_basic() {

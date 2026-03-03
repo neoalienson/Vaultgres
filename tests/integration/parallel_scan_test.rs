@@ -1,7 +1,7 @@
-use rustgres::catalog::Catalog;
-use rustgres::executor::parallel::config::ParallelConfig;
-use rustgres::executor::parallel::seq_scan::ParallelSeqScan;
-use rustgres::parser::ast::{ColumnDef, DataType, Expr};
+use vaultgres::catalog::Catalog;
+use vaultgres::executor::parallel::config::ParallelConfig;
+use vaultgres::executor::parallel::seq_scan::ParallelSeqScan;
+use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 use std::sync::Arc;
 
 #[test]

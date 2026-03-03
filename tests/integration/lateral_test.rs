@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rustgres::parser::ast::Statement;
-    use rustgres::parser::Parser;
+    use vaultgres::parser::ast::Statement;
+    use vaultgres::parser::Parser;
 
     #[test]
     fn test_parse_lateral_join() {
@@ -50,8 +50,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_simple() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();
@@ -81,8 +81,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_multiple_results() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer = HashMap::new();
@@ -104,8 +104,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_empty_subquery() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer = HashMap::new();
@@ -119,8 +119,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_preserves_outer_columns() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer = HashMap::new();
@@ -142,8 +142,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_dependent_subquery() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();
@@ -175,8 +175,8 @@ mod tests {
 
     #[test]
     fn test_lateral_executor_cross_product() {
-        use rustgres::catalog::Value;
-        use rustgres::executor::LateralSubqueryExecutor;
+        use vaultgres::catalog::Value;
+        use vaultgres::executor::LateralSubqueryExecutor;
         use std::collections::HashMap;
 
         let mut outer1 = HashMap::new();

@@ -1,4 +1,4 @@
-# RustGres Production Configuration
+# VaultGres Production Configuration
 
 server:
   host: "0.0.0.0"
@@ -6,15 +6,15 @@ server:
   max_connections: 200
 
 storage:
-  data_dir: "/var/lib/rustgres/data"
-  wal_dir: "/var/lib/rustgres/wal"
+  data_dir: "/var/lib/vaultgres/data"
+  wal_dir: "/var/lib/vaultgres/wal"
   buffer_pool_size: 10000
   page_size: 8192
 
 logging:
   level: "warn"
   scope: "*"
-  file: "/var/log/rustgres/rustgres.log"
+  file: "/var/log/vaultgres/vaultgres.log"
 
 transaction:
   timeout: 600

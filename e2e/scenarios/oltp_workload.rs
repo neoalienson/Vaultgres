@@ -7,8 +7,8 @@ mod referential_integrity;
 
 #[test]
 fn test_oltp_simple_transactions() {
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     db.execute("CREATE TABLE accounts (id INT, balance INT)").unwrap();
     db.execute("INSERT INTO accounts VALUES (1, 1000)").unwrap();
@@ -32,8 +32,8 @@ fn test_oltp_simple_transactions() {
 
 #[test]
 fn test_oltp_concurrent_inserts() {
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     db.execute("CREATE TABLE orders (id INT, product TEXT, amount INT)").unwrap();
 
@@ -60,8 +60,8 @@ fn test_oltp_concurrent_inserts() {
 
 #[test]
 fn test_oltp_read_heavy_workload() {
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
 
     db.execute("CREATE TABLE products (id INT, name TEXT, price INT)").unwrap();
     for i in 0..100 {

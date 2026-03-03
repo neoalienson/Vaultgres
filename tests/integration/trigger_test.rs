@@ -1,6 +1,6 @@
-use rustgres::catalog::Catalog;
-use rustgres::parser::ast::{TriggerEvent, TriggerTiming};
-use rustgres::parser::{Parser, Statement};
+use vaultgres::catalog::Catalog;
+use vaultgres::parser::ast::{TriggerEvent, TriggerTiming};
+use vaultgres::parser::{Parser, Statement};
 
 #[test]
 fn test_create_and_drop_trigger() {

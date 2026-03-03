@@ -1,6 +1,6 @@
 # Query Optimizer
 
-RustGres uses a cost-based query optimizer with rule-based transformations and dynamic programming for join ordering.
+VaultGres uses a cost-based query optimizer with rule-based transformations and dynamic programming for join ordering.
 
 ## Overview
 

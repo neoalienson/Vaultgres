@@ -1,12 +1,12 @@
-use rustgres::catalog::{
+use vaultgres::catalog::{
     Function, FunctionLanguage, FunctionRegistry, FunctionVolatility, Parameter,
 };
-use rustgres::executor::{
+use vaultgres::executor::{
     CursorManager, Executor, MockTupleExecutor, SetReturningFunctionExecutor,
     TableValuedFunctionExecutor,
 };
-use rustgres::parser::ast::{FetchDirection, FunctionReturnType, ParameterMode, Statement};
-use rustgres::parser::Parser;
+use vaultgres::parser::ast::{FetchDirection, FunctionReturnType, ParameterMode, Statement};
+use vaultgres::parser::Parser;
 use std::collections::HashMap;
 
 fn make_tuple(val: i64) -> HashMap<String, Vec<u8>> {
@@ -441,7 +441,7 @@ fn test_parse_function_with_immutable() {
     match stmt {
         Statement::CreateFunction(f) => {
             assert_eq!(f.name, "add");
-            assert_eq!(f.volatility, Some(rustgres::parser::ast::FunctionVolatility::Immutable));
+            assert_eq!(f.volatility, Some(vaultgres::parser::ast::FunctionVolatility::Immutable));
         }
         _ => panic!("Expected CreateFunction"),
     }
@@ -456,7 +456,7 @@ fn test_parse_function_with_stable() {
     match stmt {
         Statement::CreateFunction(f) => {
             assert_eq!(f.name, "get_time");
-            assert_eq!(f.volatility, Some(rustgres::parser::ast::FunctionVolatility::Stable));
+            assert_eq!(f.volatility, Some(vaultgres::parser::ast::FunctionVolatility::Stable));
         }
         _ => panic!("Expected CreateFunction"),
     }
@@ -471,7 +471,7 @@ fn test_parse_function_with_volatile() {
     match stmt {
         Statement::CreateFunction(f) => {
             assert_eq!(f.name, "random_val");
-            assert_eq!(f.volatility, Some(rustgres::parser::ast::FunctionVolatility::Volatile));
+            assert_eq!(f.volatility, Some(vaultgres::parser::ast::FunctionVolatility::Volatile));
         }
         _ => panic!("Expected CreateFunction"),
     }
@@ -494,7 +494,7 @@ fn test_parse_function_without_volatility() {
 
 #[test]
 fn test_function_volatility_in_registry() {
-    use rustgres::catalog::FunctionVolatility;
+    use vaultgres::catalog::FunctionVolatility;
 
     let mut registry = FunctionRegistry::new();
     let func = Function {

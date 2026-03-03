@@ -58,8 +58,8 @@ performance:
         let config_path = data_dir.path().join("config.yaml");
         std::fs::write(&config_path, config_content).expect("Failed to write config");
 
-        let process = Command::new("./target/release/rustgres")
-            .env("RUSTGRES_CONFIG", config_path.to_str().unwrap())
+        let process = Command::new("./target/release/vaultgres")
+            .env("VAULTGRES_CONFIG", config_path.to_str().unwrap())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()

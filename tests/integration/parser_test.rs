@@ -1,4 +1,4 @@
-use rustgres::parser::{parse, Expr, Statement};
+use vaultgres::parser::{parse, Expr, Statement};
 
 #[test]
 fn test_parse_simple_select() {

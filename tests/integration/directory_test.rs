@@ -1,6 +1,6 @@
-use rustgres::config::Config;
-use rustgres::storage::{DiskManager, Page, PageId};
-use rustgres::wal::{RecordType, WALDiskWriter, WALRecord};
+use vaultgres::config::Config;
+use vaultgres::storage::{DiskManager, Page, PageId};
+use vaultgres::wal::{RecordType, WALDiskWriter, WALRecord};
 use std::fs;
 use tempfile::TempDir;
 

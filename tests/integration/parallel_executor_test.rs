@@ -1,11 +1,11 @@
-use rustgres::catalog::Catalog;
-use rustgres::executor::parallel::coordinator::ParallelCoordinator;
-use rustgres::executor::parallel::hash_agg::ParallelHashAgg;
-use rustgres::executor::parallel::hash_join::ParallelHashJoin;
-use rustgres::executor::parallel::morsel::MorselGenerator;
-use rustgres::executor::parallel::seq_scan::ParallelSeqScan;
-use rustgres::executor::parallel::sort::ParallelSort;
-use rustgres::parser::ast::{ColumnDef, DataType, Expr};
+use vaultgres::catalog::Catalog;
+use vaultgres::executor::parallel::coordinator::ParallelCoordinator;
+use vaultgres::executor::parallel::hash_agg::ParallelHashAgg;
+use vaultgres::executor::parallel::hash_join::ParallelHashJoin;
+use vaultgres::executor::parallel::morsel::MorselGenerator;
+use vaultgres::executor::parallel::seq_scan::ParallelSeqScan;
+use vaultgres::executor::parallel::sort::ParallelSort;
+use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 use std::sync::Arc;
 
 #[test]
@@ -56,7 +56,7 @@ fn test_parallel_hash_join_integration() {
     let morsel_gen = Arc::new(MorselGenerator::new(100, 50));
 
     while let Some(range) = morsel_gen.next_morsel() {
-        let morsel = rustgres::executor::parallel::morsel::Morsel {
+        let morsel = vaultgres::executor::parallel::morsel::Morsel {
             tuples: vec![],
             start_offset: range.start,
             end_offset: range.end,
@@ -68,7 +68,7 @@ fn test_parallel_hash_join_integration() {
     morsel_gen.reset();
     let mut total_results = 0;
     while let Some(range) = morsel_gen.next_morsel() {
-        let morsel = rustgres::executor::parallel::morsel::Morsel {
+        let morsel = vaultgres::executor::parallel::morsel::Morsel {
             tuples: vec![],
             start_offset: range.start,
             end_offset: range.end,
@@ -99,7 +99,7 @@ fn test_parallel_aggregation_integration() {
 
     let mut worker_id = 0;
     while let Some(range) = morsel_gen.next_morsel() {
-        let morsel = rustgres::executor::parallel::morsel::Morsel {
+        let morsel = vaultgres::executor::parallel::morsel::Morsel {
             tuples: vec![],
             start_offset: range.start,
             end_offset: range.end,
@@ -134,7 +134,7 @@ fn test_parallel_sort_integration() {
     let mut sorted_runs = Vec::new();
 
     while let Some(range) = morsel_gen.next_morsel() {
-        let morsel = rustgres::executor::parallel::morsel::Morsel {
+        let morsel = vaultgres::executor::parallel::morsel::Morsel {
             tuples: vec![],
             start_offset: range.start,
             end_offset: range.end,

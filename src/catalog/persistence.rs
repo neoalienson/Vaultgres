@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_save_and_load() {
-        let test_dir = "/tmp/rustgres_test_persistence";
+        let test_dir = "/tmp/vaultgres_test_persistence";
         let _ = fs::remove_dir_all(test_dir);
         fs::create_dir_all(test_dir).unwrap();
 
@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_save_with_null_values() {
-        let test_dir = "/tmp/rustgres_test_null";
+        let test_dir = "/tmp/vaultgres_test_null";
         let _ = fs::remove_dir_all(test_dir);
         fs::create_dir_all(test_dir).unwrap();
 
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_load_nonexistent_catalog() {
-        let test_dir = "/tmp/rustgres_test_nonexistent";
+        let test_dir = "/tmp/vaultgres_test_nonexistent";
         let _ = fs::remove_dir_all(test_dir);
 
         let mut tables = HashMap::new();

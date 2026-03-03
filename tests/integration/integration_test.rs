@@ -1,5 +1,5 @@
-use rustgres::parser::Parser;
-use rustgres::protocol::Response;
+use vaultgres::parser::Parser;
+use vaultgres::protocol::Response;
 
 #[test]
 fn test_query_with_semicolon_integration() {

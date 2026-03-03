@@ -3,7 +3,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub struct TestEnv {
-    rustgres_enabled: bool,
+    vaultgres_enabled: bool,
     postgres_enabled: bool,
     monitoring_enabled: bool,
     persistence_enabled: bool,
@@ -13,7 +13,7 @@ pub struct TestEnv {
 impl TestEnv {
     pub fn new() -> Self {
         Self {
-            rustgres_enabled: false,
+            vaultgres_enabled: false,
             postgres_enabled: false,
             monitoring_enabled: false,
             persistence_enabled: false,
@@ -21,8 +21,8 @@ impl TestEnv {
         }
     }
 
-    pub fn with_rustgres(mut self) -> Self {
-        self.rustgres_enabled = true;
+    pub fn with_vaultgres(mut self) -> Self {
+        self.vaultgres_enabled = true;
         self
     }
 
@@ -44,7 +44,7 @@ impl TestEnv {
     pub fn start(self) -> RunningEnv {
         eprintln!("[TestEnv] Starting containers...");
         let mut services = vec![];
-        if self.rustgres_enabled { services.push("rustgres"); }
+        if self.vaultgres_enabled { services.push("vaultgres"); }
         if self.postgres_enabled { services.push("postgres"); }
         if self.monitoring_enabled {
             services.extend(&["prometheus", "cadvisor", "grafana"]);
@@ -64,7 +64,7 @@ impl TestEnv {
 
         RunningEnv {
             compose_project: self.compose_project,
-            rustgres_port: if self.rustgres_enabled { Some(5432) } else { None },
+            vaultgres_port: if self.vaultgres_enabled { Some(5432) } else { None },
             postgres_port: if self.postgres_enabled { Some(5433) } else { None },
             persistence_enabled: self.persistence_enabled,
         }
@@ -73,14 +73,14 @@ impl TestEnv {
 
 pub struct RunningEnv {
     compose_project: String,
-    rustgres_port: Option<u16>,
+    vaultgres_port: Option<u16>,
     postgres_port: Option<u16>,
     persistence_enabled: bool,
 }
 
 impl RunningEnv {
-    pub fn rustgres(&self) -> DbConnection {
-        DbConnection::new("localhost", self.rustgres_port.expect("RustGres not enabled"))
+    pub fn vaultgres(&self) -> DbConnection {
+        DbConnection::new("localhost", self.vaultgres_port.expect("VaultGres not enabled"))
     }
 
     pub fn postgres(&self) -> DbConnection {
@@ -89,16 +89,16 @@ impl RunningEnv {
 
     pub fn kill_container(&self) {
         eprintln!("[TestEnv] Killing container...");
-        // Find rustgres container by name pattern
+        // Find vaultgres container by name pattern
         let output = Command::new("docker")
-            .args(&["ps", "--filter", "name=rustgres", "--format", "{{.Names}}"])
+            .args(&["ps", "--filter", "name=vaultgres", "--format", "{{.Names}}"])
             .output()
             .expect("Failed to list containers");
         
         let container_name = String::from_utf8_lossy(&output.stdout)
             .lines()
             .next()
-            .unwrap_or("rustgres-test")
+            .unwrap_or("vaultgres-test")
             .to_string();
 
         Command::new("docker")
@@ -111,7 +111,7 @@ impl RunningEnv {
     pub fn restart(&self) {
         eprintln!("[TestEnv] Restarting container...");
         Command::new("docker")
-            .args(&["compose", "-p", &self.compose_project, "restart", "rustgres"])
+            .args(&["compose", "-p", &self.compose_project, "restart", "vaultgres"])
             .output()
             .expect("Failed to restart");
         eprintln!("[TestEnv] Waiting 3s for restart...");
@@ -205,16 +205,16 @@ impl MetricsMonitor {
     }
 
     fn collect_metrics() -> ContainerMetrics {
-        // Try to find rustgres container by name pattern
+        // Try to find vaultgres container by name pattern
         let output = Command::new("docker")
-            .args(&["ps", "--filter", "name=rustgres", "--format", "{{.Names}}"])
+            .args(&["ps", "--filter", "name=vaultgres", "--format", "{{.Names}}"])
             .output()
             .expect("Failed to list containers");
         
         let container_name = String::from_utf8_lossy(&output.stdout)
             .lines()
             .next()
-            .unwrap_or("rustgres-test")
+            .unwrap_or("vaultgres-test")
             .to_string();
 
         let output = Command::new("docker")

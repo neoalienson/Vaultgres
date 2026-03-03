@@ -1,4 +1,4 @@
-use rustgres::parser::Parser;
+use vaultgres::parser::Parser;
 
 #[test]
 fn test_function_with_cost_hint() {
@@ -6,7 +6,7 @@ fn test_function_with_cost_hint() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.name, "expensive_func");
         assert_eq!(func.cost, Some(1000.0));
         assert_eq!(func.rows, None);
@@ -21,7 +21,7 @@ fn test_function_with_rows_hint() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.name, "generate_data");
         assert_eq!(func.cost, None);
         assert_eq!(func.rows, Some(1000));
@@ -36,7 +36,7 @@ fn test_function_with_cost_and_rows() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.name, "complex_query");
         assert_eq!(func.cost, Some(500.0));
         assert_eq!(func.rows, Some(100));
@@ -51,7 +51,7 @@ fn test_function_without_hints() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.name, "simple_func");
         assert_eq!(func.cost, None);
         assert_eq!(func.rows, None);
@@ -67,7 +67,7 @@ fn test_function_cost_hint_only() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.cost, Some(1.0));
         assert_eq!(func.rows, None);
     } else {
@@ -81,7 +81,7 @@ fn test_function_rows_hint_only() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.cost, None);
         assert_eq!(func.rows, Some(50));
     } else {
@@ -95,8 +95,8 @@ fn test_function_hints_with_volatility() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
-        assert_eq!(func.volatility, Some(rustgres::parser::ast::FunctionVolatility::Stable));
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
+        assert_eq!(func.volatility, Some(vaultgres::parser::ast::FunctionVolatility::Stable));
         assert_eq!(func.cost, Some(10.0));
         assert_eq!(func.rows, Some(1));
     } else {
@@ -110,7 +110,7 @@ fn test_function_large_cost_value() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.cost, Some(1000000.0));
     } else {
         panic!("Expected CreateFunction statement");
@@ -123,7 +123,7 @@ fn test_function_large_rows_value() {
     let mut parser = Parser::new(sql).unwrap();
     let stmt = parser.parse().unwrap();
 
-    if let rustgres::parser::ast::Statement::CreateFunction(func) = stmt {
+    if let vaultgres::parser::ast::Statement::CreateFunction(func) = stmt {
         assert_eq!(func.rows, Some(5000000));
     } else {
         panic!("Expected CreateFunction statement");

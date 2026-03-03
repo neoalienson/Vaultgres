@@ -1,8 +1,8 @@
-# RustGres
+# VaultGres
 
-[![CI](https://github.com/neoalienson/rustgres/workflows/CI/badge.svg)](https://github.com/neoalienson/rustgres/actions/workflows/ci.yml)
-[![Integration Tests](https://github.com/neoalienson/rustgres/workflows/Integration%20Tests/badge.svg)](https://github.com/neoalienson/rustgres/actions/workflows/integration.yml)
-[![codecov](https://codecov.io/gh/neoalienson/rustgres/branch/main/graph/badge.svg)](https://codecov.io/gh/neoalienson/rustgres)
+[![CI](https://github.com/neoalienson/vaultgres/workflows/CI/badge.svg)](https://github.com/neoalienson/vaultgres/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/neoalienson/vaultgres/workflows/Integration%20Tests/badge.svg)](https://github.com/neoalienson/vaultgres/actions/workflows/integration.yml)
+[![codecov](https://codecov.io/gh/neoalienson/vaultgres/branch/main/graph/badge.svg)](https://codecov.io/gh/neoalienson/vaultgres)
 [![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
@@ -10,7 +10,7 @@ A **high-performance, PostgreSQL-compatible relational database management syste
 
 ## Purpose
 
-RustGres is a fully-featured RDBMS built from the ground up in Rust, providing:
+VaultGres is a fully-featured RDBMS built from the ground up in Rust, providing:
 
 - **PostgreSQL Wire Protocol Compatibility**: Drop-in replacement for existing PostgreSQL clients
 - **ACID Transactions**: Full transactional support with MVCC (Multi-Version Concurrency Control)
@@ -64,44 +64,44 @@ RustGres is a fully-featured RDBMS built from the ground up in Rust, providing:
 **From Binary:**
 ```bash
 # Download latest release
-curl -L https://github.com/rustgres/rustgres/releases/latest/download/rustgres-linux-x64.tar.gz | tar xz
-sudo mv rustgres /usr/local/bin/
+curl -L https://github.com/vaultgres/vaultgres/releases/latest/download/vaultgres-linux-x64.tar.gz | tar xz
+sudo mv vaultgres /usr/local/bin/
 ```
 
 **From Source:**
 ```bash
-git clone https://github.com/rustgres/rustgres.git
-cd rustgres
+git clone https://github.com/vaultgres/vaultgres.git
+cd vaultgres
 cargo build --release
-sudo cp target/release/rustgres /usr/local/bin/
+sudo cp target/release/vaultgres /usr/local/bin/
 ```
 
 **Using Docker:**
 ```bash
 # Pull and run
-docker run -d -p 5432:5432 --name rustgres rustgres:latest
+docker run -d -p 5432:5432 --name vaultgres vaultgres:latest
 
 # Or build locally
-docker build -f docker/Dockerfile -t rustgres:latest .
-docker run -d -p 5432:5432 rustgres:latest
+docker build -f docker/Dockerfile -t vaultgres:latest .
+docker run -d -p 5432:5432 vaultgres:latest
 
 # With persistent data
 docker run -d -p 5432:5432 \
-  -v rustgres-data:/var/lib/rustgres/data \
-  rustgres:latest
+  -v vaultgres-data:/var/lib/vaultgres/data \
+  vaultgres:latest
 ```
 
 ### Initialize Database
 
 ```bash
 # Initialize data directory
-rustgres init -D /var/lib/rustgres/data
+vaultgres init -D /var/lib/vaultgres/data
 
 # Start server
-rustgres start -D /var/lib/rustgres/data -p 5432
+vaultgres start -D /var/lib/vaultgres/data -p 5432
 
 # Create database
-rustgres createdb mydb
+vaultgres createdb mydb
 ```
 
 ### Connect
@@ -143,18 +143,18 @@ COMMIT;
 ## Documentation
 
 ### For Users
-- **[Quick Start Tutorial](docs/users/QUICKSTART.md)** - First steps with RustGres
+- **[Quick Start Tutorial](docs/users/QUICKSTART.md)** - First steps with VaultGres
 - **[SQL Reference](docs/users/SQL.md)** - Supported SQL syntax and features
 
 ### For Database Administrators
-- **[Installation Guide](docs/admins/INSTALLATION.md)** - Build, install, and configure RustGres
+- **[Installation Guide](docs/admins/INSTALLATION.md)** - Build, install, and configure VaultGres
 - **[Configuration Guide](docs/admins/CONFIGURATION.md)** - Server configuration and tuning
 - **[Server Operations](docs/admins/SERVER.md)** - Database administration tasks
 - **[Logging](docs/admins/LOGGING.md)** - Logging configuration and best practices
 
 ### For Developers
 - **[Architecture Overview](docs/developers/ARCHITECTURE.md)** - System design and components
-- **[Contributing Guide](docs/developers/CONTRIBUTING.md)** - How to contribute to RustGres
+- **[Contributing Guide](docs/developers/CONTRIBUTING.md)** - How to contribute to VaultGres
 - **[Coding Standards](docs/developers/STANDARDS.md)** - Development guidelines and conventions
 - **[Storage Engine](docs/developers/STORAGE.md)** - Buffer pool, indexes, WAL, recovery
 - **[Transaction Manager](docs/developers/TRANSACTIONS.md)** - MVCC, isolation levels, concurrency
@@ -173,8 +173,8 @@ COMMIT;
 
 ```bash
 # Clone repository
-git clone https://github.com/rustgres/rustgres.git
-cd rustgres
+git clone https://github.com/vaultgres/vaultgres.git
+cd vaultgres
 
 # Build release binary
 cargo build --release
@@ -191,7 +191,7 @@ cargo doc --no-deps --open
 
 ## Configuration
 
-Basic `rustgres.conf`:
+Basic `vaultgres.conf`:
 
 ```ini
 # Connection settings
@@ -226,11 +226,11 @@ We welcome contributions! See [Contributing Guide](docs/developers/CONTRIBUTING.
 
 ## License
 
-RustGres is licensed under the Apache License 2.0 or MIT License, at your option.
+VaultGres is licensed under the Apache License 2.0 or MIT License, at your option.
 
 ## Acknowledgments
 
-RustGres builds on ideas from:
+VaultGres builds on ideas from:
 - **PostgreSQL**: Query optimizer and MVCC design
 - **SQLite**: Testing methodology and SQL parser
 - **DuckDB**: Vectorized execution engine

@@ -1,8 +1,8 @@
-# RustGres Logging Configuration
+# VaultGres Logging Configuration
 
 ## Environment Variables
 
-### RUSTGRES_LOG_LEVEL
+### VAULTGRES_LOG_LEVEL
 Sets the logging level. Default: `info`
 
 **Levels:**
@@ -12,7 +12,7 @@ Sets the logging level. Default: `info`
 - `debug` - Debug information
 - `trace` - Verbose tracing
 
-### RUSTGRES_LOG_SCOPE
+### VAULTGRES_LOG_SCOPE
 Sets which modules to log. Default: `*` (all modules)
 
 **Scopes:**
@@ -26,62 +26,62 @@ Sets which modules to log. Default: `*` (all modules)
 
 **Multiple scopes:** Comma-separated list
 ```bash
-RUSTGRES_LOG_SCOPE=protocol,parser
+VAULTGRES_LOG_SCOPE=protocol,parser
 ```
 
 ## Usage Examples
 
 ### Default (info level, all modules)
 ```bash
-./target/release/rustgres
+./target/release/vaultgres
 ```
 
 ### Debug level for all modules
 ```bash
-RUSTGRES_LOG_LEVEL=debug ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=debug ./target/release/vaultgres
 ```
 
 ### Info level for protocol only
 ```bash
-RUSTGRES_LOG_SCOPE=protocol ./target/release/rustgres
+VAULTGRES_LOG_SCOPE=protocol ./target/release/vaultgres
 ```
 
 ### Debug level for protocol and parser
 ```bash
-RUSTGRES_LOG_LEVEL=debug RUSTGRES_LOG_SCOPE=protocol,parser ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=debug VAULTGRES_LOG_SCOPE=protocol,parser ./target/release/vaultgres
 ```
 
 ### Trace level for storage
 ```bash
-RUSTGRES_LOG_LEVEL=trace RUSTGRES_LOG_SCOPE=storage ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=trace VAULTGRES_LOG_SCOPE=storage ./target/release/vaultgres
 ```
 
 ### Error level only
 ```bash
-RUSTGRES_LOG_LEVEL=error ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=error ./target/release/vaultgres
 ```
 
 ## Log Output
 
 Logs are written to stderr with format:
 ```
-[2024-02-27T22:30:00Z INFO  rustgres::protocol] Query: SELECT 1;
-[2024-02-27T22:30:00Z DEBUG rustgres::parser] Parsed statement: Select(...)
+[2024-02-27T22:30:00Z INFO  vaultgres::protocol] Query: SELECT 1;
+[2024-02-27T22:30:00Z DEBUG vaultgres::parser] Parsed statement: Select(...)
 ```
 
 ## Production Recommendations
 
 **Production:**
 ```bash
-RUSTGRES_LOG_LEVEL=warn ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=warn ./target/release/vaultgres
 ```
 
 **Development:**
 ```bash
-RUSTGRES_LOG_LEVEL=debug ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=debug ./target/release/vaultgres
 ```
 
 **Troubleshooting:**
 ```bash
-RUSTGRES_LOG_LEVEL=trace RUSTGRES_LOG_SCOPE=protocol,parser ./target/release/rustgres
+VAULTGRES_LOG_LEVEL=trace VAULTGRES_LOG_SCOPE=protocol,parser ./target/release/vaultgres
 ```

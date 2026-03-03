@@ -3,7 +3,7 @@
 ## Directory Organization
 
 ```
-rustgres/
+vaultgres/
 ├── src/                    # Core source code
 │   ├── catalog/           # Schema catalog and metadata management
 │   │   ├── tests/         # Catalog-specific tests

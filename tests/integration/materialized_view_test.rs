@@ -1,5 +1,5 @@
-use rustgres::catalog::Catalog;
-use rustgres::parser::{Parser, Statement};
+use vaultgres::catalog::Catalog;
+use vaultgres::parser::{Parser, Statement};
 
 #[test]
 fn test_create_and_drop_materialized_view() {

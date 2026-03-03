@@ -1,5 +1,5 @@
-use rustgres::config::Config;
-use rustgres::protocol::Server;
+use vaultgres::config::Config;
+use vaultgres::protocol::Server;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -7,7 +7,7 @@ use std::thread;
 
 fn main() -> std::io::Result<()> {
     // Load config from file or use default
-    let config_path = env::var("RUSTGRES_CONFIG").unwrap_or_else(|_| "config.yaml".to_string());
+    let config_path = env::var("VAULTGRES_CONFIG").unwrap_or_else(|_| "config.yaml".to_string());
     let config = if Path::new(&config_path).exists() {
         Config::from_file(&config_path).unwrap_or_else(|e| {
             eprintln!("Warning: Failed to load config from {}: {}", config_path, e);
@@ -24,13 +24,13 @@ fn main() -> std::io::Result<()> {
 
     // Initialize logger from config
     let filter = if config.logging.scope == "*" {
-        format!("rustgres={}", config.logging.level)
+        format!("vaultgres={}", config.logging.level)
     } else {
         config
             .logging
             .scope
             .split(',')
-            .map(|s| format!("rustgres::{}={}", s.trim(), config.logging.level))
+            .map(|s| format!("vaultgres::{}={}", s.trim(), config.logging.level))
             .collect::<Vec<_>>()
             .join(",")
     };
@@ -39,7 +39,7 @@ fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
-    log::info!("🚀 RustGres v0.1.0 starting...");
+    log::info!("🚀 VaultGres v0.1.0 starting...");
     log::info!("📡 Listening on {}", addr);
     log::info!("📁 Data directory: {}", config.storage.data_dir);
     log::info!("📝 WAL directory: {}", config.storage.wal_dir);

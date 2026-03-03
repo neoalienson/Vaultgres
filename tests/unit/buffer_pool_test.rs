@@ -1,4 +1,4 @@
-use rustgres::storage::{BufferPool, PageId};
+use vaultgres::storage::{BufferPool, PageId};
 
 #[test]
 fn test_buffer_pool_creation() {

@@ -1,4 +1,4 @@
-# RustGres Development Configuration
+# VaultGres Development Configuration
 
 server:
   host: "127.0.0.1"

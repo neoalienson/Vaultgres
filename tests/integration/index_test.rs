@@ -1,5 +1,5 @@
-use rustgres::catalog::Catalog;
-use rustgres::parser::{Parser, Statement};
+use vaultgres::catalog::Catalog;
+use vaultgres::parser::{Parser, Statement};
 use tempfile::TempDir;
 
 #[test]

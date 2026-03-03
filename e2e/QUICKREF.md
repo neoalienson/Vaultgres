@@ -3,8 +3,8 @@
 ## Setup (One-time)
 
 ```bash
-# 1. Build RustGres Docker image
-docker build -f docker/Dockerfile -t rustgres:latest .
+# 1. Build VaultGres Docker image
+docker build -f docker/Dockerfile -t vaultgres:latest .
 
 # 2. Validate E2E framework
 cd e2e && ./validate.sh
@@ -39,7 +39,7 @@ cd e2e
 scenarios/     → Real-world workloads (OLTP, crash recovery)
 load/          → Performance tests (ramp-up, spike)
 soak/          → Stability tests (24h memory leak detection)
-comparison/    → RustGres vs PostgreSQL benchmarks
+comparison/    → VaultGres vs PostgreSQL benchmarks
 ```
 
 ## Monitoring
@@ -53,21 +53,21 @@ After running `./run_all.sh monitor`:
 
 ### Stateless (fresh start each test)
 ```rust
-let env = TestEnv::new().with_rustgres().start();
+let env = TestEnv::new().with_vaultgres().start();
 ```
 
 ### Stateful (data persists across restarts)
 ```rust
 let env = TestEnv::new()
-    .with_rustgres()
+    .with_vaultgres()
     .with_persistence()
     .start();
 ```
 
-### Comparison (RustGres vs PostgreSQL)
+### Comparison (VaultGres vs PostgreSQL)
 ```rust
 let env = TestEnv::new()
-    .with_rustgres()
+    .with_vaultgres()
     .with_postgres()
     .start();
 ```
@@ -75,7 +75,7 @@ let env = TestEnv::new()
 ### Monitoring (track memory/CPU)
 ```rust
 let env = TestEnv::new()
-    .with_rustgres()
+    .with_vaultgres()
     .with_monitoring()
     .start();
 ```
@@ -101,8 +101,8 @@ use e2e::*;
 
 #[test]
 fn test_my_scenario() {
-    let env = TestEnv::new().with_rustgres().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
     // Your test logic...
 }
 ```
@@ -111,7 +111,7 @@ fn test_my_scenario() {
 
 ```bash
 # Check container logs
-docker-compose logs rustgres
+docker-compose logs vaultgres
 docker-compose logs postgres
 
 # Clean up everything

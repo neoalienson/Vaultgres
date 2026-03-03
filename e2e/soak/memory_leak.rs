@@ -6,11 +6,11 @@ use std::time::Duration;
 #[ignore]
 fn test_memory_leak_24h() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_monitoring()
         .start();
     
-    let db = env.rustgres();
+    let db = env.vaultgres();
     db.execute("CREATE TABLE events (id INT, data TEXT, ts TIMESTAMP)").unwrap();
     
     let monitor = env.start_monitor();
@@ -36,7 +36,7 @@ fn test_memory_leak_24h() {
 #[ignore]
 fn test_connection_churn_12h() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_monitoring()
         .start();
     
@@ -56,11 +56,11 @@ fn test_connection_churn_12h() {
 #[ignore]
 fn test_disk_growth_48h() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
-    let db = env.rustgres();
+    let db = env.vaultgres();
     db.execute("CREATE TABLE logs (id INT, message TEXT)").unwrap();
     
     for hour in 0..48 {

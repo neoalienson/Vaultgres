@@ -1,6 +1,6 @@
-use rustgres::storage::btree::{BTree, TupleId};
-use rustgres::storage::heap::HeapFile;
-use rustgres::storage::{BufferPool, PageId};
+use vaultgres::storage::btree::{BTree, TupleId};
+use vaultgres::storage::heap::HeapFile;
+use vaultgres::storage::{BufferPool, PageId};
 use std::sync::Arc;
 
 #[test]

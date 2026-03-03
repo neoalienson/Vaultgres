@@ -1,4 +1,4 @@
-use rustgres::executor::parallel::work_stealing::{WorkStealingExecutor, WorkStealingScheduler};
+use vaultgres::executor::parallel::work_stealing::{WorkStealingExecutor, WorkStealingScheduler};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;

@@ -6,8 +6,8 @@ use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 #[test]
 #[ignore]
 fn test_ramp_up_load() {
-    let env = TestEnv::new().with_rustgres().with_monitoring().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().with_monitoring().start();
+    let db = env.vaultgres();
     
     db.execute("CREATE TABLE load_test (id INT, value INT)").unwrap();
     for i in 0..1000 {
@@ -52,8 +52,8 @@ fn test_ramp_up_load() {
 #[test]
 #[ignore]
 fn test_spike_load() {
-    let env = TestEnv::new().with_rustgres().with_monitoring().start();
-    let db = env.rustgres();
+    let env = TestEnv::new().with_vaultgres().with_monitoring().start();
+    let db = env.vaultgres();
     
     db.execute("CREATE TABLE spike_test (id INT)").unwrap();
     

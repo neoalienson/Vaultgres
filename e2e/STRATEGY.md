@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive end-to-end testing framework for RustGres using Docker containers to simulate real-world scenarios, compare performance with PostgreSQL, and conduct load/soak tests.
+Comprehensive end-to-end testing framework for VaultGres using Docker containers to simulate real-world scenarios, compare performance with PostgreSQL, and conduct load/soak tests.
 
 ## Architecture
 
@@ -23,7 +23,7 @@ e2e/
 │   ├── memory_leak.rs         # Long-running memory checks
 │   ├── connection_pool.rs     # Connection lifecycle
 │   └── disk_growth.rs         # Storage growth monitoring
-├── comparison/                 # RustGres vs PostgreSQL
+├── comparison/                 # VaultGres vs PostgreSQL
 │   ├── benchmark.rs           # Performance comparison
 │   └── compatibility.rs       # Feature parity checks
 ├── persistence/                # State persistence tests
@@ -61,11 +61,11 @@ Side-by-side comparison with PostgreSQL for performance and compatibility.
 ### Docker Compose Setup
 ```yaml
 services:
-  rustgres:
-    image: rustgres:latest
+  vaultgres:
+    image: vaultgres:latest
     ports: ["5432:5432"]
     volumes:
-      - rustgres-data:/var/lib/rustgres/data
+      - vaultgres-data:/var/lib/vaultgres/data
     environment:
       - RUST_LOG=info
     healthcheck:
@@ -112,7 +112,7 @@ services:
 #[test]
 fn test_oltp_workload() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .start();
     
     // Run workload
@@ -129,7 +129,7 @@ fn test_oltp_workload() {
 #[test]
 fn test_crash_recovery() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_persistence()
         .start();
     
@@ -151,7 +151,7 @@ fn test_crash_recovery() {
 #[test]
 fn test_join_performance() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_postgres()
         .start();
     
@@ -159,12 +159,12 @@ fn test_join_performance() {
     env.load_dataset("tpch_1gb");
     
     // Run query on both
-    let rustgres_time = env.rustgres().time_query(COMPLEX_JOIN);
+    let vaultgres_time = env.vaultgres().time_query(COMPLEX_JOIN);
     let postgres_time = env.postgres().time_query(COMPLEX_JOIN);
     
     // Compare
-    let speedup = postgres_time / rustgres_time;
-    assert!(speedup > 0.8, "RustGres should be competitive");
+    let speedup = postgres_time / vaultgres_time;
+    assert!(speedup > 0.8, "VaultGres should be competitive");
 }
 ```
 
@@ -174,7 +174,7 @@ fn test_join_performance() {
 #[ignore] // Run separately with --ignored
 fn test_memory_leak_24h() {
     let env = TestEnv::new()
-        .with_rustgres()
+        .with_vaultgres()
         .with_monitoring()
         .start();
     
@@ -284,7 +284,7 @@ fn test_memory_leak_24h() {
 ## Success Criteria
 
 ### Performance
-- RustGres >= 80% of PostgreSQL throughput
+- VaultGres >= 80% of PostgreSQL throughput
 - p99 latency < 100ms for simple queries
 - p99 latency < 5s for complex queries
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-RustGres development roadmap with planned features and milestones.
+VaultGres development roadmap with planned features and milestones.
 
 ## Completed Features ✅
 
@@ -67,7 +67,7 @@ RustGres development roadmap with planned features and milestones.
 - ✅ Unit tests across all modules
 - ✅ Integration tests
 - ✅ Docker-based E2E testing framework
-- ✅ Performance comparison tests (RustGres vs PostgreSQL)
+- ✅ Performance comparison tests (VaultGres vs PostgreSQL)
 - ✅ Load and soak testing infrastructure
 - ✅ Monitoring stack (Prometheus, Grafana, cAdvisor)
 
@@ -397,7 +397,7 @@ RustGres development roadmap with planned features and milestones.
 
 ## Long-Term Vision
 
-RustGres aims to be:
+VaultGres aims to be:
 1. **Fastest**: Best-in-class performance for mixed workloads
 2. **Safest**: Memory-safe with zero crashes
 3. **Simplest**: Easy to deploy and operate

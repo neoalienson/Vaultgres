@@ -1,4 +1,4 @@
-use rustgres::executor::{Except, Intersect, MockExecutor, SimpleExecutor, SimpleTuple, Union};
+use vaultgres::executor::{Except, Intersect, MockExecutor, SimpleExecutor, SimpleTuple, Union};
 
 #[test]
 fn test_union() {

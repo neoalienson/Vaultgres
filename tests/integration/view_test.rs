@@ -1,6 +1,6 @@
-use rustgres::catalog::Catalog;
-use rustgres::parser::ast::{ColumnDef, DataType};
-use rustgres::parser::{Parser, Statement};
+use vaultgres::catalog::Catalog;
+use vaultgres::parser::ast::{ColumnDef, DataType};
+use vaultgres::parser::{Parser, Statement};
 
 #[test]
 fn test_create_and_drop_view() {

@@ -1,9 +1,9 @@
-use rustgres::executor::{Executor, SeqScan};
-use rustgres::parser::parse;
-use rustgres::storage::heap::HeapFile;
-use rustgres::storage::{BufferPool, PageId};
-use rustgres::transaction::TransactionManager;
-use rustgres::wal::WALWriter;
+use vaultgres::executor::{Executor, SeqScan};
+use vaultgres::parser::parse;
+use vaultgres::storage::heap::HeapFile;
+use vaultgres::storage::{BufferPool, PageId};
+use vaultgres::transaction::TransactionManager;
+use vaultgres::wal::WALWriter;
 use std::sync::Arc;
 
 #[test]
@@ -31,7 +31,7 @@ fn test_end_to_end_transaction_flow() {
 fn test_end_to_end_query_execution() {
     // Parse query
     let stmt = parse("SELECT * FROM users").unwrap();
-    assert!(matches!(stmt, rustgres::parser::Statement::Select(_)));
+    assert!(matches!(stmt, vaultgres::parser::Statement::Select(_)));
 
     // Setup storage
     let pool = Arc::new(BufferPool::new(10));
@@ -101,7 +101,7 @@ fn test_end_to_end_buffer_pool_eviction() {
 
 #[test]
 fn test_end_to_end_wal_operations() {
-    use rustgres::wal::RecordType;
+    use vaultgres::wal::RecordType;
 
     let wal = WALWriter::new();
 

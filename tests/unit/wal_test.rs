@@ -1,5 +1,5 @@
-use rustgres::storage::PageId;
-use rustgres::wal::{RecordType, WALRecord, WALWriter};
+use vaultgres::storage::PageId;
+use vaultgres::wal::{RecordType, WALRecord, WALWriter};
 
 #[test]
 fn test_wal_writer_creation() {

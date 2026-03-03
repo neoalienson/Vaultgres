@@ -1,4 +1,4 @@
-use rustgres::transaction::{TransactionManager, TransactionState};
+use vaultgres::transaction::{TransactionManager, TransactionState};
 
 const INVALID_XID: u64 = 0;
 const FROZEN_XID: u64 = 1;

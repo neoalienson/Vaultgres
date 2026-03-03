@@ -1,5 +1,5 @@
-use rustgres::catalog::{CheckValidator, Tuple, Value};
-use rustgres::parser::ast::{BinaryOperator, CheckConstraint, Expr};
+use vaultgres::catalog::{CheckValidator, Tuple, Value};
+use vaultgres::parser::ast::{BinaryOperator, CheckConstraint, Expr};
 
 #[test]
 fn test_check_constraint_age_validation() {

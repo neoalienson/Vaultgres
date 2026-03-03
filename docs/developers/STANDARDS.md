@@ -1,6 +1,6 @@
 # Implementation Standards
 
-Engineering standards and best practices for RustGres development.
+Engineering standards and best practices for VaultGres development.
 
 ## Code Style
 
@@ -378,7 +378,7 @@ proptest! {
 
 ```rust
 // tests/integration_test.rs
-use rustgres::*;
+use vaultgres::*;
 
 #[test]
 fn test_end_to_end_query() {
@@ -422,7 +422,7 @@ fn test_transaction_rollback() {
 ```rust
 // benches/btree_benchmark.rs
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use rustgres::storage::BTree;
+use vaultgres::storage::BTree;
 
 fn bench_btree_insert(c: &mut Criterion) {
     let mut group = c.benchmark_group("btree_insert");
@@ -506,7 +506,7 @@ tests/
 /// # Examples
 ///
 /// ```
-/// use rustgres::storage::BufferPool;
+/// use vaultgres::storage::BufferPool;
 ///
 /// let mut pool = BufferPool::new(100);
 /// let page = pool.fetch(PageId(1))?;
@@ -597,7 +597,7 @@ impl BufferPool {
 //! # Examples
 //!
 //! ```
-//! use rustgres::storage::{BufferPool, PageManager};
+//! use vaultgres::storage::{BufferPool, PageManager};
 //!
 //! let mut pool = BufferPool::new(100);
 //! let page = pool.fetch(PageId(1))?;
@@ -655,11 +655,11 @@ fn test_no_performance_regression() {
 ```bash
 # CPU profiling
 cargo build --release
-perf record --call-graph=dwarf ./target/release/rustgres
+perf record --call-graph=dwarf ./target/release/vaultgres
 perf report
 
 # Memory profiling
-valgrind --tool=massif ./target/debug/rustgres
+valgrind --tool=massif ./target/debug/vaultgres
 ms_print massif.out.*
 
 # Flamegraph

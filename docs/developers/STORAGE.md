@@ -1,6 +1,6 @@
 # Storage Engine
 
-The RustGres storage engine provides durable, efficient data storage with MVCC support, crash recovery, and pluggable storage backends.
+The VaultGres storage engine provides durable, efficient data storage with MVCC support, crash recovery, and pluggable storage backends.
 
 ## Overview
 

@@ -1,4 +1,4 @@
-use rustgres::storage::{Page, PageId, PAGE_SIZE};
+use vaultgres::storage::{Page, PageId, PAGE_SIZE};
 
 #[test]
 fn test_page_creation() {

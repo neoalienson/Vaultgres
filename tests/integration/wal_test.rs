@@ -1,6 +1,6 @@
-use rustgres::storage::{BufferPool, PageId};
-use rustgres::transaction::TransactionManager;
-use rustgres::wal::{CheckpointManager, RecordType, RecoveryManager, WALWriter};
+use vaultgres::storage::{BufferPool, PageId};
+use vaultgres::transaction::TransactionManager;
+use vaultgres::wal::{CheckpointManager, RecordType, RecoveryManager, WALWriter};
 use std::sync::Arc;
 
 #[test]

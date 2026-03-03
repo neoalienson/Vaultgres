@@ -62,8 +62,8 @@ performance:
     }
 
     fn start(&mut self) {
-        let process = Command::new("./target/release/rustgres")
-            .env("RUSTGRES_CONFIG", self.config_path.to_str().unwrap())
+        let process = Command::new("./target/debug/vaultgres")
+            .env("VAULTGRES_CONFIG", self.config_path.to_str().unwrap())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
