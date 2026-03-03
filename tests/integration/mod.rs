@@ -14,6 +14,7 @@ mod directory_test;
 mod disk_test;
 mod end_to_end_test;
 mod executor;
+mod expression_index_test;
 mod fk_action_test;
 mod function_hints_test;
 mod index_selection_test;

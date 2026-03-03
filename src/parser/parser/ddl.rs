@@ -227,11 +227,22 @@ fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
     let table = parser.expect_identifier()?;
 
     parser.expect(Token::LeftParen)?;
-    let mut columns = vec![parser.expect_identifier()?];
 
-    while parser.current_token() == &Token::Comma {
+    let mut columns = Vec::new();
+    let mut expressions = Vec::new();
+
+    loop {
+        if matches!(parser.current_token(), Token::Identifier(_)) {
+            let col = parser.expect_identifier()?;
+            columns.push(col);
+        } else {
+            expressions.push(super::expr::parse_expr(parser)?);
+        }
+
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
         parser.advance();
-        columns.push(parser.expect_identifier()?);
     }
 
     parser.expect(Token::RightParen)?;
@@ -243,7 +254,14 @@ fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
         None
     };
 
-    Ok(Statement::CreateIndex(CreateIndexStmt { name, table, columns, unique, where_clause }))
+    Ok(Statement::CreateIndex(CreateIndexStmt {
+        name,
+        table,
+        columns,
+        expressions,
+        unique,
+        where_clause,
+    }))
 }
 
 pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {

@@ -185,6 +185,7 @@ pub struct CreateIndexStmt {
     pub name: String,
     pub table: String,
     pub columns: Vec<String>,
+    pub expressions: Vec<Expr>,
     pub unique: bool,
     pub where_clause: Option<Expr>,
 }
