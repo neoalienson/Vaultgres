@@ -6,21 +6,24 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0%2FMIT-blue.svg)](LICENSE)
 [![Rust Version](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
-A **high-performance, PostgreSQL-compatible relational database management system** written in Rust - delivering ACID compliance, advanced query optimization, and modern concurrency with memory safety guarantees.
+A **high-performance, PostgreSQL-compatible relational database management system** written in Rust - delivering ACID compliance, advanced query optimization, modern concurrency with memory safety guarantees, and enterprise-grade security by design.
 
 ## Purpose
 
 VaultGres is a fully-featured RDBMS built from the ground up in Rust, providing:
 
 - **PostgreSQL Wire Protocol Compatibility**: Drop-in replacement for existing PostgreSQL clients
+- **PostgreSQL SQL Compatibility**: Full SQL standard support with PostgreSQL extensions
 - **ACID Transactions**: Full transactional support with MVCC (Multi-Version Concurrency Control)
 - **Advanced Query Engine**: Cost-based optimizer with parallel execution
 - **Memory Safety**: Zero-cost abstractions with Rust's ownership model
+- **Security by Design**: Enterprise-grade security features built into the core
 - **High Performance**: Lock-free data structures and async I/O throughout
 
 **Key Benefits:**
 - 🚀 **Performance**: 2-3x faster than PostgreSQL on OLTP workloads
 - 🔒 **Memory Safe**: No buffer overflows, use-after-free, or data races
+- 🛡️ **Security First**: TDE, column-level encryption, audit logging, data masking
 - 🔄 **Full ACID**: Serializable isolation with optimistic concurrency control
 - 🔌 **Compatible**: Works with existing PostgreSQL tools and drivers
 - 📊 **Modern Architecture**: Async runtime, vectorized execution, columnar storage
@@ -55,7 +58,17 @@ VaultGres is a fully-featured RDBMS built from the ground up in Rust, providing:
 - **Backup & Recovery**: Online backups, PITR, incremental backups
 - **Monitoring**: Prometheus metrics, query statistics, slow query log
 - **Administration**: SQL-based configuration, online schema changes
-- **Security**: TLS/SSL, SCRAM authentication, row-level security
+
+### Enterprise Security (Security by Design)
+- **Transparent Data Encryption (TDE)**: Toggle-able encryption at rest for all data files
+- **Column-Level Encryption**: Encrypt sensitive columns with per-column keys
+- **Audit Logging**: Comprehensive audit trail for compliance (SOC2, HIPAA, GDPR)
+- **Data Masking**: Dynamic data masking for sensitive information
+- **Row-Level Security**: Fine-grained access control at row level
+- **Authentication**: TLS/SSL, SCRAM-SHA-256, certificate-based auth, LDAP/Kerberos
+- **Key Management**: Integration with HSM and cloud KMS (AWS KMS, Azure Key Vault)
+- **Encryption in Transit**: Mandatory TLS 1.3 with perfect forward secrecy
+- **Zero-Knowledge Backups**: Encrypted backups with client-side keys
 
 ## Quick Start
 
@@ -208,6 +221,14 @@ maintenance_work_mem = 64MB
 wal_level = replica
 max_wal_size = 1GB
 checkpoint_timeout = 5min
+
+# Security settings
+tde_enabled = true
+tde_key_rotation_days = 90
+audit_log_enabled = true
+audit_log_level = all
+ssl_enabled = true
+ssl_min_version = TLSv1.3
 
 # Query tuning
 effective_cache_size = 4GB
