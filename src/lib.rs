@@ -13,10 +13,14 @@
 pub mod catalog;
 pub mod config;
 pub mod executor;
+pub mod lock_monitor;
+pub mod metrics;
 pub mod optimizer;
 pub mod parser;
 pub mod prepared;
 pub mod protocol;
+pub mod query_stats;
+pub mod slow_query_log;
 pub mod statistics;
 pub mod storage;
 pub mod transaction;

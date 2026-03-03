@@ -165,13 +165,13 @@ VaultGres development roadmap with planned features and milestones.
 - Restore testing automation
 
 **Monitoring & Observability**
-- Prometheus metrics exporter
-- Query statistics (pg_stat_statements compatible)
-- Slow query log with configurable threshold
-- Lock monitoring and wait events
-- Buffer pool statistics
-- Connection pool metrics
-- Disk I/O statistics
+- ✅ Prometheus metrics exporter
+- ✅ Query statistics (pg_stat_statements compatible)
+- ✅ Slow query log with configurable threshold
+- ✅ Lock monitoring and wait events
+- ✅ Buffer pool statistics
+- ✅ Connection pool metrics
+- ✅ Disk I/O statistics
 
 ## Version 0.6.0 (Beta)
 
