@@ -32,37 +32,34 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     }
 }
 
+fn parse_identifier_list(parser: &mut Parser) -> Result<Vec<String>> {
+    let mut list = vec![parser.expect_identifier()?];
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        list.push(parser.expect_identifier()?);
+    }
+    Ok(list)
+}
+
 fn parse_primary_key_constraint(parser: &mut Parser) -> Result<Vec<String>> {
     parser.advance();
     parser.expect(Token::Key)?;
     parser.expect(Token::LeftParen)?;
-    let mut pk_cols = vec![parser.expect_identifier()?];
-    while parser.current_token() == &Token::Comma {
-        parser.advance();
-        pk_cols.push(parser.expect_identifier()?);
-    }
+    let cols = parse_identifier_list(parser)?;
     parser.expect(Token::RightParen)?;
-    Ok(pk_cols)
+    Ok(cols)
 }
 
 fn parse_foreign_key_constraint(parser: &mut Parser) -> Result<ForeignKeyDef> {
     parser.advance();
     parser.expect(Token::Key)?;
     parser.expect(Token::LeftParen)?;
-    let mut fk_cols = vec![parser.expect_identifier()?];
-    while parser.current_token() == &Token::Comma {
-        parser.advance();
-        fk_cols.push(parser.expect_identifier()?);
-    }
+    let fk_cols = parse_identifier_list(parser)?;
     parser.expect(Token::RightParen)?;
     parser.expect(Token::References)?;
     let ref_table = parser.expect_identifier()?;
     parser.expect(Token::LeftParen)?;
-    let mut ref_cols = vec![parser.expect_identifier()?];
-    while parser.current_token() == &Token::Comma {
-        parser.advance();
-        ref_cols.push(parser.expect_identifier()?);
-    }
+    let ref_cols = parse_identifier_list(parser)?;
     parser.expect(Token::RightParen)?;
     Ok(ForeignKeyDef {
         columns: fk_cols,
@@ -137,56 +134,47 @@ fn parse_create_materialized_view(parser: &mut Parser) -> Result<Statement> {
     }))
 }
 
+fn parse_trigger_timing(parser: &mut Parser) -> Result<TriggerTiming> {
+    let timing = match parser.current_token() {
+        Token::Before => TriggerTiming::Before,
+        Token::After => TriggerTiming::After,
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+    parser.advance();
+    Ok(timing)
+}
+
+fn parse_trigger_event(parser: &mut Parser) -> Result<TriggerEvent> {
+    let event = match parser.current_token() {
+        Token::Insert => TriggerEvent::Insert,
+        Token::Update => TriggerEvent::Update,
+        Token::Delete => TriggerEvent::Delete,
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+    parser.advance();
+    Ok(event)
+}
+
+fn parse_trigger_for(parser: &mut Parser) -> Result<TriggerFor> {
+    let for_each = match parser.current_token() {
+        Token::Row => TriggerFor::EachRow,
+        Token::Statement => TriggerFor::EachStatement,
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+    parser.advance();
+    Ok(for_each)
+}
+
 fn parse_create_trigger(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Trigger)?;
-
     let name = parser.expect_identifier()?;
-
-    let timing = match parser.current_token() {
-        Token::Before => {
-            parser.advance();
-            TriggerTiming::Before
-        }
-        Token::After => {
-            parser.advance();
-            TriggerTiming::After
-        }
-        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-    };
-
-    let event = match parser.current_token() {
-        Token::Insert => {
-            parser.advance();
-            TriggerEvent::Insert
-        }
-        Token::Update => {
-            parser.advance();
-            TriggerEvent::Update
-        }
-        Token::Delete => {
-            parser.advance();
-            TriggerEvent::Delete
-        }
-        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-    };
-
+    let timing = parse_trigger_timing(parser)?;
+    let event = parse_trigger_event(parser)?;
     parser.expect(Token::On)?;
     let table = parser.expect_identifier()?;
-
     parser.expect(Token::For)?;
     parser.expect(Token::Each)?;
-
-    let for_each = match parser.current_token() {
-        Token::Row => {
-            parser.advance();
-            TriggerFor::EachRow
-        }
-        Token::Statement => {
-            parser.advance();
-            TriggerFor::EachStatement
-        }
-        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-    };
+    let for_each = parse_trigger_for(parser)?;
 
     let when = if parser.current_token() == &Token::When {
         parser.advance();
@@ -200,14 +188,12 @@ fn parse_create_trigger(parser: &mut Parser) -> Result<Statement> {
 
     parser.expect(Token::Begin)?;
     let mut body = Vec::new();
-
     while parser.current_token() != &Token::End {
         body.push(parser.parse()?);
         if parser.current_token() == &Token::Semicolon {
             parser.advance();
         }
     }
-
     parser.expect(Token::End)?;
 
     Ok(Statement::CreateTrigger(CreateTriggerStmt {
@@ -398,87 +384,66 @@ fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
 }
 
 fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
-    match parser.current_token() {
-        Token::Int => {
+    let dtype = match parser.current_token() {
+        Token::Int => DataType::Int,
+        Token::Serial => DataType::Serial,
+        Token::Text => DataType::Text,
+        Token::Boolean => DataType::Boolean,
+        Token::Date => DataType::Date,
+        Token::Time => DataType::Time,
+        Token::Timestamp => DataType::Timestamp,
+        Token::Bytea | Token::Blob => DataType::Bytea,
+        Token::Varchar => return parse_varchar(parser),
+        Token::Decimal | Token::Numeric => return parse_decimal(parser),
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+    parser.advance();
+    Ok(dtype)
+}
+
+fn parse_varchar(parser: &mut Parser) -> Result<DataType> {
+    parser.advance();
+    if parser.current_token() == &Token::LeftParen {
+        parser.advance();
+        if let Token::Number(n) = parser.current_token() {
+            let size = *n as u32;
             parser.advance();
-            Ok(DataType::Int)
+            parser.expect(Token::RightParen)?;
+            Ok(DataType::Varchar(size))
+        } else {
+            Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token())))
         }
-        Token::Serial => {
+    } else {
+        Ok(DataType::Varchar(255))
+    }
+}
+
+fn parse_decimal(parser: &mut Parser) -> Result<DataType> {
+    parser.advance();
+    if parser.current_token() == &Token::LeftParen {
+        parser.advance();
+        if let Token::Number(p) = parser.current_token() {
+            let precision = *p as u8;
             parser.advance();
-            Ok(DataType::Serial)
-        }
-        Token::Text => {
-            parser.advance();
-            Ok(DataType::Text)
-        }
-        Token::Varchar => {
-            parser.advance();
-            if parser.current_token() == &Token::LeftParen {
+            if parser.current_token() == &Token::Comma {
                 parser.advance();
-                if let Token::Number(n) = parser.current_token() {
-                    let size = *n as u32;
+                if let Token::Number(s) = parser.current_token() {
+                    let scale = *s as u8;
                     parser.advance();
                     parser.expect(Token::RightParen)?;
-                    Ok(DataType::Varchar(size))
+                    Ok(DataType::Decimal(precision, scale))
                 } else {
                     Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token())))
                 }
             } else {
-                Ok(DataType::Varchar(255))
+                parser.expect(Token::RightParen)?;
+                Ok(DataType::Decimal(precision, 0))
             }
+        } else {
+            Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token())))
         }
-        Token::Boolean => {
-            parser.advance();
-            Ok(DataType::Boolean)
-        }
-        Token::Date => {
-            parser.advance();
-            Ok(DataType::Date)
-        }
-        Token::Time => {
-            parser.advance();
-            Ok(DataType::Time)
-        }
-        Token::Timestamp => {
-            parser.advance();
-            Ok(DataType::Timestamp)
-        }
-        Token::Decimal | Token::Numeric => {
-            parser.advance();
-            if parser.current_token() == &Token::LeftParen {
-                parser.advance();
-                if let Token::Number(p) = parser.current_token() {
-                    let precision = *p as u8;
-                    parser.advance();
-                    if parser.current_token() == &Token::Comma {
-                        parser.advance();
-                        if let Token::Number(s) = parser.current_token() {
-                            let scale = *s as u8;
-                            parser.advance();
-                            parser.expect(Token::RightParen)?;
-                            Ok(DataType::Decimal(precision, scale))
-                        } else {
-                            Err(ParseError::UnexpectedToken(format!(
-                                "{:?}",
-                                parser.current_token()
-                            )))
-                        }
-                    } else {
-                        parser.expect(Token::RightParen)?;
-                        Ok(DataType::Decimal(precision, 0))
-                    }
-                } else {
-                    Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token())))
-                }
-            } else {
-                Ok(DataType::Decimal(10, 0))
-            }
-        }
-        Token::Bytea | Token::Blob => {
-            parser.advance();
-            Ok(DataType::Bytea)
-        }
-        _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    } else {
+        Ok(DataType::Decimal(10, 0))
     }
 }
 
