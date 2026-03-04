@@ -74,6 +74,7 @@ cargo test
 # Run specific test suite
 cargo test --lib
 cargo test --test integration_tests
+cargo test --test test_harness
 
 
 # Run tests with output
