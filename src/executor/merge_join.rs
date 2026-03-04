@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 
 pub struct MergeJoin {
     left: Box<dyn SimpleExecutor>,
@@ -128,13 +130,15 @@ impl SimpleExecutor for MergeJoin {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_merge_join_basic() {
         let left =
-            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -150,8 +154,8 @@ mod tests {
 
     #[test]
     fn test_merge_join_no_matches() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2, 20] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2, 20] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -162,9 +166,9 @@ mod tests {
     #[test]
     fn test_merge_join_duplicates() {
         let left =
-            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![1, 11] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![1, 11] }]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -180,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_merge_join_empty_left() {
-        let left = MockExecutor::new(vec![]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
+        let left = OldMockExecutor::new(vec![]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -191,8 +195,8 @@ mod tests {
 
     #[test]
     fn test_merge_join_empty_right() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
-        let right = MockExecutor::new(vec![]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = OldMockExecutor::new(vec![]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -203,9 +207,9 @@ mod tests {
     #[test]
     fn test_merge_join_unsorted_input() {
         let left =
-            MockExecutor::new(vec![Tuple { data: vec![2, 20] }, Tuple { data: vec![1, 10] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![2, 20] }, Tuple { data: vec![1, 10] }]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![2, 200] }, Tuple { data: vec![1, 100] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![2, 200] }, Tuple { data: vec![1, 100] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -224,11 +228,13 @@ mod tests {
 mod edge_tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_merge_join_single_row_each() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -242,13 +248,13 @@ mod edge_tests {
 
     #[test]
     fn test_merge_join_large_groups() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![1, 11] },
             Tuple { data: vec![1, 12] },
         ]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![1, 101] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -265,9 +271,9 @@ mod edge_tests {
     #[test]
     fn test_merge_join_all_left_smaller() {
         let left =
-            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![3, 100] }, Tuple { data: vec![4, 200] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![3, 100] }, Tuple { data: vec![4, 200] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -278,9 +284,9 @@ mod edge_tests {
     #[test]
     fn test_merge_join_all_right_smaller() {
         let left =
-            MockExecutor::new(vec![Tuple { data: vec![3, 10] }, Tuple { data: vec![4, 20] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![3, 10] }, Tuple { data: vec![4, 20] }]);
         let right =
-            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
 
         let mut join = MergeJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();
@@ -290,12 +296,12 @@ mod edge_tests {
 
     #[test]
     fn test_merge_join_interleaved() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![3, 30] },
             Tuple { data: vec![5, 50] },
         ]);
-        let right = MockExecutor::new(vec![
+        let right = OldMockExecutor::new(vec![
             Tuple { data: vec![2, 200] },
             Tuple { data: vec![3, 255] },
             Tuple { data: vec![4, 250] },
@@ -315,13 +321,13 @@ mod edge_tests {
 
     #[test]
     fn test_merge_join_many_duplicates() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![1, 11] },
             Tuple { data: vec![1, 12] },
             Tuple { data: vec![1, 13] },
         ]);
-        let right = MockExecutor::new(vec![
+        let right = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 100] },
             Tuple { data: vec![1, 101] },
             Tuple { data: vec![1, 102] },

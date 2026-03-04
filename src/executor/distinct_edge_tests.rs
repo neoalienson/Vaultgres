@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::test_helpers::{count_results, MockExecutor};
     use crate::executor::{Distinct, SimpleExecutor, SimpleTuple as Tuple};
 
     #[test]
     fn test_distinct_empty_input() {
-        let input = MockExecutor::new(vec![]);
+        let input = OldMockExecutor::new(vec![]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         assert!(distinct.next().unwrap().is_none());
@@ -14,7 +16,7 @@ mod tests {
 
     #[test]
     fn test_distinct_single_row() {
-        let input = MockExecutor::new(vec![Tuple { data: vec![42] }]);
+        let input = OldMockExecutor::new(vec![Tuple { data: vec![42] }]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         let result = distinct.next().unwrap().unwrap();
@@ -26,7 +28,7 @@ mod tests {
     #[test]
     fn test_distinct_two_identical_rows() {
         let input =
-            MockExecutor::new(vec![Tuple { data: vec![1, 2, 3] }, Tuple { data: vec![1, 2, 3] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3] }, Tuple { data: vec![1, 2, 3] }]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         assert!(distinct.next().unwrap().is_some());
@@ -36,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_distinct_many_duplicates() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![1] },
             Tuple { data: vec![1] },
@@ -51,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_distinct_all_unique() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
@@ -66,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_distinct_zero_values() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![0] },
             Tuple { data: vec![0] },
             Tuple { data: vec![1] },
@@ -79,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_distinct_max_values() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![255] },
             Tuple { data: vec![255] },
             Tuple { data: vec![254] },
@@ -96,7 +98,7 @@ mod tests {
         for i in 0..100 {
             tuples.push(Tuple { data: vec![(i % 10) as u8] });
         }
-        let input = MockExecutor::new(tuples);
+        let input = OldMockExecutor::new(tuples);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         assert_eq!(count_results(&mut distinct).unwrap(), 10);
@@ -105,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_distinct_alternating_pattern() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![1] },
@@ -120,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_distinct_consecutive_duplicates() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
@@ -136,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_distinct_wide_rows() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 2, 3, 4, 5] },
             Tuple { data: vec![1, 2, 3, 4, 5] },
             Tuple { data: vec![1, 2, 3, 4, 6] },
@@ -149,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_distinct_empty_rows() {
-        let input = MockExecutor::new(vec![Tuple { data: vec![] }, Tuple { data: vec![] }]);
+        let input = OldMockExecutor::new(vec![Tuple { data: vec![] }, Tuple { data: vec![] }]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         assert_eq!(count_results(&mut distinct).unwrap(), 1);
@@ -158,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_distinct_order_preservation() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![5] },
             Tuple { data: vec![3] },
             Tuple { data: vec![5] },
@@ -180,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_distinct_reopen() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },

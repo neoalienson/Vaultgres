@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 use std::collections::HashSet;
 
 pub struct Union {
@@ -53,11 +55,13 @@ impl SimpleExecutor for Union {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_union_basic() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
 
@@ -71,8 +75,8 @@ mod tests {
 
     #[test]
     fn test_union_removes_duplicates() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
 
@@ -86,8 +90,8 @@ mod tests {
 
     #[test]
     fn test_union_all_keeps_duplicates() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), true);
         union.open().unwrap();
 
@@ -101,8 +105,8 @@ mod tests {
 
     #[test]
     fn test_union_empty_left() {
-        let left = MockExecutor::new(vec![]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let left = OldMockExecutor::new(vec![]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
 
@@ -116,8 +120,8 @@ mod tests {
 
     #[test]
     fn test_union_empty_right() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
 
@@ -131,8 +135,8 @@ mod tests {
 
     #[test]
     fn test_union_empty_both() {
-        let left = MockExecutor::new(vec![]);
-        let right = MockExecutor::new(vec![]);
+        let left = OldMockExecutor::new(vec![]);
+        let right = OldMockExecutor::new(vec![]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
         assert!(union.next().unwrap().is_none());
@@ -141,8 +145,8 @@ mod tests {
 
     #[test]
     fn test_union_all_duplicates() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), true);
         union.open().unwrap();
 

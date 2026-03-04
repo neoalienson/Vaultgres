@@ -1,3 +1,4 @@
+use std::sync::Arc;
 #[test]
 fn test_subquery_with_avg_aggregate() {
     env_logger::builder().filter_level(log::LevelFilter::Trace).is_test(true).try_init().ok();
@@ -6,6 +7,7 @@ fn test_subquery_with_avg_aggregate() {
     use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
 
     // Create table
     catalog
@@ -47,7 +49,7 @@ fn test_subquery_with_avg_aggregate() {
     };
 
     // Query with subquery - AVG(price) = 200, so only price=300 should be returned
-    let result = catalog.select(
+    let result = Catalog::select_with_catalog(&catalog_arc, 
         "items",
         false,
         vec!["id".to_string(), "price".to_string()],

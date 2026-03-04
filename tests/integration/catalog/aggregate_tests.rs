@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use vaultgres::catalog::*;
 use vaultgres::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr};
 
 #[test]
 fn test_aggregate_count() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -13,10 +15,21 @@ fn test_aggregate_count() {
 
     let agg_expr = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Count,
-        arg: Box::new(Expr::Star),
+        arg: Box::new(Expr::Number(1)),
     };
-    let rows =
-        catalog.select("data", false, vec![agg_expr], None, None, None, None, None, None).unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![agg_expr],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], Value::Int(3));
 }
@@ -24,6 +37,7 @@ fn test_aggregate_count() {
 #[test]
 fn test_aggregate_sum() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -35,8 +49,19 @@ fn test_aggregate_sum() {
         func: vaultgres::parser::ast::AggregateFunc::Sum,
         arg: Box::new(Expr::Column("value".to_string())),
     };
-    let rows =
-        catalog.select("data", false, vec![agg_expr], None, None, None, None, None, None).unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![agg_expr],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], Value::Int(60));
 }
@@ -44,6 +69,7 @@ fn test_aggregate_sum() {
 #[test]
 fn test_aggregate_avg() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -55,8 +81,19 @@ fn test_aggregate_avg() {
         func: vaultgres::parser::ast::AggregateFunc::Avg,
         arg: Box::new(Expr::Column("value".to_string())),
     };
-    let rows =
-        catalog.select("data", false, vec![agg_expr], None, None, None, None, None, None).unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![agg_expr],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], Value::Int(20));
 }
@@ -64,6 +101,7 @@ fn test_aggregate_avg() {
 #[test]
 fn test_aggregate_min_max() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -75,24 +113,45 @@ fn test_aggregate_min_max() {
         func: vaultgres::parser::ast::AggregateFunc::Min,
         arg: Box::new(Expr::Column("value".to_string())),
     };
-    let rows = catalog
-        .select("data", false, vec![agg_expr_min], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![agg_expr_min],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows[0][0], Value::Int(10));
 
     let agg_expr_max = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Max,
         arg: Box::new(Expr::Column("value".to_string())),
     };
-    let rows = catalog
-        .select("data", false, vec![agg_expr_max], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![agg_expr_max],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows[0][0], Value::Int(50));
 }
 
 #[test]
 fn test_group_by() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("category".to_string(), DataType::Text),
         ColumnDef::new("value".to_string(), DataType::Int),
@@ -105,19 +164,19 @@ fn test_group_by() {
     catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(40)]).unwrap();
 
     let group_by = Some(vec![Expr::Column("category".to_string())]);
-    let rows = catalog
-        .select(
-            "data",
-            false,
-            vec![Expr::Column("category".to_string())],
-            None,
-            group_by,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![Expr::Column("category".to_string())],
+        None,
+        group_by,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
     assert_eq!(rows.len(), 2);
 }
@@ -125,6 +184,7 @@ fn test_group_by() {
 #[test]
 fn test_having_clause() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("category".to_string(), DataType::Text),
         ColumnDef::new("value".to_string(), DataType::Int),
@@ -143,18 +203,18 @@ fn test_having_clause() {
         right: Box::new(Expr::Number(1)),
     });
 
-    let rows = catalog
-        .select(
-            "data",
-            false,
-            vec![Expr::Column("category".to_string())],
-            None,
-            group_by,
-            having,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "data",
+        false,
+        vec![Expr::Column("category".to_string())],
+        None,
+        group_by,
+        having,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 3);
 }

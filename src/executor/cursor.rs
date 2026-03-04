@@ -1,4 +1,4 @@
-use super::{ExecutorError, Tuple};
+use super::operators::executor::{Executor, ExecutorError, Tuple};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -19,14 +19,12 @@ impl CursorManager {
     pub fn declare(
         &self,
         name: String,
-        mut executor: Box<dyn super::Executor>,
+        mut executor: Box<dyn Executor>,
     ) -> Result<(), ExecutorError> {
-        executor.open()?;
         let mut tuples = Vec::new();
         while let Some(tuple) = executor.next()? {
             tuples.push(tuple);
         }
-        executor.close()?;
         let cursor = Cursor { tuples, position: 0 };
         self.cursors.lock().unwrap().insert(name, cursor);
         Ok(())
@@ -135,11 +133,12 @@ impl Default for CursorManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::Value;
     use crate::executor::MockTupleExecutor;
 
     fn make_tuple(val: i64) -> Tuple {
         let mut map = HashMap::new();
-        map.insert("col".to_string(), val.to_string().into_bytes());
+        map.insert("col".to_string(), Value::Int(val));
         map
     }
 

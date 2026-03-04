@@ -1,7 +1,11 @@
+use std::sync::Arc;
 use vaultgres::catalog::*;
 use vaultgres::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
 
-fn setup_catalog_with_data(columns: Vec<(&str, DataType)>, data: Vec<Vec<Expr>>) -> Catalog {
+fn setup_catalog_with_data(
+    columns: Vec<(&str, DataType)>,
+    data: Vec<Vec<Expr>>,
+) -> (Catalog, Arc<Catalog>) {
     let catalog = Catalog::new();
     let cols: Vec<ColumnDef> =
         columns.iter().map(|(n, t)| ColumnDef::new(n.to_string(), t.clone())).collect();
@@ -9,22 +13,33 @@ fn setup_catalog_with_data(columns: Vec<(&str, DataType)>, data: Vec<Vec<Expr>>)
     for row in data {
         catalog.insert("data", row).unwrap();
     }
-    catalog
+    let catalog_arc = Arc::new(catalog.clone());
+    (catalog, catalog_arc)
 }
 
 fn binary_op(col: &str, op: BinaryOperator, value: Expr) -> Expr {
     Expr::BinaryOp { left: Box::new(Expr::Column(col.to_string())), op, right: Box::new(value) }
 }
 
-fn select_where(catalog: &Catalog, where_clause: Expr) -> Vec<Vec<Value>> {
-    catalog
-        .select("data", false, vec![Expr::Star], Some(where_clause), None, None, None, None, None)
-        .unwrap()
+fn select_where(catalog_arc: &Arc<Catalog>, where_clause: Expr) -> Vec<Vec<Value>> {
+    Catalog::select_with_catalog(
+        catalog_arc,
+        "data",
+        false,
+        vec![Expr::Star],
+        Some(where_clause),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap()
 }
 
 #[test]
 fn test_select_with_where() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("id", DataType::Int), ("value", DataType::Int)],
         vec![
             vec![Expr::Number(1), Expr::Number(100)],
@@ -33,7 +48,7 @@ fn test_select_with_where() {
         ],
     );
 
-    let rows = select_where(&catalog, binary_op("id", BinaryOperator::Equals, Expr::Number(2)));
+    let rows = select_where(&catalog_arc, binary_op("id", BinaryOperator::Equals, Expr::Number(2)));
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], Value::Int(2));
     assert_eq!(rows[0][1], Value::Int(200));
@@ -41,42 +56,45 @@ fn test_select_with_where() {
 
 #[test]
 fn test_select_with_not_equals() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("id", DataType::Int)],
         vec![vec![Expr::Number(1)], vec![Expr::Number(2)], vec![Expr::Number(3)]],
     );
 
-    let rows = select_where(&catalog, binary_op("id", BinaryOperator::NotEquals, Expr::Number(2)));
+    let rows =
+        select_where(&catalog_arc, binary_op("id", BinaryOperator::NotEquals, Expr::Number(2)));
     assert_eq!(rows.len(), 2);
 }
 
 #[test]
 fn test_select_with_less_than() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("value", DataType::Int)],
         vec![vec![Expr::Number(10)], vec![Expr::Number(20)], vec![Expr::Number(30)]],
     );
 
     let rows =
-        select_where(&catalog, binary_op("value", BinaryOperator::LessThan, Expr::Number(25)));
+        select_where(&catalog_arc, binary_op("value", BinaryOperator::LessThan, Expr::Number(25)));
     assert_eq!(rows.len(), 2);
 }
 
 #[test]
 fn test_select_with_greater_than() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("value", DataType::Int)],
         vec![vec![Expr::Number(10)], vec![Expr::Number(20)], vec![Expr::Number(30)]],
     );
 
-    let rows =
-        select_where(&catalog, binary_op("value", BinaryOperator::GreaterThan, Expr::Number(15)));
+    let rows = select_where(
+        &catalog_arc,
+        binary_op("value", BinaryOperator::GreaterThan, Expr::Number(15)),
+    );
     assert_eq!(rows.len(), 2);
 }
 
 #[test]
 fn test_where_with_and() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("id", DataType::Int), ("value", DataType::Int)],
         vec![
             vec![Expr::Number(1), Expr::Number(10)],
@@ -91,14 +109,14 @@ fn test_where_with_and() {
         right: Box::new(binary_op("value", BinaryOperator::LessThan, Expr::Number(30))),
     };
 
-    let rows = select_where(&catalog, where_clause);
+    let rows = select_where(&catalog_arc, where_clause);
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0][0], Value::Int(2));
 }
 
 #[test]
 fn test_where_with_or() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("id", DataType::Int)],
         vec![vec![Expr::Number(1)], vec![Expr::Number(2)], vec![Expr::Number(3)]],
     );
@@ -109,13 +127,13 @@ fn test_where_with_or() {
         right: Box::new(binary_op("id", BinaryOperator::Equals, Expr::Number(3))),
     };
 
-    let rows = select_where(&catalog, where_clause);
+    let rows = select_where(&catalog_arc, where_clause);
     assert_eq!(rows.len(), 2);
 }
 
 #[test]
 fn test_like_operator() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("name", DataType::Text)],
         vec![
             vec![Expr::String("hello world".to_string())],
@@ -125,7 +143,7 @@ fn test_like_operator() {
     );
 
     let rows = select_where(
-        &catalog,
+        &catalog_arc,
         binary_op("name", BinaryOperator::Like, Expr::String("%hello%".to_string())),
     );
     assert_eq!(rows.len(), 2);
@@ -133,7 +151,7 @@ fn test_like_operator() {
 
 #[test]
 fn test_in_operator() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("id", DataType::Int)],
         vec![
             vec![Expr::Number(1)],
@@ -144,7 +162,7 @@ fn test_in_operator() {
     );
 
     let rows = select_where(
-        &catalog,
+        &catalog_arc,
         binary_op("id", BinaryOperator::In, Expr::List(vec![Expr::Number(1), Expr::Number(3)])),
     );
     assert_eq!(rows.len(), 2);
@@ -152,7 +170,7 @@ fn test_in_operator() {
 
 #[test]
 fn test_between_operator() {
-    let catalog = setup_catalog_with_data(
+    let (catalog, catalog_arc) = setup_catalog_with_data(
         vec![("value", DataType::Int)],
         vec![
             vec![Expr::Number(5)],
@@ -162,13 +180,21 @@ fn test_between_operator() {
         ],
     );
 
-    let rows = select_where(
-        &catalog,
-        binary_op(
-            "value",
-            BinaryOperator::Between,
-            Expr::List(vec![Expr::Number(10), Expr::Number(30)]),
-        ),
-    );
+    // Use parser to create BETWEEN expression (which converts to AND of comparisons)
+    let where_clause = Expr::BinaryOp {
+        left: Box::new(Expr::BinaryOp {
+            left: Box::new(Expr::Column("value".to_string())),
+            op: BinaryOperator::GreaterThanOrEqual,
+            right: Box::new(Expr::Number(10)),
+        }),
+        op: BinaryOperator::And,
+        right: Box::new(Expr::BinaryOp {
+            left: Box::new(Expr::Column("value".to_string())),
+            op: BinaryOperator::LessThanOrEqual,
+            right: Box::new(Expr::Number(30)),
+        }),
+    };
+
+    let rows = select_where(&catalog_arc, where_clause);
     assert_eq!(rows.len(), 2);
 }

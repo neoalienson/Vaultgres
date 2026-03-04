@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 
 pub struct Sort {
     input: Box<dyn SimpleExecutor>,
@@ -52,10 +54,12 @@ impl SimpleExecutor for Sort {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_sort_basic() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![3] },
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
@@ -75,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_sort_empty() {
-        let input = MockExecutor::new(vec![]);
+        let input = OldMockExecutor::new(vec![]);
         let mut sort = Sort::new(Box::new(input));
         sort.open().unwrap();
         assert!(sort.next().unwrap().is_none());

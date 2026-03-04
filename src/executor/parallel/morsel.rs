@@ -1,4 +1,4 @@
-use crate::executor::executor::SimpleTuple;
+use crate::executor::old_executor::SimpleTuple;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Clone)]

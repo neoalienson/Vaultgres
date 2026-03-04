@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use vaultgres::catalog::Catalog;
 use vaultgres::executor::IndexOnlyScan;
 use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
@@ -5,6 +6,7 @@ use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 #[test]
 fn test_covering_index_two_columns() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("email".to_string(), DataType::Text),
@@ -24,25 +26,26 @@ fn test_covering_index_two_columns() {
         .unwrap();
 
     // Query only needs id and email, which are covered by index
-    let rows = catalog
-        .select(
-            "users",
-            false,
-            vec![Expr::Column("id".to_string()), Expr::Column("email".to_string())],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "users",
+        false,
+        vec![Expr::Column("id".to_string()), Expr::Column("email".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
 }
 
 #[test]
 fn test_covering_index_all_query_columns() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("category".to_string(), DataType::Text),
@@ -64,25 +67,26 @@ fn test_covering_index_all_query_columns() {
         .unwrap();
 
     // Index on (category, price) covers query for these columns
-    let rows = catalog
-        .select(
-            "products",
-            false,
-            vec![Expr::Column("category".to_string()), Expr::Column("price".to_string())],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "products",
+        false,
+        vec![Expr::Column("category".to_string()), Expr::Column("price".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
 }
 
 #[test]
 fn test_covering_index_with_where_clause() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("status".to_string(), DataType::Text),
@@ -101,19 +105,19 @@ fn test_covering_index_with_where_clause() {
         .unwrap();
 
     // Index on (status, priority) covers query
-    let rows = catalog
-        .select(
-            "tasks",
-            false,
-            vec![Expr::Column("status".to_string()), Expr::Column("priority".to_string())],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "tasks",
+        false,
+        vec![Expr::Column("status".to_string()), Expr::Column("priority".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 2);
 }
 
@@ -128,6 +132,7 @@ fn test_covering_index_scan_only() {
 #[test]
 fn test_covering_index_includes_all_needed() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("first_name".to_string(), DataType::Text),
@@ -149,25 +154,26 @@ fn test_covering_index_includes_all_needed() {
         .unwrap();
 
     // Index on (first_name, last_name, age) covers query
-    let rows = catalog
-        .select(
-            "people",
-            false,
-            vec![Expr::Column("first_name".to_string()), Expr::Column("last_name".to_string())],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "people",
+        false,
+        vec![Expr::Column("first_name".to_string()), Expr::Column("last_name".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
 }
 
 #[test]
 fn test_covering_index_order_by() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("name".to_string(), DataType::Text),
@@ -189,18 +195,18 @@ fn test_covering_index_order_by() {
         .unwrap();
 
     // Index on (name, created_at) covers query with ORDER BY
-    let rows = catalog
-        .select(
-            "items",
-            false,
-            vec![Expr::Column("name".to_string())],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "items",
+        false,
+        vec![Expr::Column("name".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 2);
 }

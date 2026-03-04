@@ -74,7 +74,8 @@ cargo test
 # Run specific test suite
 cargo test --lib
 cargo test --test integration_tests
-cargo test --test e2e_tests
+cargo test --test test_harness
+
 
 # Run tests with output
 cargo test -- --nocapture
@@ -82,8 +83,10 @@ cargo test -- --nocapture
 # Run tests in specific module
 cargo test storage::
 
-# Run end-to-end shell tests
-cd tests/e2e && ./test_all_sql.sh
+# Run end-to-end shell tests for pet store scenario
+cd tests/e2e && ./run_all.sh scenarios pet_store_comprehensive
+
+
 ```
 
 ### Benchmarking

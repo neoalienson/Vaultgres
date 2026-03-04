@@ -1,4 +1,6 @@
-use crate::executor::{ExecutorError, SimpleExecutor, SimpleTuple};
+use crate::executor::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple,
+};
 use std::collections::HashMap;
 
 pub struct CTE {
@@ -54,6 +56,8 @@ impl SimpleExecutor for CTE {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     struct MockExecutor {
         tuples: Vec<SimpleTuple>,
@@ -90,7 +94,7 @@ mod tests {
     #[test]
     fn test_cte_basic() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut cte = CTE::new(HashMap::new(), mock);
 
         cte.open().unwrap();
@@ -106,7 +110,7 @@ mod tests {
         cte_results.insert("temp".to_string(), vec![SimpleTuple { data: vec![10] }]);
 
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let cte = CTE::new(cte_results, mock);
 
         assert_eq!(cte.get_cte("temp").unwrap().len(), 1);
@@ -115,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_cte_empty() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut cte = CTE::new(HashMap::new(), mock);
 
         cte.open().unwrap();
@@ -126,7 +130,7 @@ mod tests {
     #[test]
     fn test_cte_multiple_opens() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut cte = CTE::new(HashMap::new(), mock);
 
         cte.open().unwrap();
@@ -140,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_cte_get_nonexistent() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let cte = CTE::new(HashMap::new(), mock);
 
         assert!(cte.get_cte("nonexistent").is_none());
@@ -152,7 +156,7 @@ mod tests {
         cte_results.insert("cte1".to_string(), vec![SimpleTuple { data: vec![1] }]);
         cte_results.insert("cte2".to_string(), vec![SimpleTuple { data: vec![2] }]);
 
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let cte = CTE::new(cte_results, mock);
 
         assert_eq!(cte.get_cte("cte1").unwrap()[0].data, vec![1]);
@@ -162,7 +166,7 @@ mod tests {
     #[test]
     fn test_cte_large_result() {
         let tuples: Vec<SimpleTuple> = (0..100).map(|i| SimpleTuple { data: vec![i] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut cte = CTE::new(HashMap::new(), mock);
 
         cte.open().unwrap();

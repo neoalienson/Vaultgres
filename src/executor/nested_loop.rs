@@ -1,4 +1,4 @@
-use super::executor::{Executor, ExecutorError, Tuple};
+use super::old_executor::{OldExecutor as Executor, OldExecutorError as ExecutorError, Tuple};
 
 pub struct NestedLoopJoin {
     left: Box<dyn Executor>,
@@ -52,6 +52,8 @@ impl Executor for NestedLoopJoin {
 
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use super::*;
     use std::collections::HashMap;
 
@@ -99,8 +101,8 @@ mod tests {
         let mut r2 = HashMap::new();
         r2.insert("right_id".to_string(), b"b".to_vec());
 
-        let left = MockExecutor::new(vec![l1, l2]);
-        let right = MockExecutor::new(vec![r1, r2]);
+        let left = OldMockExecutor::new(vec![l1, l2]);
+        let right = OldMockExecutor::new(vec![r1, r2]);
 
         let mut join = NestedLoopJoin::new(Box::new(left), Box::new(right));
         join.open().unwrap();

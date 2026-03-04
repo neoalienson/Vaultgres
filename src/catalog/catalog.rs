@@ -1,34 +1,34 @@
 use super::crud_helper::CrudHelper;
 use super::insert_validator::InsertValidator;
 use super::persistence::Persistence;
-use super::select_executor::SelectExecutor;
 use super::update_delete_executor::UpdateDeleteExecutor;
-use super::{Function, TableSchema, Tuple, Value};
+use super::{Function, TableSchema, Value};
 use crate::parser::ast::{
     ColumnDef, CreateIndexStmt, CreateTriggerStmt, Expr, ForeignKeyAction, ForeignKeyDef,
     OrderByExpr, SelectStmt,
 };
-use crate::transaction::{IsolationLevel, Transaction, TransactionManager, TupleHeader};
+use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
+#[derive(Clone)]
 pub struct Catalog {
-    tables: Arc<RwLock<HashMap<String, TableSchema>>>,
-    views: Arc<RwLock<HashMap<String, SelectStmt>>>,
-    materialized_views: Arc<RwLock<HashMap<String, (SelectStmt, Vec<Vec<Value>>)>>>,
-    triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
-    indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
-    functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
-    pub(crate) data: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
-    sequences: Arc<RwLock<HashMap<String, i64>>>,
-    active_txn: Arc<RwLock<Option<Transaction>>>,
-    savepoints: Arc<RwLock<HashMap<String, Vec<Tuple>>>>,
+    pub(crate) tables: Arc<RwLock<HashMap<String, TableSchema>>>,
+    pub(crate) views: Arc<RwLock<HashMap<String, SelectStmt>>>,
+    pub(crate) materialized_views: Arc<RwLock<HashMap<String, (SelectStmt, Vec<Vec<Value>>)>>>,
+    pub(crate) triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
+    pub(crate) indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
+    pub(crate) functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
+    pub(crate) data: Arc<RwLock<HashMap<String, Vec<crate::catalog::tuple::Tuple>>>>,
+    pub(crate) sequences: Arc<RwLock<HashMap<String, i64>>>,
+    pub(crate) active_txn: Arc<RwLock<Option<Transaction>>>,
+    pub(crate) savepoints: Arc<RwLock<HashMap<String, Vec<crate::catalog::tuple::Tuple>>>>,
     pub(crate) txn_mgr: Arc<TransactionManager>,
-    data_dir: Option<String>,
-    save_tx: Option<Sender<()>>,
+    pub(crate) data_dir: Option<String>,
+    pub(crate) save_tx: Option<Sender<()>>,
 }
 
 impl Catalog {
@@ -250,7 +250,7 @@ impl Catalog {
     }
 
     pub fn get_view(&self, name: &str) -> Option<SelectStmt> {
-        CrudHelper::get(&self.views, name)
+        self.views.read().unwrap().get(name).cloned()
     }
 
     pub fn create_materialized_view(&self, name: String, query: SelectStmt) -> Result<(), String> {
@@ -363,7 +363,7 @@ impl Catalog {
         }
 
         let txn = self.txn_mgr.begin();
-        let header = TupleHeader::new(txn.xid);
+        let header = crate::transaction::TupleHeader::new(txn.xid);
 
         let tuple_data: Result<Vec<Value>, String> = schema
             .columns
@@ -391,7 +391,8 @@ impl Catalog {
         InsertValidator::validate_unique(&schema, &tuple_data, table, &data, &self.txn_mgr)?;
         drop(data);
 
-        let tuple = Tuple { header, data: tuple_data, column_map: HashMap::new() };
+        let tuple =
+            crate::catalog::tuple::Tuple { header, data: tuple_data, column_map: HashMap::new() };
 
         let mut data = self.data.write().unwrap();
         data.get_mut(table).unwrap().push(tuple);
@@ -416,9 +417,9 @@ impl Catalog {
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
         let txn = self.txn_mgr.begin();
-        let header = TupleHeader::new(txn.xid);
+        let header = crate::transaction::TupleHeader::new(txn.xid);
 
-        let tuples: Result<Vec<Tuple>, String> = batch
+        let tuples: Result<Vec<crate::catalog::tuple::Tuple>, String> = batch
             .into_iter()
             .map(|values| {
                 if values.len() > schema.columns.len() {
@@ -438,7 +439,11 @@ impl Catalog {
                     })
                     .collect();
 
-                Ok(Tuple { header, data: tuple_data?, column_map: HashMap::new() })
+                Ok(crate::catalog::tuple::Tuple {
+                    header,
+                    data: tuple_data?,
+                    column_map: HashMap::new(),
+                })
             })
             .collect();
 
@@ -456,7 +461,7 @@ impl Catalog {
 
     pub fn select(
         &self,
-        table: &str,
+        table_name: &str,
         distinct: bool,
         columns: Vec<Expr>,
         where_clause: Option<Expr>,
@@ -466,26 +471,125 @@ impl Catalog {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<Vec<Vec<Value>>, String> {
-        let schema =
-            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
-        let data = self.data.read().unwrap();
-        let tuples = data.get(table).ok_or_else(|| format!("Table '{}' has no data", table))?;
-
-        SelectExecutor::execute_with_distinct(
-            self,
-            table,
+        // Build a SelectStmt from the parameters
+        let select_stmt = SelectStmt {
             distinct,
             columns,
+            from: table_name.to_string(),
+            table_alias: None,
+            joins: Vec::new(),
             where_clause,
             group_by,
             having,
             order_by,
             limit,
             offset,
-            tuples,
-            &schema,
-            &self.txn_mgr,
-        )
+        };
+
+        // Use the planner to build and execute the query plan
+        // Note: This creates a new planner without catalog for simple queries
+        // For queries with subqueries or views, use select_with_catalog
+        use crate::planner::planner::Planner;
+        let planner = Planner::new_without_catalog();
+        let mut plan = planner.plan(&select_stmt).map_err(|e| format!("{:?}", e))?;
+
+        // Collect results by calling next() on the plan
+        let mut rows: Vec<Vec<Value>> = Vec::new();
+        let mut output_column_names: Option<Vec<String>> = None;
+
+        loop {
+            match plan.next() {
+                Ok(Some(tuple_hashmap)) => {
+                    let mut row = Vec::new();
+
+                    // Determine column names from the first tuple
+                    // Use sorted keys to ensure consistent column order
+                    if output_column_names.is_none() {
+                        let mut keys: Vec<String> = tuple_hashmap.keys().cloned().collect();
+                        keys.sort();
+                        output_column_names = Some(keys);
+                    }
+
+                    // Collect values in the order of column names
+                    if let Some(ref col_names) = output_column_names {
+                        for col_name in col_names {
+                            row.push(tuple_hashmap.get(col_name).cloned().unwrap_or(Value::Null));
+                        }
+                    }
+                    rows.push(row);
+                }
+                Ok(None) => break, // End of data
+                Err(e) => return Err(format!("{:?}", e)),
+            }
+        }
+
+        Ok(rows)
+    }
+
+    /// Select with Arc<Catalog> for subquery and view support
+    pub fn select_with_catalog(
+        catalog_arc: &Arc<Catalog>,
+        table_name: &str,
+        distinct: bool,
+        columns: Vec<Expr>,
+        where_clause: Option<Expr>,
+        group_by: Option<Vec<Expr>>,
+        having: Option<Expr>,
+        order_by: Option<Vec<OrderByExpr>>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Vec<Value>>, String> {
+        // Build a SelectStmt from the parameters
+        let select_stmt = SelectStmt {
+            distinct,
+            columns,
+            from: table_name.to_string(),
+            table_alias: None,
+            joins: Vec::new(),
+            where_clause,
+            group_by,
+            having,
+            order_by,
+            limit,
+            offset,
+        };
+
+        // Use the planner to build and execute the query plan
+        use crate::planner::planner::Planner;
+        let planner = Planner::new_with_catalog(catalog_arc.clone());
+        let mut plan = planner.plan(&select_stmt).map_err(|e| format!("{:?}", e))?;
+
+        // Collect results by calling next() on the plan
+        let mut rows: Vec<Vec<Value>> = Vec::new();
+        let mut output_column_names: Option<Vec<String>> = None;
+
+        loop {
+            match plan.next() {
+                Ok(Some(tuple_hashmap)) => {
+                    let mut row = Vec::new();
+
+                    // Determine column names from the first tuple
+                    // Use sorted keys to ensure consistent column order
+                    if output_column_names.is_none() {
+                        let mut keys: Vec<String> = tuple_hashmap.keys().cloned().collect();
+                        keys.sort();
+                        output_column_names = Some(keys);
+                    }
+
+                    // Collect values in the order of column names
+                    if let Some(ref col_names) = output_column_names {
+                        for col_name in col_names {
+                            row.push(tuple_hashmap.get(col_name).cloned().unwrap_or(Value::Null));
+                        }
+                    }
+                    rows.push(row);
+                }
+                Ok(None) => break, // End of data
+                Err(e) => return Err(format!("{:?}", e)),
+            }
+        }
+
+        Ok(rows)
     }
 
     pub fn update(
@@ -602,7 +706,8 @@ impl Catalog {
         drop(active);
 
         let data = self.data.read().unwrap();
-        let snapshot: Vec<Tuple> = data.values().flat_map(|v| v.clone()).collect();
+        let snapshot: Vec<crate::catalog::tuple::Tuple> =
+            data.values().flat_map(|v| v.clone()).collect();
         self.savepoints.write().unwrap().insert(name, snapshot);
         Ok(())
     }

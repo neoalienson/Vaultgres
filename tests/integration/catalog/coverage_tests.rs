@@ -2,12 +2,14 @@
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use vaultgres::catalog::Catalog;
     use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 
     #[test]
     fn test_list_tables() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog.create_table("t1".to_string(), vec![]).unwrap();
         catalog.create_table("t2".to_string(), vec![]).unwrap();
         let tables = catalog.list_tables();
@@ -19,6 +21,7 @@ mod tests {
     #[test]
     fn test_row_count() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -30,12 +33,14 @@ mod tests {
     #[test]
     fn test_row_count_nonexistent() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         assert_eq!(catalog.row_count("nonexistent"), 0);
     }
 
     #[test]
     fn test_insert_type_mismatch() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -46,6 +51,7 @@ mod tests {
     #[test]
     fn test_insert_wrong_column_count() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -56,11 +62,13 @@ mod tests {
     #[test]
     fn test_select_nonexistent_column() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         catalog.insert("t", vec![Expr::Number(1)]).unwrap();
-        let result = catalog.select(
+        let result = Catalog::select_with_catalog(
+            &catalog_arc,
             "t",
             false,
             vec![Expr::Column("nonexistent".to_string())],
@@ -77,6 +85,7 @@ mod tests {
     #[test]
     fn test_update_nonexistent_column() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -88,6 +97,7 @@ mod tests {
     #[test]
     fn test_update_type_mismatch() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -106,6 +116,7 @@ mod tests {
     #[test]
     fn test_select_varchar_type() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "t".to_string(),
@@ -113,14 +124,25 @@ mod tests {
             )
             .unwrap();
         catalog.insert("t", vec![Expr::String("test".to_string())]).unwrap();
-        let result =
-            catalog.select("t", false, vec![Expr::Star], None, None, None, None, None, None);
+        let result = Catalog::select_with_catalog(
+            &catalog_arc,
+            "t",
+            false,
+            vec![Expr::Star],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_update_varchar_type() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "t".to_string(),
@@ -136,6 +158,7 @@ mod tests {
     #[test]
     fn test_insert_text_type() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
@@ -146,6 +169,7 @@ mod tests {
     #[test]
     fn test_update_text_type() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
@@ -158,6 +182,7 @@ mod tests {
     #[test]
     fn test_insert_invalid_expr() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
@@ -168,6 +193,7 @@ mod tests {
     #[test]
     fn test_update_invalid_expr() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();

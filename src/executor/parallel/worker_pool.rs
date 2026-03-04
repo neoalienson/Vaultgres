@@ -1,4 +1,4 @@
-use crate::executor::executor::ExecutorError;
+use crate::executor::old_executor::OldExecutorError as ExecutorError;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
 use crossbeam::channel::{bounded, Receiver, Sender};
@@ -99,7 +99,7 @@ impl Drop for WorkerPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::executor::executor::SimpleTuple;
+    use crate::executor::old_executor::SimpleTuple;
 
     struct TestOperator;
 

@@ -102,10 +102,19 @@ fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
         let lower = parse_primary(parser)?;
         parser.expect(Token::And)?;
         let upper = parse_primary(parser)?;
+        // Convert BETWEEN to: left >= lower AND left <= upper
         return Ok(Expr::BinaryOp {
-            left: Box::new(left.clone()),
-            op: BinaryOperator::Between,
-            right: Box::new(Expr::List(vec![lower, upper])),
+            left: Box::new(Expr::BinaryOp {
+                left: Box::new(left.clone()),
+                op: BinaryOperator::GreaterThanOrEqual,
+                right: Box::new(lower),
+            }),
+            op: BinaryOperator::And,
+            right: Box::new(Expr::BinaryOp {
+                left: Box::new(left),
+                op: BinaryOperator::LessThanOrEqual,
+                right: Box::new(upper),
+            }),
         });
     }
 

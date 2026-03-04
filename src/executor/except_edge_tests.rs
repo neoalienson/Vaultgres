@@ -1,16 +1,18 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::mock::MockExecutor;
     use crate::executor::{Except, SimpleExecutor, SimpleTuple as Tuple};
 
     #[test]
     fn test_except_single_difference() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
         ]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2] }, Tuple { data: vec![3] }]);
         let mut except = Except::new(Box::new(left), Box::new(right));
         except.open().unwrap();
 
@@ -22,12 +24,12 @@ mod tests {
 
     #[test]
     fn test_except_duplicates_in_left() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
         ]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2] }]);
         let mut except = Except::new(Box::new(left), Box::new(right));
         except.open().unwrap();
 
@@ -45,8 +47,8 @@ mod tests {
         for i in 0..100 {
             left_tuples.push(Tuple { data: vec![(i % 10) as u8] });
         }
-        let right = MockExecutor::new(vec![Tuple { data: vec![5] }]);
-        let mut except = Except::new(Box::new(MockExecutor::new(left_tuples)), Box::new(right));
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![5] }]);
+        let mut except = Except::new(Box::new(OldMockExecutor::new(left_tuples)), Box::new(right));
         except.open().unwrap();
 
         let mut count = 0;
@@ -59,11 +61,11 @@ mod tests {
 
     #[test]
     fn test_except_wide_tuples() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 2, 3, 4, 5] },
             Tuple { data: vec![6, 7, 8, 9, 10] },
         ]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
         let mut except = Except::new(Box::new(left), Box::new(right));
         except.open().unwrap();
 
@@ -75,8 +77,8 @@ mod tests {
 
     #[test]
     fn test_except_subset() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
@@ -89,12 +91,12 @@ mod tests {
 
     #[test]
     fn test_except_superset() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
         ]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
         let mut except = Except::new(Box::new(left), Box::new(right));
         except.open().unwrap();
 

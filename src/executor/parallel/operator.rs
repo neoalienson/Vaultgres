@@ -1,4 +1,4 @@
-use crate::executor::executor::ExecutorError;
+use crate::executor::old_executor::OldExecutorError as ExecutorError;
 use crate::executor::parallel::morsel::Morsel;
 
 pub trait ParallelOperator: Send + Sync {

@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 use std::collections::HashMap;
 
 pub struct HashJoin {
@@ -86,13 +88,15 @@ impl SimpleExecutor for HashJoin {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_hash_join_basic() {
         let build =
-            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![2, 20] }]);
         let probe =
-            MockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 100] }, Tuple { data: vec![2, 200] }]);
 
         let mut join = HashJoin::new(Box::new(build), Box::new(probe));
         join.open().unwrap();
@@ -108,8 +112,8 @@ mod tests {
 
     #[test]
     fn test_hash_join_no_match() {
-        let build = MockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
-        let probe = MockExecutor::new(vec![Tuple { data: vec![2, 20] }]);
+        let build = OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }]);
+        let probe = OldMockExecutor::new(vec![Tuple { data: vec![2, 20] }]);
 
         let mut join = HashJoin::new(Box::new(build), Box::new(probe));
         join.open().unwrap();

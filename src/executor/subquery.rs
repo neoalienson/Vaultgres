@@ -1,8 +1,7 @@
-use crate::executor::{SimpleExecutor, SimpleTuple};
+use crate::executor::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple,
+};
 use std::collections::HashSet;
-
-#[cfg(test)]
-use crate::executor::ExecutorError;
 
 pub struct Subquery {
     input: Box<dyn SimpleExecutor>,
@@ -44,19 +43,17 @@ impl Subquery {
 }
 
 impl SimpleExecutor for Subquery {
-    fn open(&mut self) -> Result<(), crate::executor::ExecutorError> {
+    fn open(&mut self) -> Result<(), ExecutorError> {
         self.input.open()?;
         self.position = 0;
         Ok(())
     }
 
-    fn next(
-        &mut self,
-    ) -> Result<Option<crate::executor::SimpleTuple>, crate::executor::ExecutorError> {
+    fn next(&mut self) -> Result<Option<crate::executor::SimpleTuple>, ExecutorError> {
         self.input.next()
     }
 
-    fn close(&mut self) -> Result<(), crate::executor::ExecutorError> {
+    fn close(&mut self) -> Result<(), ExecutorError> {
         self.input.close()
     }
 }
@@ -64,6 +61,8 @@ impl SimpleExecutor for Subquery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     struct MockExecutor {
         tuples: Vec<SimpleTuple>,
@@ -100,7 +99,7 @@ mod tests {
     #[test]
     fn test_subquery_scalar() {
         let tuples = vec![SimpleTuple { data: vec![42] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut subquery = Subquery::new(mock);
 
         let result = subquery.execute_scalar();
@@ -109,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_subquery_scalar_empty() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut subquery = Subquery::new(mock);
 
         let result = subquery.execute_scalar();
@@ -123,7 +122,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut subquery = Subquery::new(mock);
 
         let result = subquery.execute_set();
@@ -140,7 +139,7 @@ mod tests {
             SimpleTuple { data: vec![1] },
             SimpleTuple { data: vec![2] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut subquery = Subquery::new(mock);
 
         let result = subquery.execute_set();
@@ -149,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_subquery_set_empty() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut subquery = Subquery::new(mock);
 
         let result = subquery.execute_set();
@@ -159,7 +158,7 @@ mod tests {
     #[test]
     fn test_subquery_caching() {
         let tuples = vec![SimpleTuple { data: vec![10] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut subquery = Subquery::new(mock);
 
         let result1 = subquery.execute_scalar();
@@ -170,7 +169,7 @@ mod tests {
     #[test]
     fn test_subquery_iterator() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut subquery = Subquery::new(mock);
 
         subquery.open().unwrap();

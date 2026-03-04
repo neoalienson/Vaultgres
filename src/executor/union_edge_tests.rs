@@ -1,12 +1,14 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::test_helpers::{count_results, MockExecutor};
     use crate::executor::{SimpleExecutor, SimpleTuple as Tuple, Union};
 
     #[test]
     fn test_union_single_row_each() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![2] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![2] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 2);
@@ -15,8 +17,8 @@ mod tests {
 
     #[test]
     fn test_union_all_same_values() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 1);
@@ -25,8 +27,8 @@ mod tests {
 
     #[test]
     fn test_union_all_with_all_same() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![1] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), true);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 4);
@@ -39,9 +41,9 @@ mod tests {
         for i in 0..100 {
             left_tuples.push(Tuple { data: vec![(i % 10) as u8] });
         }
-        let right = MockExecutor::new(vec![Tuple { data: vec![5] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![5] }]);
         let mut union =
-            Union::new(Box::new(MockExecutor::new(left_tuples)), Box::new(right), false);
+            Union::new(Box::new(OldMockExecutor::new(left_tuples)), Box::new(right), false);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 10);
         union.close().unwrap();
@@ -58,8 +60,8 @@ mod tests {
             right_tuples.push(Tuple { data: vec![(i % 10) as u8] });
         }
         let mut union = Union::new(
-            Box::new(MockExecutor::new(left_tuples)),
-            Box::new(MockExecutor::new(right_tuples)),
+            Box::new(OldMockExecutor::new(left_tuples)),
+            Box::new(OldMockExecutor::new(right_tuples)),
             true,
         );
         union.open().unwrap();
@@ -69,8 +71,8 @@ mod tests {
 
     #[test]
     fn test_union_wide_tuples() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 1);
@@ -79,8 +81,8 @@ mod tests {
 
     #[test]
     fn test_union_all_wide_tuples() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3, 4, 5] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), true);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 2);
@@ -89,12 +91,12 @@ mod tests {
 
     #[test]
     fn test_union_partial_overlap() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
         ]);
-        let right = MockExecutor::new(vec![
+        let right = OldMockExecutor::new(vec![
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
             Tuple { data: vec![4] },
@@ -107,12 +109,12 @@ mod tests {
 
     #[test]
     fn test_union_all_partial_overlap() {
-        let left = MockExecutor::new(vec![
+        let left = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
         ]);
-        let right = MockExecutor::new(vec![
+        let right = OldMockExecutor::new(vec![
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
             Tuple { data: vec![4] },
@@ -125,8 +127,8 @@ mod tests {
 
     #[test]
     fn test_union_no_overlap() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), false);
         union.open().unwrap();
         assert_eq!(count_results(&mut union).unwrap(), 4);
@@ -135,8 +137,8 @@ mod tests {
 
     #[test]
     fn test_union_preserves_order() {
-        let left = MockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
-        let right = MockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
+        let left = OldMockExecutor::new(vec![Tuple { data: vec![1] }, Tuple { data: vec![2] }]);
+        let right = OldMockExecutor::new(vec![Tuple { data: vec![3] }, Tuple { data: vec![4] }]);
         let mut union = Union::new(Box::new(left), Box::new(right), true);
         union.open().unwrap();
 

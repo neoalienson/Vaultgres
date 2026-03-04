@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::case::Case;
     use crate::executor::{ExecutorError, SimpleExecutor, SimpleTuple};
 
@@ -37,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_case_zero_rows() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let evaluator = Box::new(|_: &SimpleTuple| vec![0]);
         let mut case = Case::new(mock, evaluator);
 
@@ -49,7 +51,7 @@ mod tests {
     #[test]
     fn test_case_one_row() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![99]);
         let mut case = Case::new(mock, evaluator);
 
@@ -67,7 +69,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![42]);
         let mut case = Case::new(mock, evaluator);
 
@@ -86,7 +88,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|t: &SimpleTuple| vec![t.data[0] * 10]);
         let mut case = Case::new(mock, evaluator);
 
@@ -100,7 +102,7 @@ mod tests {
     #[test]
     fn test_case_boundary_values() {
         let tuples = vec![SimpleTuple { data: vec![0] }, SimpleTuple { data: vec![255] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|t: &SimpleTuple| vec![t.data[0]]);
         let mut case = Case::new(mock, evaluator);
 
@@ -117,7 +119,7 @@ mod tests {
             SimpleTuple { data: vec![50] },
             SimpleTuple { data: vec![100] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|t: &SimpleTuple| {
             if t.data[0] < 10 {
                 vec![1]
@@ -139,7 +141,7 @@ mod tests {
     #[test]
     fn test_case_large_result_values() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![255; 100]);
         let mut case = Case::new(mock, evaluator);
 
@@ -152,7 +154,7 @@ mod tests {
     #[test]
     fn test_case_empty_input_data() {
         let tuples = vec![SimpleTuple { data: vec![] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![1]);
         let mut case = Case::new(mock, evaluator);
 
@@ -166,7 +168,7 @@ mod tests {
     fn test_case_many_rows() {
         let tuples: Vec<SimpleTuple> =
             (0..1000).map(|i| SimpleTuple { data: vec![i as u8] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|t: &SimpleTuple| if t.data[0] < 128 { vec![0] } else { vec![1] });
         let mut case = Case::new(mock, evaluator);
 
@@ -182,7 +184,7 @@ mod tests {
     #[test]
     fn test_case_reopen_multiple_times() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![5]);
         let mut case = Case::new(mock, evaluator);
 
@@ -201,7 +203,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![0]);
         let mut case = Case::new(mock, evaluator);
 
@@ -217,7 +219,7 @@ mod tests {
     #[test]
     fn test_case_complex_evaluation() {
         let tuples = vec![SimpleTuple { data: vec![10, 20] }, SimpleTuple { data: vec![30, 40] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator =
             Box::new(
                 |t: &SimpleTuple| {
@@ -239,7 +241,7 @@ mod tests {
     #[test]
     fn test_case_zero_result() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let evaluator = Box::new(|_: &SimpleTuple| vec![0]);
         let mut case = Case::new(mock, evaluator);
 

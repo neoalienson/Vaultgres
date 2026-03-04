@@ -1,12 +1,14 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::test_helpers::{count_results, MockExecutor};
     use crate::executor::window::{Window, WindowFunction};
     use crate::executor::{SimpleExecutor, SimpleTuple};
 
     #[test]
     fn test_row_number_zero_rows() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -17,7 +19,7 @@ mod tests {
     #[test]
     fn test_row_number_one_row() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -31,7 +33,7 @@ mod tests {
     fn test_row_number_many_rows() {
         let tuples: Vec<SimpleTuple> =
             (0..1000).map(|i| SimpleTuple { data: vec![i as u8] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -44,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_rank_empty() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut window = Window::new(mock, WindowFunction::Rank);
 
         window.open().unwrap();
@@ -55,7 +57,7 @@ mod tests {
     #[test]
     fn test_rank_single() {
         let tuples = vec![SimpleTuple { data: vec![10] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Rank);
 
         window.open().unwrap();
@@ -66,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_dense_rank_empty() {
-        let mock = Box::new(MockExecutor::new(vec![]));
+        let mock = Box::new(OldMockExecutor::new(vec![]));
         let mut window = Window::new(mock, WindowFunction::DenseRank);
 
         window.open().unwrap();
@@ -81,7 +83,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::DenseRank);
 
         window.open().unwrap();
@@ -95,7 +97,7 @@ mod tests {
     #[test]
     fn test_window_reopen_multiple_times() {
         let tuples = vec![SimpleTuple { data: vec![1] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         for _ in 0..5 {
@@ -109,7 +111,7 @@ mod tests {
     #[test]
     fn test_window_large_data_values() {
         let tuples = vec![SimpleTuple { data: vec![255; 1000] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -121,7 +123,7 @@ mod tests {
     #[test]
     fn test_window_empty_data() {
         let tuples = vec![SimpleTuple { data: vec![] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -135,7 +137,7 @@ mod tests {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
 
         for func in [WindowFunction::RowNumber, WindowFunction::Rank, WindowFunction::DenseRank] {
-            let mock = Box::new(MockExecutor::new(tuples.clone()));
+            let mock = Box::new(OldMockExecutor::new(tuples.clone()));
             let mut window = Window::new(mock, func);
 
             window.open().unwrap();
@@ -150,7 +152,7 @@ mod tests {
     #[test]
     fn test_window_max_rows() {
         let tuples: Vec<SimpleTuple> = (0..10000).map(|_| SimpleTuple { data: vec![1] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -165,7 +167,7 @@ mod tests {
             SimpleTuple { data: vec![2] },
             SimpleTuple { data: vec![3] },
         ];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::RowNumber);
 
         window.open().unwrap();
@@ -181,7 +183,7 @@ mod tests {
     #[test]
     fn test_lag_single_row() {
         let tuples = vec![SimpleTuple { data: vec![42] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lag);
 
         window.open().unwrap();
@@ -193,7 +195,7 @@ mod tests {
     #[test]
     fn test_lead_single_row() {
         let tuples = vec![SimpleTuple { data: vec![42] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lead);
 
         window.open().unwrap();
@@ -205,7 +207,7 @@ mod tests {
     #[test]
     fn test_lag_offset_zero() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lag).with_offset(0);
 
         window.open().unwrap();
@@ -219,7 +221,7 @@ mod tests {
     #[test]
     fn test_lead_offset_zero() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lead).with_offset(0);
 
         window.open().unwrap();
@@ -233,7 +235,7 @@ mod tests {
     #[test]
     fn test_lag_large_offset() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lag).with_offset(100);
 
         window.open().unwrap();
@@ -247,7 +249,7 @@ mod tests {
     #[test]
     fn test_lead_large_offset() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lead).with_offset(100);
 
         window.open().unwrap();
@@ -261,7 +263,7 @@ mod tests {
     #[test]
     fn test_lag_many_rows() {
         let tuples: Vec<SimpleTuple> = (0..100).map(|i| SimpleTuple { data: vec![i] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lag);
 
         window.open().unwrap();
@@ -278,7 +280,7 @@ mod tests {
     #[test]
     fn test_lead_many_rows() {
         let tuples: Vec<SimpleTuple> = (0..100).map(|i| SimpleTuple { data: vec![i] }).collect();
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lead);
 
         window.open().unwrap();
@@ -296,13 +298,13 @@ mod tests {
     fn test_lag_lead_alternating() {
         let tuples = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
 
-        let mock1 = Box::new(MockExecutor::new(tuples.clone()));
+        let mock1 = Box::new(OldMockExecutor::new(tuples.clone()));
         let mut lag = Window::new(mock1, WindowFunction::Lag);
         lag.open().unwrap();
         lag.next().unwrap();
         lag.close().unwrap();
 
-        let mock2 = Box::new(MockExecutor::new(tuples));
+        let mock2 = Box::new(OldMockExecutor::new(tuples));
         let mut lead = Window::new(mock2, WindowFunction::Lead);
         lead.open().unwrap();
         lead.next().unwrap();
@@ -312,7 +314,7 @@ mod tests {
     #[test]
     fn test_lag_with_empty_data() {
         let tuples = vec![SimpleTuple { data: vec![] }, SimpleTuple { data: vec![] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lag);
 
         window.open().unwrap();
@@ -327,7 +329,7 @@ mod tests {
     #[test]
     fn test_lead_with_empty_data() {
         let tuples = vec![SimpleTuple { data: vec![] }, SimpleTuple { data: vec![] }];
-        let mock = Box::new(MockExecutor::new(tuples));
+        let mock = Box::new(OldMockExecutor::new(tuples));
         let mut window = Window::new(mock, WindowFunction::Lead);
 
         window.open().unwrap();

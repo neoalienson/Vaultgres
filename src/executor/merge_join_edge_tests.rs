@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use crate::executor::merge_join::MergeJoin;
     use crate::executor::test_helpers::{count_results, MockExecutor};
     use crate::executor::{SimpleExecutor, SimpleTuple};
@@ -7,8 +9,8 @@ mod tests {
     #[test]
     fn test_merge_join_both_empty() {
         let mut join = MergeJoin::new(
-            Box::new(MockExecutor::new(vec![])),
-            Box::new(MockExecutor::new(vec![])),
+            Box::new(OldMockExecutor::new(vec![])),
+            Box::new(OldMockExecutor::new(vec![])),
         );
 
         join.open().unwrap();
@@ -22,7 +24,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![50] }];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(join.next().unwrap().unwrap().data, vec![50, 50]);
@@ -36,7 +38,7 @@ mod tests {
         let right: Vec<SimpleTuple> = (0..100).map(|i| SimpleTuple { data: vec![i] }).collect();
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(join.next().unwrap().unwrap().data, vec![50, 50]);
@@ -50,7 +52,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![1] }];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 10);
@@ -63,7 +65,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![1] }; 10];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 10);
@@ -76,7 +78,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![1] }; 5];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 25);
@@ -89,7 +91,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![3] }, SimpleTuple { data: vec![4] }];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert!(join.next().unwrap().is_none());
@@ -102,7 +104,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert!(join.next().unwrap().is_none());
@@ -123,7 +125,7 @@ mod tests {
         ];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(join.next().unwrap().unwrap().data, vec![3, 3]);
@@ -146,7 +148,7 @@ mod tests {
         ];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 5);
@@ -163,7 +165,7 @@ mod tests {
         ];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 3);
@@ -176,7 +178,7 @@ mod tests {
         let right: Vec<SimpleTuple> = (0..100).map(|i| SimpleTuple { data: vec![i] }).collect();
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert_eq!(count_results(&mut join).unwrap(), 100);
@@ -189,7 +191,7 @@ mod tests {
         let right = vec![SimpleTuple { data: vec![] }];
 
         let mut join =
-            MergeJoin::new(Box::new(MockExecutor::new(left)), Box::new(MockExecutor::new(right)));
+            MergeJoin::new(Box::new(OldMockExecutor::new(left)), Box::new(OldMockExecutor::new(right)));
 
         join.open().unwrap();
         assert!(join.next().unwrap().is_some());

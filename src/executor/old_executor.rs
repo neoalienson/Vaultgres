@@ -1,3 +1,8 @@
+//! Old executor model (legacy)
+//!
+//! This module contains the old executor model with open()/next()/close() methods.
+//! New code should use the new Executor trait from `operators::executor`.
+
 use std::collections::HashMap;
 
 pub type Value = Vec<u8>;
@@ -8,20 +13,14 @@ pub struct SimpleTuple {
     pub data: Vec<u8>,
 }
 
-pub trait SimpleExecutor: Send {
-    fn open(&mut self) -> Result<(), ExecutorError>;
-    fn next(&mut self) -> Result<Option<SimpleTuple>, ExecutorError>;
-    fn close(&mut self) -> Result<(), ExecutorError>;
-}
-
-pub trait Executor: Send {
-    fn open(&mut self) -> Result<(), ExecutorError>;
-    fn next(&mut self) -> Result<Option<Tuple>, ExecutorError>;
-    fn close(&mut self) -> Result<(), ExecutorError>;
+pub trait OldExecutor: Send {
+    fn open(&mut self) -> Result<(), OldExecutorError>;
+    fn next(&mut self) -> Result<Option<SimpleTuple>, OldExecutorError>;
+    fn close(&mut self) -> Result<(), OldExecutorError>;
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ExecutorError {
+pub enum OldExecutorError {
     #[error("Storage error: {0}")]
     Storage(String),
     #[error("Column not found: {0}")]

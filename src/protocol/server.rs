@@ -34,7 +34,7 @@ impl Server {
 
     pub fn shutdown(&self) -> Result<(), String> {
         log::info!("💾 Saving catalog to disk...");
-        self.catalog.save_to_disk(&self.data_dir)?;
+        (&*self.catalog).save_to_disk(&self.data_dir)?;
         log::info!("✅ Catalog saved successfully");
         Ok(())
     }

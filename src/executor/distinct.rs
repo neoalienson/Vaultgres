@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 use std::collections::HashSet;
 
 pub struct Distinct {
@@ -36,10 +38,12 @@ impl SimpleExecutor for Distinct {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_distinct_basic() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 2] },
             Tuple { data: vec![1, 2] },
             Tuple { data: vec![3, 4] },
@@ -57,7 +61,7 @@ mod tests {
 
     #[test]
     fn test_distinct_empty_input() {
-        let input = MockExecutor::new(vec![]);
+        let input = OldMockExecutor::new(vec![]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
         assert!(distinct.next().unwrap().is_none());
@@ -66,7 +70,7 @@ mod tests {
 
     #[test]
     fn test_distinct_all_unique() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1] },
             Tuple { data: vec![2] },
             Tuple { data: vec![3] },
@@ -84,7 +88,7 @@ mod tests {
 
     #[test]
     fn test_distinct_all_duplicates() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 2] },
             Tuple { data: vec![1, 2] },
             Tuple { data: vec![1, 2] },
@@ -100,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_distinct_single_row() {
-        let input = MockExecutor::new(vec![Tuple { data: vec![1, 2, 3] }]);
+        let input = OldMockExecutor::new(vec![Tuple { data: vec![1, 2, 3] }]);
         let mut distinct = Distinct::new(Box::new(input));
         distinct.open().unwrap();
 
@@ -112,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_distinct_multiple_columns() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 2, 3] },
             Tuple { data: vec![1, 2, 4] },
             Tuple { data: vec![1, 2, 3] },
@@ -130,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_distinct_preserves_order() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![3] },
             Tuple { data: vec![1] },
             Tuple { data: vec![3] },

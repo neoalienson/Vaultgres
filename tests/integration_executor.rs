@@ -1,57 +1,268 @@
-// Integration tests for executor operators
-use vaultgres::executor::{
-    Except, Intersect, Join, JoinType, MockExecutor, SimpleExecutor, SimpleTuple, Union,
+// Integration tests for executor operators using the high-level catalog API
+// These tests verify the new Volcano-style executor model works correctly
+
+use vaultgres::catalog::{Catalog, Value};
+use vaultgres::parser::ast::{
+    AggregateFunc, BinaryOperator, ColumnDef, DataType, Expr, OrderByExpr,
 };
 
 #[test]
-fn test_join_execution() {
-    let left = MockExecutor::new(vec![SimpleTuple { data: vec![1] }]);
-    let right = MockExecutor::new(vec![SimpleTuple { data: vec![1] }]);
-    let mut join = Join::new(
-        Box::new(left),
-        Box::new(right),
-        JoinType::Inner,
-        Box::new(|l, r| l.data[0] == r.data[0]),
-    );
-    join.open().unwrap();
-    assert!(join.next().unwrap().is_some());
-    join.close().unwrap();
+fn test_filter_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
+    ];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1), Expr::Number(10)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2), Expr::Number(20)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(3), Expr::Number(30)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let where_clause = Some(Expr::BinaryOp {
+        left: Box::new(Expr::Column("id".to_string())),
+        op: BinaryOperator::GreaterThan,
+        right: Box::new(Expr::Number(1)),
+    });
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Star],
+        where_clause,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 2); // id > 1 should return 2 rows
 }
 
 #[test]
-fn test_union_execution() {
-    let left = MockExecutor::new(vec![SimpleTuple { data: vec![1] }]);
-    let right = MockExecutor::new(vec![SimpleTuple { data: vec![2] }]);
-    let mut union = Union::new(Box::new(left), Box::new(right), false);
-    union.open().unwrap();
-    let mut count = 0;
-    while union.next().unwrap().is_some() {
-        count += 1;
-    }
-    assert_eq!(count, 2);
-    union.close().unwrap();
+fn test_limit_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(3)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        Some(2),
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 2);
 }
 
 #[test]
-fn test_intersect_execution() {
-    let left =
-        MockExecutor::new(vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }]);
-    let right = MockExecutor::new(vec![SimpleTuple { data: vec![2] }]);
-    let mut intersect = Intersect::new(Box::new(left), Box::new(right));
-    intersect.open().unwrap();
-    let result = intersect.next().unwrap().unwrap();
-    assert_eq!(result.data[0], 2);
-    intersect.close().unwrap();
+fn test_project_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("name".to_string(), DataType::Text),
+    ];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Column("name".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].len(), 1); // Only name column
 }
 
 #[test]
-fn test_except_execution() {
-    let left =
-        MockExecutor::new(vec![SimpleTuple { data: vec![1] }, SimpleTuple { data: vec![2] }]);
-    let right = MockExecutor::new(vec![SimpleTuple { data: vec![2] }]);
-    let mut except = Except::new(Box::new(left), Box::new(right));
-    except.open().unwrap();
-    let result = except.next().unwrap().unwrap();
-    assert_eq!(result.data[0], 1);
-    except.close().unwrap();
+fn test_distinct_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        true, // distinct
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 2); // Should have 2 distinct values
+}
+
+#[test]
+fn test_sort_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(3)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: true }]);
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        order_by,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0][0], Value::Int(1));
+    assert_eq!(rows[1][0], Value::Int(2));
+    assert_eq!(rows[2][0], Value::Int(3));
+}
+
+#[test]
+fn test_aggregate_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(10)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(20)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(30)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let agg_exprs = vec![Expr::Aggregate {
+        func: AggregateFunc::Sum,
+        arg: Box::new(Expr::Column("value".to_string())),
+    }];
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        agg_exprs,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0][0], Value::Int(60));
+}
+
+#[test]
+fn test_seq_scan_through_catalog() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 2);
+}
+
+#[test]
+fn test_combined_operators() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("value".to_string(), DataType::Int),
+    ];
+    catalog.create_table("test".to_string(), columns).unwrap();
+    catalog.insert("test", vec![Expr::Number(1), Expr::Number(10)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(2), Expr::Number(20)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(3), Expr::Number(30)]).unwrap();
+    catalog.insert("test", vec![Expr::Number(4), Expr::Number(40)]).unwrap();
+
+    let catalog_arc = std::sync::Arc::new(catalog.clone());
+
+    // Filter: value > 15, Order by id DESC, Limit 2
+    let where_clause = Some(Expr::BinaryOp {
+        left: Box::new(Expr::Column("value".to_string())),
+        op: BinaryOperator::GreaterThan,
+        right: Box::new(Expr::Number(15)),
+    });
+
+    let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: false }]);
+
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "test",
+        false,
+        vec![Expr::Star],
+        where_clause,
+        None,
+        None,
+        order_by,
+        Some(2),
+        None,
+    )
+    .unwrap();
+
+    // Should return id=4 and id=3 (value > 15, ordered by id DESC, limited to 2)
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0][0], Value::Int(4));
+    assert_eq!(rows[1][0], Value::Int(3));
 }

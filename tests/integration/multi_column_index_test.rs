@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use vaultgres::catalog::Catalog;
 use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 
 #[test]
 fn test_multi_column_index_two_columns() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("first_name".to_string(), DataType::Text),
@@ -32,15 +34,26 @@ fn test_multi_column_index_two_columns() {
         )
         .unwrap();
 
-    let rows = catalog
-        .select("users", false, vec![Expr::Star], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "users",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 2);
 }
 
 #[test]
 fn test_multi_column_index_three_columns() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("country".to_string(), DataType::Text),
@@ -61,15 +74,26 @@ fn test_multi_column_index_three_columns() {
         )
         .unwrap();
 
-    let rows = catalog
-        .select("locations", false, vec![Expr::Star], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "locations",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
 }
 
 #[test]
 fn test_multi_column_index_ordering() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("category".to_string(), DataType::Text),
@@ -96,15 +120,26 @@ fn test_multi_column_index_ordering() {
         )
         .unwrap();
 
-    let rows = catalog
-        .select("products", false, vec![Expr::Star], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "products",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 3);
 }
 
 #[test]
 fn test_multi_column_unique_index() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("email".to_string(), DataType::Text),
@@ -123,8 +158,18 @@ fn test_multi_column_unique_index() {
         )
         .unwrap();
 
-    let rows = catalog
-        .select("accounts", false, vec![Expr::Star], None, None, None, None, None, None)
-        .unwrap();
+    let rows = Catalog::select_with_catalog(
+        &catalog_arc,
+        "accounts",
+        false,
+        vec![Expr::Star],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
 }

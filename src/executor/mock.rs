@@ -1,4 +1,5 @@
-use super::{Executor, ExecutorError, SimpleExecutor, SimpleTuple, Tuple};
+use super::old_executor::{OldExecutor, OldExecutorError, SimpleTuple};
+use super::operators::executor::{Executor, ExecutorError, Tuple};
 
 pub struct MockExecutor {
     tuples: Vec<SimpleTuple>,
@@ -11,12 +12,12 @@ impl MockExecutor {
     }
 }
 
-impl SimpleExecutor for MockExecutor {
-    fn open(&mut self) -> Result<(), ExecutorError> {
+impl OldExecutor for MockExecutor {
+    fn open(&mut self) -> Result<(), OldExecutorError> {
         Ok(())
     }
 
-    fn next(&mut self) -> Result<Option<SimpleTuple>, ExecutorError> {
+    fn next(&mut self) -> Result<Option<SimpleTuple>, OldExecutorError> {
         if self.index < self.tuples.len() {
             let tuple = self.tuples[self.index].clone();
             self.index += 1;
@@ -26,7 +27,7 @@ impl SimpleExecutor for MockExecutor {
         }
     }
 
-    fn close(&mut self) -> Result<(), ExecutorError> {
+    fn close(&mut self) -> Result<(), OldExecutorError> {
         Ok(())
     }
 }
@@ -43,11 +44,6 @@ impl MockTupleExecutor {
 }
 
 impl Executor for MockTupleExecutor {
-    fn open(&mut self) -> Result<(), ExecutorError> {
-        self.index = 0;
-        Ok(())
-    }
-
     fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
         if self.index < self.tuples.len() {
             let tuple = self.tuples[self.index].clone();
@@ -56,9 +52,5 @@ impl Executor for MockTupleExecutor {
         } else {
             Ok(None)
         }
-    }
-
-    fn close(&mut self) -> Result<(), ExecutorError> {
-        Ok(())
     }
 }

@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use vaultgres::catalog::Catalog;
     use vaultgres::parser::ast::*;
 
     #[test]
     fn test_multi_statement_transaction_commit() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -30,6 +32,7 @@ mod tests {
     #[test]
     fn test_multi_statement_transaction_rollback() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -51,6 +54,7 @@ mod tests {
     #[test]
     fn test_multi_statement_mixed_operations() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -94,6 +98,7 @@ mod tests {
     #[test]
     fn test_multi_statement_with_savepoint() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -122,6 +127,7 @@ mod tests {
     #[test]
     fn test_multi_statement_isolation() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -136,8 +142,18 @@ mod tests {
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
 
-        let result =
-            catalog.select("users", false, vec![Expr::Star], None, None, None, None, None, None);
+        let result = Catalog::select_with_catalog(
+            &catalog_arc,
+            "users",
+            false,
+            vec![Expr::Star],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 2);
 
@@ -147,6 +163,7 @@ mod tests {
     #[test]
     fn test_multi_statement_error_handling() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -170,6 +187,7 @@ mod tests {
     #[test]
     fn test_sequential_multi_statement_transactions() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),
@@ -198,6 +216,7 @@ mod tests {
     #[test]
     fn test_multi_statement_large_transaction() {
         let catalog = Catalog::new();
+        let catalog_arc = Arc::new(catalog.clone());
         catalog
             .create_table(
                 "users".to_string(),

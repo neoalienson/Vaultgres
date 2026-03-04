@@ -1,5 +1,6 @@
 use super::{TableSchema, Value};
 use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
+use std::collections::HashMap;
 
 pub struct PredicateEvaluator;
 
@@ -279,6 +280,61 @@ impl PredicateEvaluator {
         Self::evaluate_expr_with_subquery(expr, tuple, schema, &|_| {
             Err("Subquery evaluation not supported in this context".to_string())
         })
+    }
+
+    pub fn evaluate_tuple_map(
+        expr: &Expr,
+        tuple_map: &HashMap<String, Value>,
+        schema: &TableSchema,
+    ) -> Result<bool, String> {
+        // This is a simplified implementation.
+        // It's similar to evaluate_with_subquery but uses a HashMap for tuple access.
+        // For now, subquery_eval and in_subquery_eval are not supported in this context.
+        match expr {
+            Expr::BinaryOp { left, op, right } => {
+                let left_val = Self::evaluate_expr_tuple_map(left, tuple_map, schema)?;
+                let right_val = Self::evaluate_expr_tuple_map(right, tuple_map, schema)?;
+                Self::compare_values(&left_val, op, &right_val)
+            }
+            Expr::UnaryOp { op, expr } => match op {
+                UnaryOperator::Not => {
+                    let result = Self::evaluate_tuple_map(expr, tuple_map, schema)?;
+                    Ok(!result)
+                }
+                _ => Err("Unsupported unary operator".to_string()),
+            },
+            Expr::IsNull(expr) => {
+                let val = Self::evaluate_expr_tuple_map(expr, tuple_map, schema)?;
+                Ok(matches!(val, Value::Null))
+            }
+            Expr::IsNotNull(expr) => {
+                let val = Self::evaluate_expr_tuple_map(expr, tuple_map, schema)?;
+                Ok(!matches!(val, Value::Null))
+            }
+            _ => Err("Unsupported predicate expression for tuple_map".to_string()),
+        }
+    }
+
+    fn evaluate_expr_tuple_map(
+        expr: &Expr,
+        tuple_map: &HashMap<String, Value>,
+        schema: &TableSchema,
+    ) -> Result<Value, String> {
+        match expr {
+            Expr::Column(name) => tuple_map
+                .get(name)
+                .cloned()
+                .ok_or_else(|| format!("Column '{}' not found in tuple map", name)),
+            Expr::QualifiedColumn { table: _, column } => tuple_map
+                .get(column)
+                .cloned()
+                .ok_or_else(|| format!("Column '{}' not found in tuple map", column)),
+            Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::String(s) => Ok(Value::Text(s.clone())),
+            _ => {
+                Err("Unsupported expression type in predicate evaluation for tuple_map".to_string())
+            }
+        }
     }
 
     pub fn evaluate_having(expr: &Expr, row: &[Value]) -> Result<bool, String> {

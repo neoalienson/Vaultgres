@@ -1,55 +1,32 @@
-//! Edge case tests for query executor
+//! Edge case tests for query executor - Updated for new Executor trait
 
 #[cfg(test)]
 mod tests {
     use crate::executor::*;
+    use crate::catalog::Value;
     use std::collections::HashMap;
 
     struct EmptyExecutor;
 
     impl Executor for EmptyExecutor {
-        fn open(&mut self) -> Result<(), ExecutorError> {
-            Ok(())
-        }
-
         fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
             Ok(None)
-        }
-
-        fn close(&mut self) -> Result<(), ExecutorError> {
-            Ok(())
         }
     }
 
     struct ErrorExecutor;
 
     impl Executor for ErrorExecutor {
-        fn open(&mut self) -> Result<(), ExecutorError> {
-            Err(ExecutorError::Storage("Open failed".to_string()))
-        }
-
         fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
             Err(ExecutorError::Storage("Next failed".to_string()))
-        }
-
-        fn close(&mut self) -> Result<(), ExecutorError> {
-            Ok(())
         }
     }
 
     #[test]
     fn test_empty_executor() {
         let mut exec = EmptyExecutor;
-        exec.open().unwrap();
         let result = exec.next().unwrap();
         assert!(result.is_none());
-        exec.close().unwrap();
-    }
-
-    #[test]
-    fn test_executor_open_error() {
-        let mut exec = ErrorExecutor;
-        assert!(exec.open().is_err());
     }
 
     #[test]
@@ -67,21 +44,19 @@ mod tests {
     #[test]
     fn test_tuple_with_empty_values() {
         let mut tuple: Tuple = HashMap::new();
-        tuple.insert("col1".to_string(), vec![]);
-        assert_eq!(tuple.get("col1").unwrap().len(), 0);
+        tuple.insert("col1".to_string(), Value::Text(String::new()));
+        assert!(matches!(tuple.get("col1").unwrap(), Value::Text(s) if s.is_empty()));
     }
 
     #[test]
     fn test_tuple_with_large_values() {
         let mut tuple: Tuple = HashMap::new();
-        tuple.insert("col1".to_string(), vec![0u8; 1_000_000]);
-        assert_eq!(tuple.get("col1").unwrap().len(), 1_000_000);
-    }
-
-    #[test]
-    fn test_simple_tuple_empty() {
-        let tuple = SimpleTuple { data: vec![] };
-        assert_eq!(tuple.data.len(), 0);
+        tuple.insert("col1".to_string(), Value::Text("x".repeat(1_000_000)));
+        if let Value::Text(s) = tuple.get("col1").unwrap() {
+            assert_eq!(s.len(), 1_000_000);
+        } else {
+            panic!("Expected Text value");
+        }
     }
 
     #[test]
@@ -109,14 +84,5 @@ mod tests {
     fn test_tuple_column_access_nonexistent() {
         let tuple: Tuple = HashMap::new();
         assert!(tuple.get("nonexistent").is_none());
-    }
-
-    #[test]
-    fn test_multiple_close_calls() {
-        let mut exec = EmptyExecutor;
-        exec.open().unwrap();
-        exec.close().unwrap();
-        exec.close().unwrap();
-        exec.close().unwrap();
     }
 }

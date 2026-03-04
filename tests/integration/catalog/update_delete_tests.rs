@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use vaultgres::catalog::*;
 use vaultgres::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
 
 #[test]
 fn test_update() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("value".to_string(), DataType::Int),
@@ -21,6 +23,7 @@ fn test_update() {
 #[test]
 fn test_update_nonexistent_table() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let result = catalog.update("nonexistent", vec![("col".to_string(), Expr::Number(1))], None);
     assert!(result.is_err());
 }
@@ -28,6 +31,7 @@ fn test_update_nonexistent_table() {
 #[test]
 fn test_update_with_where() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![
         ColumnDef::new("id".to_string(), DataType::Int),
         ColumnDef::new("value".to_string(), DataType::Int),
@@ -52,6 +56,7 @@ fn test_update_with_where() {
 #[test]
 fn test_delete() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
@@ -66,6 +71,7 @@ fn test_delete() {
 #[test]
 fn test_delete_empty_table() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("empty".to_string(), columns).unwrap();
@@ -76,6 +82,7 @@ fn test_delete_empty_table() {
 #[test]
 fn test_delete_with_where() {
     let catalog = Catalog::new();
+    let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();

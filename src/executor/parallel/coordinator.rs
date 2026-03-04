@@ -1,4 +1,4 @@
-use crate::executor::executor::{ExecutorError, SimpleTuple};
+use crate::executor::old_executor::{OldExecutorError as ExecutorError, SimpleTuple};
 use crate::executor::parallel::morsel::{Morsel, MorselGenerator};
 use crate::executor::parallel::operator::ParallelOperator;
 use crate::executor::parallel::worker_pool::WorkerPool;

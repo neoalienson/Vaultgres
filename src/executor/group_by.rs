@@ -1,4 +1,6 @@
-use super::{ExecutorError, SimpleExecutor, SimpleTuple as Tuple};
+use super::old_executor::{
+    OldExecutor as SimpleExecutor, OldExecutorError as ExecutorError, SimpleTuple as Tuple,
+};
 use std::collections::HashMap;
 
 pub struct GroupBy {
@@ -87,10 +89,12 @@ impl SimpleExecutor for GroupBy {
 mod tests {
     use super::*;
     use crate::executor::mock::MockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
+    use crate::executor::test_helpers::OldMockExecutor;
 
     #[test]
     fn test_group_by_single_column() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![1, 20] },
             Tuple { data: vec![2, 30] },
@@ -109,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_group_by_multiple_columns() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 1, 10] },
             Tuple { data: vec![1, 1, 20] },
             Tuple { data: vec![1, 2, 30] },
@@ -129,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_group_by_empty_input() {
-        let input = MockExecutor::new(vec![]);
+        let input = OldMockExecutor::new(vec![]);
         let mut group_by = GroupBy::new(Box::new(input), vec![0], vec![1]);
         group_by.open().unwrap();
 
@@ -139,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_group_by_single_group() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![1, 20] },
             Tuple { data: vec![1, 30] },
@@ -159,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_group_by_all_different_groups() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10] },
             Tuple { data: vec![2, 20] },
             Tuple { data: vec![3, 30] },
@@ -179,7 +183,7 @@ mod tests {
     #[test]
     fn test_group_by_reopen() {
         let input =
-            MockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![1, 20] }]);
+            OldMockExecutor::new(vec![Tuple { data: vec![1, 10] }, Tuple { data: vec![1, 20] }]);
         let mut group_by = GroupBy::new(Box::new(input), vec![0], vec![1]);
         group_by.open().unwrap();
 
@@ -192,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_group_by_multiple_aggregates() {
-        let input = MockExecutor::new(vec![
+        let input = OldMockExecutor::new(vec![
             Tuple { data: vec![1, 10, 5] },
             Tuple { data: vec![1, 20, 3] },
             Tuple { data: vec![2, 30, 7] },

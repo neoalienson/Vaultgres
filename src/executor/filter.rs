@@ -1,4 +1,4 @@
-use super::executor::{Executor, ExecutorError, Tuple};
+use super::old_executor::{OldExecutor as Executor, OldExecutorError as ExecutorError, Tuple};
 use crate::parser::Expr;
 
 pub struct Filter {
@@ -81,6 +81,8 @@ impl Executor for Filter {
 
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use super::*;
     use crate::parser::Expr;
     use std::collections::HashMap;
@@ -124,7 +126,7 @@ mod tests {
         let mut t2 = HashMap::new();
         t2.insert("id".to_string(), b"2".to_vec());
 
-        let mock = MockExecutor::new(vec![t1, t2]);
+        let mock = OldMockExecutor::new(vec![t1, t2]);
         let predicate = Expr::BinaryOp {
             left: Box::new(Expr::Column("id".to_string())),
             op: crate::parser::BinaryOperator::Equals,

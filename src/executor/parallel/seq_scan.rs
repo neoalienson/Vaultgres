@@ -1,5 +1,5 @@
 use crate::catalog::Catalog;
-use crate::executor::executor::{ExecutorError, SimpleTuple};
+use crate::executor::old_executor::{OldExecutorError as ExecutorError, SimpleTuple};
 use crate::executor::parallel::config::ParallelConfig;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
@@ -18,7 +18,7 @@ impl ParallelSeqScan {
     }
 
     pub fn execute(&self, config: &ParallelConfig) -> Result<Vec<SimpleTuple>, ExecutorError> {
-        let row_count = self.catalog.row_count(&self.table_name);
+        let row_count = (&*self.catalog).row_count(&self.table_name);
         if row_count == 0 {
             return Ok(vec![]);
         }
@@ -65,7 +65,7 @@ struct SeqScanOperator {
 
 impl ParallelOperator for SeqScanOperator {
     fn process_morsel(&self, mut morsel: Morsel) -> Result<Morsel, ExecutorError> {
-        let row_count = self.catalog.row_count(&self.table_name);
+        let row_count = (&*self.catalog).row_count(&self.table_name);
         morsel.tuples.extend(
             (morsel.start_offset..morsel.end_offset.min(row_count))
                 .map(|i| SimpleTuple { data: vec![i as u8] }),
@@ -76,7 +76,7 @@ impl ParallelOperator for SeqScanOperator {
 
 impl ParallelOperator for ParallelSeqScan {
     fn process_morsel(&self, mut morsel: Morsel) -> Result<Morsel, ExecutorError> {
-        let row_count = self.catalog.row_count(&self.table_name);
+        let row_count = (&*self.catalog).row_count(&self.table_name);
         morsel.tuples.extend(
             (morsel.start_offset..morsel.end_offset.min(row_count))
                 .map(|i| SimpleTuple { data: vec![i as u8] }),
@@ -93,12 +93,12 @@ mod tests {
     #[test]
     fn test_parallel_seq_scan() {
         let catalog = Arc::new(Catalog::new());
-        catalog
+        (&*catalog)
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..10 {
-            catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -123,12 +123,12 @@ mod tests {
     #[test]
     fn test_parallel_execute_with_workers() {
         let catalog = Arc::new(Catalog::new());
-        catalog
+        (&*catalog)
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..100 {
-            catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -151,12 +151,12 @@ mod tests {
     #[test]
     fn test_parallel_execute_single_worker() {
         let catalog = Arc::new(Catalog::new());
-        catalog
+        (&*catalog)
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..50 {
-            catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -168,12 +168,12 @@ mod tests {
     #[test]
     fn test_parallel_execute_many_workers() {
         let catalog = Arc::new(Catalog::new());
-        catalog
+        (&*catalog)
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..200 {
-            catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -185,12 +185,12 @@ mod tests {
     #[test]
     fn test_parallel_execute_more_workers_than_rows() {
         let catalog = Arc::new(Catalog::new());
-        catalog
+        (&*catalog)
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
         for i in 0..5 {
-            catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);

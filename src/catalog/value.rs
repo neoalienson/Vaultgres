@@ -15,6 +15,25 @@ pub enum Value {
     Null,
 }
 
+impl Value {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::Int(i) => i.to_le_bytes().to_vec(),
+            Value::Float(f) => f.to_le_bytes().to_vec(),
+            Value::Bool(b) => vec![*b as u8],
+            Value::Text(s) => s.as_bytes().to_vec(),
+            Value::Array(_) => b"ARRAY".to_vec(), // Placeholder
+            Value::Json(_) => b"JSON".to_vec(),   // Placeholder
+            Value::Date(d) => d.to_le_bytes().to_vec(),
+            Value::Time(t) => t.to_le_bytes().to_vec(),
+            Value::Timestamp(ts) => ts.to_le_bytes().to_vec(),
+            Value::Decimal(_, _) => b"DECIMAL".to_vec(), // Placeholder
+            Value::Bytea(b) => b.clone(),
+            Value::Null => vec![],
+        }
+    }
+}
+
 impl Eq for Value {}
 
 impl PartialOrd for Value {
@@ -81,6 +100,25 @@ impl std::hash::Hash for Value {
             }
             Value::Bytea(b) => b.hash(state),
             Value::Null => 0.hash(state),
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Float(fl) => write!(f, "{}", fl),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Text(s) => write!(f, "{}", s),
+            Value::Array(_) => write!(f, "ARRAY"), // TODO: Proper array display
+            Value::Json(j) => write!(f, "{}", j),
+            Value::Date(d) => write!(f, "{}", d), // TODO: Proper date display
+            Value::Time(t) => write!(f, "{}", t), // TODO: Proper time display
+            Value::Timestamp(ts) => write!(f, "{}", ts), // TODO: Proper timestamp display
+            Value::Decimal(v, s) => write!(f, "{}.{}", v, s), // TODO: Proper decimal display
+            Value::Bytea(_) => write!(f, "BYTEA"), // TODO: Proper bytea display
+            Value::Null => write!(f, "NULL"),
         }
     }
 }

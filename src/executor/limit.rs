@@ -1,4 +1,4 @@
-use super::executor::{Executor, ExecutorError, Tuple};
+use super::old_executor::{OldExecutor as Executor, OldExecutorError as ExecutorError, Tuple};
 
 pub struct Limit {
     input: Box<dyn Executor>,

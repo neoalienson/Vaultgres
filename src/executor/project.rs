@@ -56,6 +56,8 @@ impl Executor for Project {
 
 #[cfg(test)]
 mod tests {
+    use crate::executor::test_helpers::OldMockExecutor;
+    use crate::executor::old_executor::SimpleTuple;
     use super::*;
     use crate::parser::ast::{BinaryOperator, Expr};
     use std::collections::HashMap;
@@ -98,7 +100,7 @@ mod tests {
         tuple.insert("id".to_string(), b"1".to_vec());
         tuple.insert("name".to_string(), b"test".to_vec());
 
-        let mock = MockExecutor::new(vec![tuple]);
+        let mock = OldMockExecutor::new(vec![tuple]);
         let mut project = Project::new(Box::new(mock), vec![Expr::Column("id".to_string())]);
 
         project.open().unwrap();
@@ -115,7 +117,7 @@ mod tests {
         tuple.insert("id".to_string(), b"1".to_vec());
         tuple.insert("name".to_string(), b"test".to_vec());
 
-        let mock = MockExecutor::new(vec![tuple.clone()]);
+        let mock = OldMockExecutor::new(vec![tuple.clone()]);
         let mut project = Project::new(Box::new(mock), vec![Expr::Star]);
 
         project.open().unwrap();
