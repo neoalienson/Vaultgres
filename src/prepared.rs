@@ -39,13 +39,11 @@ mod tests {
     use super::*;
     use crate::parser::ast::{Expr, SelectStmt};
 
-    #[test]
-    fn test_prepare_and_get() {
-        let manager = PreparedStatementManager::new();
-        let stmt = Statement::Select(SelectStmt {
+    fn create_test_stmt(table: &str) -> Statement {
+        Statement::Select(SelectStmt {
             distinct: false,
             columns: vec![Expr::Star],
-            from: "users".to_string(),
+            from: table.to_string(),
             table_alias: None,
             joins: vec![],
             where_clause: None,
@@ -54,8 +52,13 @@ mod tests {
             order_by: None,
             limit: None,
             offset: None,
-        });
+        })
+    }
 
+    #[test]
+    fn test_prepare_and_get() {
+        let manager = PreparedStatementManager::new();
+        let stmt = create_test_stmt("users");
         manager.prepare("test".to_string(), stmt.clone());
         let retrieved = manager.get("test");
         assert!(retrieved.is_some());
@@ -71,20 +74,7 @@ mod tests {
     #[test]
     fn test_deallocate() {
         let manager = PreparedStatementManager::new();
-        let stmt = Statement::Select(SelectStmt {
-            distinct: false,
-            columns: vec![Expr::Star],
-            from: "users".to_string(),
-            table_alias: None,
-            joins: vec![],
-            where_clause: None,
-            group_by: None,
-            having: None,
-            order_by: None,
-            limit: None,
-            offset: None,
-        });
-
+        let stmt = create_test_stmt("users");
         manager.prepare("test".to_string(), stmt);
         assert!(manager.deallocate("test"));
         assert!(manager.get("test").is_none());
@@ -99,20 +89,7 @@ mod tests {
     #[test]
     fn test_clear() {
         let manager = PreparedStatementManager::new();
-        let stmt = Statement::Select(SelectStmt {
-            distinct: false,
-            columns: vec![Expr::Star],
-            from: "users".to_string(),
-            table_alias: None,
-            joins: vec![],
-            where_clause: None,
-            group_by: None,
-            having: None,
-            order_by: None,
-            limit: None,
-            offset: None,
-        });
-
+        let stmt = create_test_stmt("users");
         manager.prepare("test1".to_string(), stmt.clone());
         manager.prepare("test2".to_string(), stmt);
         manager.clear();
@@ -123,36 +100,10 @@ mod tests {
     #[test]
     fn test_multiple_statements() {
         let manager = PreparedStatementManager::new();
-        let stmt1 = Statement::Select(SelectStmt {
-            distinct: false,
-            columns: vec![Expr::Star],
-            from: "users".to_string(),
-            table_alias: None,
-            joins: vec![],
-            where_clause: None,
-            group_by: None,
-            having: None,
-            order_by: None,
-            limit: None,
-            offset: None,
-        });
-        let stmt2 = Statement::Select(SelectStmt {
-            distinct: false,
-            columns: vec![Expr::Star],
-            from: "orders".to_string(),
-            table_alias: None,
-            joins: vec![],
-            where_clause: None,
-            group_by: None,
-            having: None,
-            order_by: None,
-            limit: None,
-            offset: None,
-        });
-
+        let stmt1 = create_test_stmt("users");
+        let stmt2 = create_test_stmt("orders");
         manager.prepare("stmt1".to_string(), stmt1.clone());
         manager.prepare("stmt2".to_string(), stmt2.clone());
-
         assert_eq!(manager.get("stmt1").unwrap(), stmt1);
         assert_eq!(manager.get("stmt2").unwrap(), stmt2);
     }

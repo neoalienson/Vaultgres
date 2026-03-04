@@ -278,84 +278,49 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
     }
 }
 
-fn parse_drop_table(parser: &mut Parser) -> Result<Statement> {
-    parser.expect(Token::Table)?;
-
-    let if_exists = if parser.current_token() == &Token::If {
+fn parse_if_exists(parser: &mut Parser) -> Result<bool> {
+    Ok(if parser.current_token() == &Token::If {
         parser.advance();
         parser.expect(Token::Exists)?;
         true
     } else {
         false
-    };
+    })
+}
 
+fn parse_drop_table(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Table)?;
+    let if_exists = parse_if_exists(parser)?;
     let table = parser.expect_identifier()?;
-
     Ok(Statement::DropTable(DropTableStmt { table, if_exists }))
 }
 
 fn parse_drop_view(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::View)?;
-
-    let if_exists = if parser.current_token() == &Token::If {
-        parser.advance();
-        parser.expect(Token::Exists)?;
-        true
-    } else {
-        false
-    };
-
+    let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
-
     Ok(Statement::DropView(DropViewStmt { name, if_exists }))
 }
 
 fn parse_drop_materialized_view(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Materialized)?;
     parser.expect(Token::View)?;
-
-    let if_exists = if parser.current_token() == &Token::If {
-        parser.advance();
-        parser.expect(Token::Exists)?;
-        true
-    } else {
-        false
-    };
-
+    let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
-
     Ok(Statement::DropMaterializedView(DropMaterializedViewStmt { name, if_exists }))
 }
 
 fn parse_drop_trigger(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Trigger)?;
-
-    let if_exists = if parser.current_token() == &Token::If {
-        parser.advance();
-        parser.expect(Token::Exists)?;
-        true
-    } else {
-        false
-    };
-
+    let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
-
     Ok(Statement::DropTrigger(DropTriggerStmt { name, if_exists }))
 }
 
 fn parse_drop_index(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Index)?;
-
-    let if_exists = if parser.current_token() == &Token::If {
-        parser.advance();
-        parser.expect(Token::Exists)?;
-        true
-    } else {
-        false
-    };
-
+    let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
-
     Ok(Statement::DropIndex(DropIndexStmt { name, if_exists }))
 }
 
@@ -759,17 +724,8 @@ fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
 
 fn parse_drop_function(parser: &mut Parser) -> Result<Statement> {
     parser.advance(); // FUNCTION or PROCEDURE
-
-    let if_exists = if parser.current_token() == &Token::If {
-        parser.advance();
-        parser.expect(Token::Exists)?;
-        true
-    } else {
-        false
-    };
-
+    let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
-
     Ok(Statement::DropFunction(DropFunctionStmt { name, if_exists }))
 }
 
