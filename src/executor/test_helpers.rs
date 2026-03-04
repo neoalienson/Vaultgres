@@ -39,3 +39,26 @@ pub fn count_results<E: SimpleExecutor>(executor: &mut E) -> Result<usize, Execu
     }
     Ok(count)
 }
+
+pub fn run_executor<E: SimpleExecutor>(
+    executor: &mut E,
+) -> Result<Vec<SimpleTuple>, ExecutorError> {
+    let mut results = Vec::new();
+    executor.open()?;
+    while let Some(tuple) = executor.next()? {
+        results.push(tuple);
+    }
+    executor.close()?;
+    Ok(results)
+}
+
+pub fn test_executor_lifecycle<E: SimpleExecutor>(
+    executor: &mut E,
+    expected_count: usize,
+) -> Result<(), ExecutorError> {
+    executor.open()?;
+    let count = count_results(executor)?;
+    assert_eq!(count, expected_count);
+    executor.close()?;
+    Ok(())
+}
