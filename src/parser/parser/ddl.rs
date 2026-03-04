@@ -4,12 +4,23 @@ use crate::parser::ast::{
     CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
     CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
     DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
-    DropViewStmt, FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
-    FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, Statement,
-    TriggerEvent, TriggerFor, TriggerTiming,
+    DropViewStmt, Expr, FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef,
+    ForeignKeyRef, FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode,
+    Statement, TriggerEvent, TriggerFor, TriggerTiming,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
+
+enum TableElement {
+    Column(ColumnDef),
+    PrimaryKey(Vec<String>),
+    ForeignKey(ForeignKeyDef),
+}
+
+enum IndexColumn {
+    Name(String),
+    Expr(Expr),
+}
 
 pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Create)?;
@@ -70,6 +81,14 @@ fn parse_foreign_key_constraint(parser: &mut Parser) -> Result<ForeignKeyDef> {
     })
 }
 
+fn parse_table_element(parser: &mut Parser) -> Result<TableElement> {
+    match parser.current_token() {
+        Token::Primary => Ok(TableElement::PrimaryKey(parse_primary_key_constraint(parser)?)),
+        Token::Foreign => Ok(TableElement::ForeignKey(parse_foreign_key_constraint(parser)?)),
+        _ => Ok(TableElement::Column(parse_column_def(parser)?)),
+    }
+}
+
 fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Table)?;
     let table = parser.expect_identifier()?;
@@ -80,14 +99,11 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     let mut foreign_keys = Vec::new();
 
     loop {
-        if parser.current_token() == &Token::Primary {
-            primary_key = Some(parse_primary_key_constraint(parser)?);
-        } else if parser.current_token() == &Token::Foreign {
-            foreign_keys.push(parse_foreign_key_constraint(parser)?);
-        } else {
-            columns.push(parse_column_def(parser)?);
+        match parse_table_element(parser)? {
+            TableElement::Column(col) => columns.push(col),
+            TableElement::PrimaryKey(pk) => primary_key = Some(pk),
+            TableElement::ForeignKey(fk) => foreign_keys.push(fk),
         }
-
         if parser.current_token() != &Token::Comma {
             break;
         }
@@ -95,7 +111,6 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     }
 
     parser.expect(Token::RightParen)?;
-
     Ok(Statement::CreateTable(CreateTableStmt {
         table,
         columns,
@@ -207,27 +222,29 @@ fn parse_create_trigger(parser: &mut Parser) -> Result<Statement> {
     }))
 }
 
+fn parse_index_column(parser: &mut Parser) -> Result<IndexColumn> {
+    if matches!(parser.current_token(), Token::Identifier(_)) {
+        Ok(IndexColumn::Name(parser.expect_identifier()?))
+    } else {
+        Ok(IndexColumn::Expr(super::expr::parse_expr(parser)?))
+    }
+}
+
 fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
     parser.expect(Token::Index)?;
-
     let name = parser.expect_identifier()?;
-
     parser.expect(Token::On)?;
     let table = parser.expect_identifier()?;
-
     parser.expect(Token::LeftParen)?;
 
     let mut columns = Vec::new();
     let mut expressions = Vec::new();
 
     loop {
-        if matches!(parser.current_token(), Token::Identifier(_)) {
-            let col = parser.expect_identifier()?;
-            columns.push(col);
-        } else {
-            expressions.push(super::expr::parse_expr(parser)?);
+        match parse_index_column(parser)? {
+            IndexColumn::Name(col) => columns.push(col),
+            IndexColumn::Expr(expr) => expressions.push(expr),
         }
-
         if parser.current_token() != &Token::Comma {
             break;
         }
@@ -235,7 +252,6 @@ fn parse_create_index(parser: &mut Parser, unique: bool) -> Result<Statement> {
     }
 
     parser.expect(Token::RightParen)?;
-
     let where_clause = if parser.current_token() == &Token::Where {
         parser.advance();
         Some(super::expr::parse_expr(parser)?)
@@ -332,55 +348,56 @@ fn parse_column_defs(parser: &mut Parser) -> Result<Vec<ColumnDef>> {
     Ok(columns)
 }
 
+fn parse_column_constraint(parser: &mut Parser, col_def: &mut ColumnDef) -> Result<()> {
+    match parser.current_token() {
+        Token::AutoIncrement => {
+            parser.advance();
+            col_def.is_auto_increment = true;
+        }
+        Token::Primary => {
+            parser.advance();
+            parser.expect(Token::Key)?;
+            col_def.is_primary_key = true;
+        }
+        Token::Default => {
+            parser.advance();
+            col_def.default_value = Some(super::expr::parse_expr(parser)?);
+        }
+        Token::References => {
+            parser.advance();
+            let ref_table = parser.expect_identifier()?;
+            parser.expect(Token::LeftParen)?;
+            let ref_column = parser.expect_identifier()?;
+            parser.expect(Token::RightParen)?;
+            col_def.foreign_key = Some(ForeignKeyRef { table: ref_table, column: ref_column });
+        }
+        _ => return Ok(()),
+    }
+    Ok(())
+}
+
 fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
     let name = parser.expect_identifier()?;
     let data_type = parse_data_type(parser)?;
-
-    let mut is_primary_key = false;
-    let is_unique = false;
-    let mut is_auto_increment = data_type == DataType::Serial;
-    let mut default_value = None;
-    let mut foreign_key = None;
-
-    // Check for AUTO_INCREMENT
-    if parser.current_token() == &Token::AutoIncrement {
-        parser.advance();
-        is_auto_increment = true;
-    }
-
-    // Check for column-level PRIMARY KEY
-    if parser.current_token() == &Token::Primary {
-        parser.advance();
-        parser.expect(Token::Key)?;
-        is_primary_key = true;
-    }
-
-    // Check for DEFAULT
-    if parser.current_token() == &Token::Default {
-        parser.advance();
-        default_value = Some(super::expr::parse_expr(parser)?);
-    }
-
-    // Check for column-level REFERENCES
-    if parser.current_token() == &Token::References {
-        parser.advance();
-        let ref_table = parser.expect_identifier()?;
-        parser.expect(Token::LeftParen)?;
-        let ref_column = parser.expect_identifier()?;
-        parser.expect(Token::RightParen)?;
-        foreign_key = Some(ForeignKeyRef { table: ref_table, column: ref_column });
-    }
-
-    Ok(ColumnDef {
+    let mut col_def = ColumnDef {
         name,
-        data_type,
-        is_primary_key,
-        is_unique,
-        is_auto_increment,
+        data_type: data_type.clone(),
+        is_primary_key: false,
+        is_unique: false,
+        is_auto_increment: data_type == DataType::Serial,
         is_not_null: false,
-        default_value,
-        foreign_key,
-    })
+        default_value: None,
+        foreign_key: None,
+    };
+
+    while matches!(
+        parser.current_token(),
+        Token::AutoIncrement | Token::Primary | Token::Default | Token::References
+    ) {
+        parse_column_constraint(parser, &mut col_def)?;
+    }
+
+    Ok(col_def)
 }
 
 fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
@@ -452,7 +469,13 @@ fn parse_type_name(parser: &mut Parser) -> Result<String> {
         Token::Int => "INT",
         Token::Text => "TEXT",
         Token::Avg => "FLOAT",
-        Token::Identifier(s) => return Ok(s.clone()),
+        Token::Sql => "SQL",
+        Token::PlPgSql => "PLPGSQL",
+        Token::Identifier(s) => {
+            let name = s.clone();
+            parser.advance();
+            return Ok(name);
+        }
         _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     };
     parser.advance();
