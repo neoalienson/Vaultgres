@@ -32,58 +32,61 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
     }
 }
 
+fn parse_primary_key_constraint(parser: &mut Parser) -> Result<Vec<String>> {
+    parser.advance();
+    parser.expect(Token::Key)?;
+    parser.expect(Token::LeftParen)?;
+    let mut pk_cols = vec![parser.expect_identifier()?];
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        pk_cols.push(parser.expect_identifier()?);
+    }
+    parser.expect(Token::RightParen)?;
+    Ok(pk_cols)
+}
+
+fn parse_foreign_key_constraint(parser: &mut Parser) -> Result<ForeignKeyDef> {
+    parser.advance();
+    parser.expect(Token::Key)?;
+    parser.expect(Token::LeftParen)?;
+    let mut fk_cols = vec![parser.expect_identifier()?];
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        fk_cols.push(parser.expect_identifier()?);
+    }
+    parser.expect(Token::RightParen)?;
+    parser.expect(Token::References)?;
+    let ref_table = parser.expect_identifier()?;
+    parser.expect(Token::LeftParen)?;
+    let mut ref_cols = vec![parser.expect_identifier()?];
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        ref_cols.push(parser.expect_identifier()?);
+    }
+    parser.expect(Token::RightParen)?;
+    Ok(ForeignKeyDef {
+        columns: fk_cols,
+        ref_table,
+        ref_columns: ref_cols,
+        on_delete: ForeignKeyAction::Restrict,
+        on_update: ForeignKeyAction::Restrict,
+    })
+}
+
 fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Table)?;
-
     let table = parser.expect_identifier()?;
-
     parser.expect(Token::LeftParen)?;
 
     let mut columns = Vec::new();
     let mut primary_key = None;
     let mut foreign_keys = Vec::new();
-    let check_constraints = Vec::new();
-    let unique_constraints = Vec::new();
 
     loop {
-        // Check for table-level constraints
         if parser.current_token() == &Token::Primary {
-            parser.advance();
-            parser.expect(Token::Key)?;
-            parser.expect(Token::LeftParen)?;
-            let mut pk_cols = vec![parser.expect_identifier()?];
-            while parser.current_token() == &Token::Comma {
-                parser.advance();
-                pk_cols.push(parser.expect_identifier()?);
-            }
-            parser.expect(Token::RightParen)?;
-            primary_key = Some(pk_cols);
+            primary_key = Some(parse_primary_key_constraint(parser)?);
         } else if parser.current_token() == &Token::Foreign {
-            parser.advance();
-            parser.expect(Token::Key)?;
-            parser.expect(Token::LeftParen)?;
-            let mut fk_cols = vec![parser.expect_identifier()?];
-            while parser.current_token() == &Token::Comma {
-                parser.advance();
-                fk_cols.push(parser.expect_identifier()?);
-            }
-            parser.expect(Token::RightParen)?;
-            parser.expect(Token::References)?;
-            let ref_table = parser.expect_identifier()?;
-            parser.expect(Token::LeftParen)?;
-            let mut ref_cols = vec![parser.expect_identifier()?];
-            while parser.current_token() == &Token::Comma {
-                parser.advance();
-                ref_cols.push(parser.expect_identifier()?);
-            }
-            parser.expect(Token::RightParen)?;
-            foreign_keys.push(ForeignKeyDef {
-                columns: fk_cols,
-                ref_table,
-                ref_columns: ref_cols,
-                on_delete: ForeignKeyAction::Restrict,
-                on_update: ForeignKeyAction::Restrict,
-            });
+            foreign_keys.push(parse_foreign_key_constraint(parser)?);
         } else {
             columns.push(parse_column_def(parser)?);
         }
@@ -101,8 +104,8 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
         columns,
         primary_key,
         foreign_keys,
-        check_constraints,
-        unique_constraints,
+        check_constraints: Vec::new(),
+        unique_constraints: Vec::new(),
     }))
 }
 

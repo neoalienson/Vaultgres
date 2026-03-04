@@ -11,6 +11,35 @@ pub struct SelectExecutor;
 impl SelectExecutor {
     pub fn execute(
         table: &str,
+        columns: Vec<String>,
+        where_clause: Option<Expr>,
+        group_by: Option<Vec<String>>,
+        having: Option<Expr>,
+        order_by: Option<Vec<OrderByExpr>>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+        tuples: &[Tuple],
+        schema: &TableSchema,
+        txn_mgr: &Arc<TransactionManager>,
+    ) -> Result<Vec<Vec<Value>>, String> {
+        Self::execute_with_distinct(
+            table,
+            false,
+            columns,
+            where_clause,
+            group_by,
+            having,
+            order_by,
+            limit,
+            offset,
+            tuples,
+            schema,
+            txn_mgr,
+        )
+    }
+
+    pub fn execute_with_distinct(
+        table: &str,
         distinct: bool,
         columns: Vec<String>,
         where_clause: Option<Expr>,
@@ -28,12 +57,21 @@ impl SelectExecutor {
         }
 
         let snapshot = txn_mgr.get_snapshot();
-        let mut results: Vec<Vec<Value>> = tuples
-            .iter()
-            .filter(|t| t.header.is_visible(&snapshot, txn_mgr))
-            .filter(|t| Self::matches_predicate(t, &where_clause, schema))
-            .map(|t| Self::project_columns(t, &columns, schema))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut results = Vec::new();
+
+        for tuple in tuples {
+            if !tuple.header.is_visible(&snapshot, txn_mgr) {
+                continue;
+            }
+
+            if let Some(ref pred) = where_clause {
+                if !PredicateEvaluator::evaluate(pred, &tuple.data, schema)? {
+                    continue;
+                }
+            }
+
+            results.push(Self::project_columns(tuple, &columns, schema)?);
+        }
 
         if let Some(group_cols) = group_by {
             results = Aggregator::apply_group_by(results, &group_cols, &columns, schema)?;

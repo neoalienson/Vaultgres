@@ -473,7 +473,7 @@ impl Catalog {
         let data = self.data.read().unwrap();
         let tuples = data.get(table).ok_or_else(|| format!("Table '{}' has no data", table))?;
 
-        SelectExecutor::execute(
+        SelectExecutor::execute_with_distinct(
             table,
             distinct,
             columns,
