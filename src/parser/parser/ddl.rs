@@ -447,83 +447,92 @@ fn parse_decimal(parser: &mut Parser) -> Result<DataType> {
     }
 }
 
+fn parse_type_name(parser: &mut Parser) -> Result<String> {
+    let type_name = match parser.current_token() {
+        Token::Int => "INT",
+        Token::Text => "TEXT",
+        Token::Avg => "FLOAT",
+        Token::Identifier(s) => return Ok(s.clone()),
+        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
+    };
+    parser.advance();
+    Ok(type_name.to_string())
+}
+
+fn parse_param_mode(parser: &mut Parser) -> ParameterMode {
+    let mode = match parser.current_token() {
+        Token::Out => ParameterMode::Out,
+        Token::Inout => ParameterMode::InOut,
+        Token::Variadic => ParameterMode::Variadic,
+        _ => return ParameterMode::In,
+    };
+    parser.advance();
+    mode
+}
+
+fn parse_default_value(parser: &mut Parser) -> Option<String> {
+    if parser.current_token() != &Token::Equals {
+        return None;
+    }
+    parser.advance();
+    let val = match parser.current_token() {
+        Token::String(s) => format!("'{}'", s),
+        Token::Number(n) => n.to_string(),
+        Token::Identifier(s) => s.clone(),
+        _ => return None,
+    };
+    parser.advance();
+    Some(val)
+}
+
+fn parse_function_parameter(parser: &mut Parser) -> Result<FunctionParameter> {
+    let mode = parse_param_mode(parser);
+    let name = parser.expect_identifier()?;
+    let data_type = parse_type_name(parser)?;
+    let default = parse_default_value(parser);
+    Ok(FunctionParameter { name, data_type, mode, default })
+}
+
+fn parse_table_columns(parser: &mut Parser) -> Result<Vec<(String, String)>> {
+    let mut cols = Vec::new();
+    loop {
+        let col_name = parser.expect_identifier()?;
+        let col_type = parse_type_name(parser)?;
+        cols.push((col_name, col_type));
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
+        parser.advance();
+    }
+    Ok(cols)
+}
+
+fn parse_return_type(parser: &mut Parser) -> Result<FunctionReturnType> {
+    match parser.current_token() {
+        Token::Table => {
+            parser.advance();
+            parser.expect(Token::LeftParen)?;
+            let cols = parse_table_columns(parser)?;
+            parser.expect(Token::RightParen)?;
+            Ok(FunctionReturnType::Table(cols))
+        }
+        Token::Setof => {
+            parser.advance();
+            Ok(FunctionReturnType::Setof(parse_type_name(parser)?))
+        }
+        _ => Ok(FunctionReturnType::Type(parse_type_name(parser)?)),
+    }
+}
+
 fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
-    parser.advance(); // FUNCTION or PROCEDURE
+    parser.advance();
     let name = parser.expect_identifier()?;
     parser.expect(Token::LeftParen)?;
 
     let mut parameters = Vec::new();
     if parser.current_token() != &Token::RightParen {
         loop {
-            let mode = match parser.current_token() {
-                Token::Out => {
-                    parser.advance();
-                    ParameterMode::Out
-                }
-                Token::Inout => {
-                    parser.advance();
-                    ParameterMode::InOut
-                }
-                Token::Variadic => {
-                    parser.advance();
-                    ParameterMode::Variadic
-                }
-                _ => ParameterMode::In,
-            };
-
-            let param_name = parser.expect_identifier()?;
-            let data_type = match parser.current_token() {
-                Token::Int => {
-                    parser.advance();
-                    "INT".to_string()
-                }
-                Token::Text => {
-                    parser.advance();
-                    "TEXT".to_string()
-                }
-                Token::Avg => {
-                    parser.advance();
-                    "FLOAT".to_string()
-                }
-                Token::Identifier(s) => {
-                    let t = s.clone();
-                    parser.advance();
-                    t
-                }
-                _ => {
-                    return Err(ParseError::UnexpectedToken(format!(
-                        "{:?}",
-                        parser.current_token()
-                    )))
-                }
-            };
-
-            let default = if parser.current_token() == &Token::Equals {
-                parser.advance();
-                match parser.current_token() {
-                    Token::String(s) => {
-                        let val = format!("'{}'", s);
-                        parser.advance();
-                        Some(val)
-                    }
-                    Token::Number(n) => {
-                        let val = n.to_string();
-                        parser.advance();
-                        Some(val)
-                    }
-                    Token::Identifier(s) => {
-                        let val = s.clone();
-                        parser.advance();
-                        Some(val)
-                    }
-                    _ => None,
-                }
-            } else {
-                None
-            };
-
-            parameters.push(FunctionParameter { name: param_name, data_type, mode, default });
-
+            parameters.push(parse_function_parameter(parser)?);
             if parser.current_token() != &Token::Comma {
                 break;
             }
@@ -533,99 +542,10 @@ fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::RightParen)?;
 
     parser.expect(Token::Returns)?;
-    let return_type = if parser.current_token() == &Token::Table {
-        parser.advance();
-        parser.expect(Token::LeftParen)?;
-        let mut cols = Vec::new();
-        loop {
-            let col_name = parser.expect_identifier()?;
-            let col_type = match parser.current_token() {
-                Token::Int => {
-                    parser.advance();
-                    "INT".to_string()
-                }
-                Token::Text => {
-                    parser.advance();
-                    "TEXT".to_string()
-                }
-                Token::Identifier(s) => {
-                    let t = s.clone();
-                    parser.advance();
-                    t
-                }
-                _ => {
-                    return Err(ParseError::UnexpectedToken(format!(
-                        "{:?}",
-                        parser.current_token()
-                    )))
-                }
-            };
-            cols.push((col_name, col_type));
-            if parser.current_token() != &Token::Comma {
-                break;
-            }
-            parser.advance();
-        }
-        parser.expect(Token::RightParen)?;
-        FunctionReturnType::Table(cols)
-    } else if parser.current_token() == &Token::Setof {
-        parser.advance();
-        let type_name = match parser.current_token() {
-            Token::Int => {
-                parser.advance();
-                "INT".to_string()
-            }
-            Token::Text => {
-                parser.advance();
-                "TEXT".to_string()
-            }
-            Token::Identifier(s) => {
-                let t = s.clone();
-                parser.advance();
-                t
-            }
-            _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-        };
-        FunctionReturnType::Setof(type_name)
-    } else {
-        let type_name = match parser.current_token() {
-            Token::Int => {
-                parser.advance();
-                "INT".to_string()
-            }
-            Token::Text => {
-                parser.advance();
-                "TEXT".to_string()
-            }
-            Token::Identifier(s) => {
-                let t = s.clone();
-                parser.advance();
-                t
-            }
-            _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-        };
-        FunctionReturnType::Type(type_name)
-    };
-
+    let return_type = parse_return_type(parser)?;
     parser.expect(Token::Language)?;
-    let language = match parser.current_token() {
-        Token::Sql => {
-            parser.advance();
-            "SQL".to_string()
-        }
-        Token::PlPgSql => {
-            parser.advance();
-            "PLPGSQL".to_string()
-        }
-        Token::Identifier(s) => {
-            let l = s.clone();
-            parser.advance();
-            l
-        }
-        _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
-    };
+    let language = parse_type_name(parser)?;
 
-    // Optional volatility
     let volatility = match parser.current_token() {
         Token::Immutable => {
             parser.advance();
@@ -642,7 +562,6 @@ fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
         _ => None,
     };
 
-    // Optional cost hint
     let cost = if parser.current_token() == &Token::Cost {
         parser.advance();
         if let Token::Number(n) = parser.current_token() {
@@ -656,7 +575,6 @@ fn parse_create_function(parser: &mut Parser) -> Result<Statement> {
         None
     };
 
-    // Optional rows hint
     let rows = if parser.current_token() == &Token::Rows {
         parser.advance();
         if let Token::Number(n) = parser.current_token() {
