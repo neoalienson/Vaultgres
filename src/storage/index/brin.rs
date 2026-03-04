@@ -126,6 +126,7 @@ impl Index for BRINIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::page::PageId;
 
     #[test]
     fn test_brin_insert_and_search() {

@@ -1,5 +1,5 @@
 use vaultgres::catalog::*;
-use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
+use vaultgres::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr};
 
 #[test]
 fn test_aggregate_count() {
@@ -12,7 +12,7 @@ fn test_aggregate_count() {
     catalog.insert("data", vec![Expr::Number(3)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
-        func: crate::parser::ast::AggregateFunc::Count,
+        func: vaultgres::parser::ast::AggregateFunc::Count,
         arg: Box::new(Expr::Star),
     };
     let rows =
@@ -32,7 +32,7 @@ fn test_aggregate_sum() {
     catalog.insert("data", vec![Expr::Number(30)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
-        func: crate::parser::ast::AggregateFunc::Sum,
+        func: vaultgres::parser::ast::AggregateFunc::Sum,
         arg: Box::new(Expr::Column("value".to_string())),
     };
     let rows =
@@ -52,7 +52,7 @@ fn test_aggregate_avg() {
     catalog.insert("data", vec![Expr::Number(30)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
-        func: crate::parser::ast::AggregateFunc::Avg,
+        func: vaultgres::parser::ast::AggregateFunc::Avg,
         arg: Box::new(Expr::Column("value".to_string())),
     };
     let rows =
@@ -72,7 +72,7 @@ fn test_aggregate_min_max() {
     catalog.insert("data", vec![Expr::Number(30)]).unwrap();
 
     let agg_expr_min = Expr::Aggregate {
-        func: crate::parser::ast::AggregateFunc::Min,
+        func: vaultgres::parser::ast::AggregateFunc::Min,
         arg: Box::new(Expr::Column("value".to_string())),
     };
     let rows = catalog
@@ -81,7 +81,7 @@ fn test_aggregate_min_max() {
     assert_eq!(rows[0][0], Value::Int(10));
 
     let agg_expr_max = Expr::Aggregate {
-        func: crate::parser::ast::AggregateFunc::Max,
+        func: vaultgres::parser::ast::AggregateFunc::Max,
         arg: Box::new(Expr::Column("value".to_string())),
     };
     let rows = catalog
@@ -104,7 +104,7 @@ fn test_group_by() {
     catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
     catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(40)]).unwrap();
 
-    let group_by = Some(vec!["category".to_string()]);
+    let group_by = Some(vec![Expr::Column("category".to_string())]);
     let rows = catalog
         .select(
             "data",
@@ -136,7 +136,7 @@ fn test_having_clause() {
     catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
     catalog.insert("data", vec![Expr::String("C".to_string()), Expr::Number(5)]).unwrap();
 
-    let group_by = Some(vec!["category".to_string()]);
+    let group_by = Some(vec![Expr::Column("category".to_string())]);
     let having = Some(Expr::BinaryOp {
         left: Box::new(Expr::Number(2)),
         op: vaultgres::parser::ast::BinaryOperator::GreaterThan,

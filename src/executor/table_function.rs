@@ -100,7 +100,7 @@ impl super::Executor for SetReturningFunctionExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::Parameter;
+    use crate::catalog::{FunctionLanguage, FunctionVolatility, Parameter};
     use crate::executor::Executor;
 
     #[test]

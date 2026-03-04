@@ -33,7 +33,7 @@ fn test_multi_column_index_two_columns() {
         .unwrap();
 
     let rows = catalog
-        .select("users", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("users", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 2);
 }
@@ -62,7 +62,7 @@ fn test_multi_column_index_three_columns() {
         .unwrap();
 
     let rows = catalog
-        .select("locations", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("locations", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 1);
 }
@@ -97,7 +97,7 @@ fn test_multi_column_index_ordering() {
         .unwrap();
 
     let rows = catalog
-        .select("products", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("products", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 3);
 }
@@ -124,7 +124,7 @@ fn test_multi_column_unique_index() {
         .unwrap();
 
     let rows = catalog
-        .select("accounts", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("accounts", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 1);
 }

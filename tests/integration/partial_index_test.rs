@@ -15,7 +15,7 @@ fn test_partial_index_creation() {
     catalog.insert("orders", vec![Expr::Number(3), Expr::String("active".to_string())]).unwrap();
 
     let rows = catalog
-        .select("orders", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("orders", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 3);
 }
@@ -34,7 +34,7 @@ fn test_partial_index_with_where_clause() {
     catalog.insert("products", vec![Expr::Number(3), Expr::Number(50)]).unwrap();
 
     let rows = catalog
-        .select("products", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("products", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 3);
 }

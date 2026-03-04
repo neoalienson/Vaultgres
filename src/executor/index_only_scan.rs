@@ -70,6 +70,7 @@ impl IndexOnlyScan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::btree::TupleId;
     use crate::storage::page::PageId;
 
     #[test]

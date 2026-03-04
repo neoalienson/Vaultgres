@@ -460,7 +460,7 @@ impl Catalog {
         distinct: bool,
         columns: Vec<Expr>,
         where_clause: Option<Expr>,
-        group_by: Option<Vec<String>>,
+        group_by: Option<Vec<Expr>>,
         having: Option<Expr>,
         order_by: Option<Vec<OrderByExpr>>,
         limit: Option<usize>,

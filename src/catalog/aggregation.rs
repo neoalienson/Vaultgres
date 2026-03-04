@@ -98,8 +98,8 @@ impl Aggregator {
 
     pub fn apply_group_by(
         rows: Vec<Vec<Value>>,
-        group_cols: &[String],
-        select_cols: &[String],
+        group_cols: &[Expr],
+        select_cols: &[Expr],
         schema: &TableSchema,
     ) -> Result<Vec<Vec<Value>>, String> {
         use std::collections::HashMap;
@@ -108,13 +108,17 @@ impl Aggregator {
 
         for row in rows {
             let mut key = Vec::new();
-            for col_name in group_cols {
-                let idx = schema
-                    .columns
-                    .iter()
-                    .position(|c| &c.name == col_name)
-                    .ok_or_else(|| format!("Column '{}' not found", col_name))?;
-                key.push(row[idx].clone());
+            for col_expr in group_cols {
+                if let Expr::Column(col_name) = col_expr {
+                    let idx = schema
+                        .columns
+                        .iter()
+                        .position(|c| &c.name == col_name)
+                        .ok_or_else(|| format!("Column '{}' not found", col_name))?;
+                    key.push(row[idx].clone());
+                } else {
+                    return Err(format!("Unsupported expression in GROUP BY: {:?}", col_expr));
+                }
             }
             groups.entry(key).or_default().push(row);
         }
@@ -122,12 +126,33 @@ impl Aggregator {
         let mut result = Vec::new();
         for (key, group_rows) in groups {
             let mut row = Vec::new();
-            for col_name in select_cols {
-                if group_cols.contains(col_name) {
-                    let idx = group_cols.iter().position(|c| c == col_name).unwrap();
-                    row.push(key[idx].clone());
+            for col_expr in select_cols {
+                if let Expr::Column(col_name) = col_expr {
+                    // Check if the select column is one of the group by columns
+                    if group_cols.iter().any(|g_expr| {
+                        if let Expr::Column(g_name) = g_expr {
+                            g_name == col_name
+                        } else {
+                            false
+                        }
+                    }) {
+                        let idx = group_cols
+                            .iter()
+                            .position(|g_expr| {
+                                if let Expr::Column(g_name) = g_expr {
+                                    g_name == col_name
+                                } else {
+                                    false
+                                }
+                            })
+                            .unwrap();
+                        row.push(key[idx].clone());
+                    } else {
+                        row.push(Value::Int(group_rows.len() as i64)); // Placeholder for aggregates
+                    }
                 } else {
-                    row.push(Value::Int(group_rows.len() as i64));
+                    // This is where aggregates should be evaluated
+                    row.push(Value::Int(group_rows.len() as i64)); // Placeholder for aggregates
                 }
             }
             result.push(row);
@@ -272,8 +297,8 @@ mod tests {
 
         let result = Aggregator::apply_group_by(
             rows,
-            &["category".to_string()],
-            &["category".to_string()],
+            &[Expr::Column("category".to_string())],
+            &[Expr::Column("category".to_string())],
             &schema,
         )
         .unwrap();

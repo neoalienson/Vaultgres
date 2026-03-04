@@ -1,5 +1,5 @@
 use super::Parser;
-use crate::parser::ast::{JoinClause, JoinType, OrderByExpr, SelectStmt, Statement};
+use crate::parser::ast::{Expr, JoinClause, JoinType, OrderByExpr, SelectStmt, Statement};
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
 
@@ -209,17 +209,6 @@ fn parse_order_by_list(parser: &mut Parser) -> Result<Vec<OrderByExpr>> {
     Ok(order_by)
 }
 
-fn parse_group_by_list(parser: &mut Parser) -> Result<Vec<String>> {
-    let mut columns = Vec::new();
-
-    loop {
-        columns.push(parser.expect_identifier()?);
-
-        if parser.current_token() != &Token::Comma {
-            break;
-        }
-        parser.advance();
-    }
-
-    Ok(columns)
+fn parse_group_by_list(parser: &mut Parser) -> Result<Vec<Expr>> {
+    super::expr::parse_expr_list(parser)
 }

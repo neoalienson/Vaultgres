@@ -18,7 +18,7 @@ fn test_expression_index_creation() {
         .unwrap();
 
     let rows = catalog
-        .select("users", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("users", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 2);
 }
@@ -36,7 +36,7 @@ fn test_expression_index_with_function() {
     catalog.insert("products", vec![Expr::Number(2), Expr::String("Gadget".to_string())]).unwrap();
 
     let rows = catalog
-        .select("products", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("products", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 2);
 }
@@ -63,7 +63,7 @@ fn test_expression_index_multiple_expressions() {
         .unwrap();
 
     let rows = catalog
-        .select("people", false, vec!["*".to_string()], None, None, None, None, None, None)
+        .select("people", false, vec![Expr::Star], None, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 1);
 }

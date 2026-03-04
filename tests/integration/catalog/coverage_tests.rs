@@ -63,7 +63,7 @@ mod tests {
         let result = catalog.select(
             "t",
             false,
-            vec!["nonexistent".to_string()],
+            vec![Expr::Column("nonexistent".to_string())],
             None,
             None,
             None,
@@ -114,7 +114,7 @@ mod tests {
             .unwrap();
         catalog.insert("t", vec![Expr::String("test".to_string())]).unwrap();
         let result =
-            catalog.select("t", false, vec!["*".to_string()], None, None, None, None, None, None);
+            catalog.select("t", false, vec![Expr::Star], None, None, None, None, None, None);
         assert!(result.is_ok());
     }
 

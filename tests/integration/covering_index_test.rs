@@ -28,7 +28,7 @@ fn test_covering_index_two_columns() {
         .select(
             "users",
             false,
-            vec!["id".to_string(), "email".to_string()],
+            vec![Expr::Column("id".to_string()), Expr::Column("email".to_string())],
             None,
             None,
             None,
@@ -68,7 +68,7 @@ fn test_covering_index_all_query_columns() {
         .select(
             "products",
             false,
-            vec!["category".to_string(), "price".to_string()],
+            vec![Expr::Column("category".to_string()), Expr::Column("price".to_string())],
             None,
             None,
             None,
@@ -105,7 +105,7 @@ fn test_covering_index_with_where_clause() {
         .select(
             "tasks",
             false,
-            vec!["status".to_string(), "priority".to_string()],
+            vec![Expr::Column("status".to_string()), Expr::Column("priority".to_string())],
             None,
             None,
             None,
@@ -153,7 +153,7 @@ fn test_covering_index_includes_all_needed() {
         .select(
             "people",
             false,
-            vec!["first_name".to_string(), "last_name".to_string()],
+            vec![Expr::Column("first_name".to_string()), Expr::Column("last_name".to_string())],
             None,
             None,
             None,
@@ -190,7 +190,17 @@ fn test_covering_index_order_by() {
 
     // Index on (name, created_at) covers query with ORDER BY
     let rows = catalog
-        .select("items", false, vec!["name".to_string()], None, None, None, None, None, None)
+        .select(
+            "items",
+            false,
+            vec![Expr::Column("name".to_string())],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(rows.len(), 2);
 }

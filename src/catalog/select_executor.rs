@@ -14,7 +14,7 @@ impl SelectExecutor {
         table: &str,
         columns: Vec<Expr>,
         where_clause: Option<Expr>,
-        group_by: Option<Vec<String>>,
+        group_by: Option<Vec<Expr>>,
         having: Option<Expr>,
         order_by: Option<Vec<OrderByExpr>>,
         limit: Option<usize>,
@@ -46,8 +46,8 @@ impl SelectExecutor {
         distinct: bool,
         columns: Vec<Expr>,
         where_clause: Option<Expr>,
-        _group_by: Option<Vec<String>>,
-        _having: Option<Expr>,
+        group_by: Option<Vec<Expr>>,
+        having: Option<Expr>,
         order_by: Option<Vec<OrderByExpr>>,
         limit: Option<usize>,
         offset: Option<usize>,
@@ -101,14 +101,14 @@ impl SelectExecutor {
             results.push(Self::project_columns(tuple, &columns, schema)?);
         }
 
-        // if let Some(group_cols) = group_by {
-        //     results = Aggregator::apply_group_by(results, &group_cols, &columns, schema)?;
-        //     if let Some(having_expr) = having {
-        //         results.retain(|row| {
-        //             PredicateEvaluator::evaluate_having(&having_expr, row).unwrap_or(false)
-        //         });
-        //     }
-        // }
+        if let Some(group_cols) = group_by {
+            results = Aggregator::apply_group_by(results, &group_cols, &columns, schema)?;
+            if let Some(having_expr) = having {
+                results.retain(|row| {
+                    PredicateEvaluator::evaluate_having(&having_expr, row).unwrap_or(false)
+                });
+            }
+        }
 
         if let Some(order_by_exprs) = order_by {
             Self::apply_order_by(&mut results, &order_by_exprs, schema)?;
@@ -186,8 +186,6 @@ impl SelectExecutor {
         columns: &[Expr],
         schema: &TableSchema,
     ) -> Result<Vec<Value>, String> {
-        
-
         if columns.is_empty() || matches!(columns.first(), Some(Expr::Star)) {
             return Ok(tuple.data.clone());
         }
@@ -196,7 +194,6 @@ impl SelectExecutor {
     }
 
     fn eval_expr(expr: &Expr, tuple: &Tuple, schema: &TableSchema) -> Result<Value, String> {
-        
         match expr {
             Expr::Column(name) => {
                 let idx = schema

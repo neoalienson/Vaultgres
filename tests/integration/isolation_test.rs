@@ -80,17 +80,8 @@ mod tests {
         catalog.commit_transaction().unwrap();
 
         catalog.begin_transaction_with_isolation(IsolationLevel::ReadCommitted.into()).unwrap();
-        let result = catalog.select(
-            "users",
-            false,
-            vec!["*".to_string()],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let result =
+            catalog.select("users", false, vec![Expr::Star], None, None, None, None, None, None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 1);
         catalog.commit_transaction().unwrap();

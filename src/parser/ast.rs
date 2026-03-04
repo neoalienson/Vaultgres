@@ -393,7 +393,7 @@ pub struct SelectStmt {
     pub table_alias: Option<String>,
     pub joins: Vec<JoinClause>,
     pub where_clause: Option<Expr>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<Expr>>,
     pub having: Option<Expr>,
     pub order_by: Option<Vec<OrderByExpr>>,
     pub limit: Option<usize>,

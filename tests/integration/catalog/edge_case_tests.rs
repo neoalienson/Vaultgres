@@ -1,5 +1,5 @@
 use vaultgres::catalog::*;
-use vaultgres::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr};
+use vaultgres::parser::ast::{AggregateFunc, BinaryOperator, ColumnDef, DataType, Expr};
 
 #[test]
 fn test_insert_null_value() {
@@ -32,7 +32,7 @@ fn test_select_from_empty_result() {
     });
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None)
+        .select("data", false, vec![Expr::Star], where_clause, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 0);
 }
@@ -89,7 +89,7 @@ fn test_select_with_invalid_column() {
     let result = catalog.select(
         "data",
         false,
-        vec!["nonexistent".to_string()],
+        vec![Expr::Column("nonexistent".to_string())],
         None,
         None,
         None,
@@ -114,17 +114,8 @@ fn test_where_with_invalid_column() {
         right: Box::new(Expr::Number(1)),
     });
 
-    let result = catalog.select(
-        "data",
-        false,
-        vec!["*".to_string()],
-        where_clause,
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let result =
+        catalog.select("data", false, vec![Expr::Star], where_clause, None, None, None, None, None);
     assert!(result.is_err());
 }
 
@@ -150,7 +141,7 @@ fn test_limit_larger_than_result_set() {
     catalog.insert("data", vec![Expr::Number(2)]).unwrap();
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], None, None, None, None, Some(100), None)
+        .select("data", false, vec![Expr::Star], None, None, None, None, Some(100), None)
         .unwrap();
     assert_eq!(rows.len(), 2);
 }
@@ -164,7 +155,7 @@ fn test_offset_larger_than_result_set() {
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], None, None, None, None, None, Some(100))
+        .select("data", false, vec![Expr::Star], None, None, None, None, None, Some(100))
         .unwrap();
     assert_eq!(rows.len(), 0);
 }
@@ -177,7 +168,20 @@ fn test_aggregate_on_empty_table() {
     catalog.create_table("data".to_string(), columns).unwrap();
 
     let rows = catalog
-        .select("data", false, vec!["AGG:COUNT:*".to_string()], None, None, None, None, None, None)
+        .select(
+            "data",
+            false,
+            vec![Expr::Aggregate {
+                func: vaultgres::parser::ast::AggregateFunc::Count,
+                arg: Box::new(Expr::Star),
+            }],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(rows[0][0], Value::Int(0));
 }
@@ -197,7 +201,7 @@ fn test_in_operator_empty_list() {
     });
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None)
+        .select("data", false, vec![Expr::Star], where_clause, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 0);
 }
@@ -218,7 +222,7 @@ fn test_between_with_reversed_bounds() {
     });
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None)
+        .select("data", false, vec![Expr::Star], where_clause, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 0);
 }
@@ -238,7 +242,7 @@ fn test_like_with_empty_pattern() {
     });
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], where_clause, None, None, None, None, None)
+        .select("data", false, vec![Expr::Star], where_clause, None, None, None, None, None)
         .unwrap();
     assert_eq!(rows.len(), 1);
 }
@@ -250,9 +254,8 @@ fn test_distinct_on_empty_table() {
 
     catalog.create_table("data".to_string(), columns).unwrap();
 
-    let rows = catalog
-        .select("data", true, vec!["*".to_string()], None, None, None, None, None, None)
-        .unwrap();
+    let rows =
+        catalog.select("data", true, vec![Expr::Star], None, None, None, None, None, None).unwrap();
     assert_eq!(rows.len(), 0);
 }
 
@@ -266,9 +269,8 @@ fn test_distinct_all_duplicates() {
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
 
-    let rows = catalog
-        .select("data", true, vec!["*".to_string()], None, None, None, None, None, None)
-        .unwrap();
+    let rows =
+        catalog.select("data", true, vec![Expr::Star], None, None, None, None, None, None).unwrap();
     assert_eq!(rows.len(), 1);
 }
 
@@ -285,17 +287,8 @@ fn test_order_by_with_invalid_column() {
         ascending: true,
     }]);
 
-    let result = catalog.select(
-        "data",
-        false,
-        vec!["*".to_string()],
-        None,
-        None,
-        None,
-        order_by,
-        None,
-        None,
-    );
+    let result =
+        catalog.select("data", false, vec![Expr::Star], None, None, None, order_by, None, None);
     assert!(result.is_err());
 }
 
@@ -307,11 +300,11 @@ fn test_group_by_with_invalid_column() {
     catalog.create_table("data".to_string(), columns).unwrap();
     catalog.insert("data", vec![Expr::Number(1)]).unwrap();
 
-    let group_by = Some(vec!["nonexistent".to_string()]);
+    let group_by = Some(vec![Expr::Column("nonexistent".to_string())]);
     let result = catalog.select(
         "data",
         false,
-        vec!["id".to_string()],
+        vec![Expr::Column("id".to_string())],
         None,
         group_by,
         None,
@@ -332,7 +325,7 @@ fn test_zero_limit() {
     catalog.insert("data", vec![Expr::Number(2)]).unwrap();
 
     let rows = catalog
-        .select("data", false, vec!["*".to_string()], None, None, None, None, Some(0), None)
+        .select("data", false, vec![Expr::Star], None, None, None, None, Some(0), None)
         .unwrap();
     assert_eq!(rows.len(), 0);
 }

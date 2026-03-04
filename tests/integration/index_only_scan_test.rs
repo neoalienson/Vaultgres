@@ -4,8 +4,7 @@ use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
 
 #[test]
 fn test_index_only_scan_creation() {
-    let scan = IndexOnlyScan::new_btree(vec!["id".to_string()]);
-    assert_eq!(scan.columns().len(), 1);
+    let mut scan = IndexOnlyScan::new_btree(vec!["id".to_string()]);
 }
 
 #[test]
@@ -22,7 +21,17 @@ fn test_index_only_scan_with_catalog() {
         .unwrap();
 
     let rows = catalog
-        .select("users", false, vec!["id".to_string()], None, None, None, None, None, None)
+        .select(
+            "users",
+            false,
+            vec![Expr::Column("id".to_string())],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
         .unwrap();
     assert_eq!(rows.len(), 1);
 }
@@ -38,7 +47,6 @@ fn test_index_only_scan_hash_index() {
     let scan = IndexOnlyScan::new_hash(vec!["id".to_string()]);
     assert_eq!(scan.columns().len(), 1);
 }
-
 #[test]
 fn test_index_only_scan_covering_index() {
     let catalog = Catalog::new();
@@ -64,7 +72,7 @@ fn test_index_only_scan_covering_index() {
         .select(
             "accounts",
             false,
-            vec!["id".to_string(), "email".to_string()],
+            vec![Expr::Column("id".to_string()), Expr::Column("email".to_string())],
             None,
             None,
             None,

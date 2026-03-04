@@ -18,17 +18,7 @@ fn binary_op(col: &str, op: BinaryOperator, value: Expr) -> Expr {
 
 fn select_where(catalog: &Catalog, where_clause: Expr) -> Vec<Vec<Value>> {
     catalog
-        .select(
-            "data",
-            false,
-            vec!["*".to_string()],
-            Some(where_clause),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        .select("data", false, vec![Expr::Star], Some(where_clause), None, None, None, None, None)
         .unwrap()
 }
 

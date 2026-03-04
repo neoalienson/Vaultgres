@@ -136,17 +136,8 @@ mod tests {
         catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
 
-        let result = catalog.select(
-            "users",
-            false,
-            vec!["*".to_string()],
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let result =
+            catalog.select("users", false, vec![Expr::Star], None, None, None, None, None, None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 2);
 
