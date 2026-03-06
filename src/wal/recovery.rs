@@ -131,9 +131,13 @@ mod tests {
 
     fn create_test_records() -> Vec<WALRecord> {
         vec![
-            WALRecord::new(1, 10, RecordType::Insert, Some(PageId(1)), vec![]),
-            WALRecord::new(2, 10, RecordType::Commit, None, vec![]),
-            WALRecord::new(3, 20, RecordType::Update, Some(PageId(2)), vec![]),
+            WALRecord::new(1, 10, RecordType::Insert, Some(PageId(1)), vec![]), // Txn 10 inserts into Page 1
+            WALRecord::new(2, 20, RecordType::Insert, Some(PageId(2)), vec![]), // Txn 20 inserts into Page 2
+            WALRecord::new(3, 10, RecordType::Commit, None, vec![]),            // Txn 10 commits
+            WALRecord::new(4, 30, RecordType::Insert, Some(PageId(3)), vec![]), // Txn 30 inserts into Page 3
+            WALRecord::new(5, 20, RecordType::Abort, None, vec![]),             // Txn 20 aborts
+            WALRecord::new(6, 40, RecordType::Update, Some(PageId(4)), vec![]), // Txn 40 updates Page 4 (active)
+            WALRecord::new(7, 50, RecordType::Checkpoint, None, vec![]),        // Checkpoint
         ]
     }
 
@@ -145,7 +149,14 @@ mod tests {
         let state = mgr.analysis_phase(&records).unwrap();
 
         assert!(state.committed_txns.contains(&10));
-        assert!(state.active_txns.contains(&20));
+        assert!(state.aborted_txns.contains(&20));
+        assert!(state.active_txns.contains(&30)); // Txn 30 is in progress
+        assert!(state.active_txns.contains(&40)); // Txn 40 is in progress
+
+        assert!(state.dirty_pages.contains(&PageId(1)));
+        assert!(state.dirty_pages.contains(&PageId(2)));
+        assert!(state.dirty_pages.contains(&PageId(3)));
+        assert!(state.dirty_pages.contains(&PageId(4)));
     }
 
     #[test]
@@ -156,7 +167,11 @@ mod tests {
         let state = mgr.recover(&records).unwrap();
 
         assert!(state.committed_txns.contains(&10));
-        assert!(state.active_txns.contains(&20));
+        assert!(state.aborted_txns.contains(&20));
+        assert!(state.active_txns.contains(&30));
+        assert!(state.active_txns.contains(&40));
+
+        assert!(!state.active_txns.contains(&20)); // Txn 20 is aborted, so not active
     }
 
     #[test]

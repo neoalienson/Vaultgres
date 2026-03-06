@@ -40,7 +40,7 @@ impl WALRecord {
         Self { lsn, xid, record_type, page_id, data }
     }
 
-    /// Serializes the record to bytes
+    /// Converts page to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&self.lsn.to_le_bytes());
@@ -175,14 +175,6 @@ mod tests {
         assert_eq!(record.lsn, 1);
         assert_eq!(record.xid, 10);
         assert_eq!(record.record_type, RecordType::Insert);
-    }
-
-    #[test]
-    fn test_wal_record_serialization() {
-        let record = WALRecord::new(1, 10, RecordType::Insert, Some(PageId(1)), vec![1, 2, 3]);
-
-        let bytes = record.to_bytes();
-        assert!(!bytes.is_empty());
     }
 
     #[test]

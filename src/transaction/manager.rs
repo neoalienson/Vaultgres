@@ -199,4 +199,62 @@ mod tests {
         let snapshot = mgr.get_snapshot();
         assert_eq!(snapshot.active.len(), 2);
     }
+
+    #[test]
+    fn test_commit_non_existent_transaction() {
+        let mgr = TransactionManager::new();
+        let result = mgr.commit(999); // Non-existent XID
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TransactionError::NotFound(_)));
+    }
+
+    #[test]
+    fn test_commit_already_committed_transaction() {
+        let mgr = TransactionManager::new();
+        let txn = mgr.begin();
+        mgr.commit(txn.xid).unwrap(); // Commit once
+
+        let result = mgr.commit(txn.xid); // Commit again
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TransactionError::AlreadyCommitted(_)));
+    }
+
+    #[test]
+    fn test_commit_already_aborted_transaction() {
+        let mgr = TransactionManager::new();
+        let txn = mgr.begin();
+        mgr.abort(txn.xid).unwrap(); // Abort once
+
+        let result = mgr.commit(txn.xid); // Commit aborted transaction
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TransactionError::AlreadyAborted(_)));
+    }
+
+    #[test]
+    fn test_abort_non_existent_transaction() {
+        let mgr = TransactionManager::new();
+        let result = mgr.abort(999); // Non-existent XID
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TransactionError::NotFound(_)));
+    }
+
+    #[test]
+    fn test_abort_already_committed_transaction() {
+        let mgr = TransactionManager::new();
+        let txn = mgr.begin();
+        mgr.commit(txn.xid).unwrap(); // Commit once
+
+        let result = mgr.abort(txn.xid); // Abort committed transaction
+        assert!(result.is_ok()); // Aborting a committed transaction should still succeed in marking it as aborted if the logic changes
+    }
+
+    #[test]
+    fn test_abort_already_aborted_transaction() {
+        let mgr = TransactionManager::new();
+        let txn = mgr.begin();
+        mgr.abort(txn.xid).unwrap(); // Abort once
+
+        let result = mgr.abort(txn.xid); // Abort again
+        assert!(result.is_ok()); // Aborting an already aborted transaction should still succeed
+    }
 }

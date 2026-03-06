@@ -78,6 +78,7 @@ impl DiskManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::page::PageHeader;
     use tempfile::TempDir;
 
     #[test]
@@ -94,12 +95,54 @@ mod tests {
 
         let page_id = PageId(0);
         let mut page = Page::new(page_id);
-        page.set_data(vec![1, 2, 3, 4]);
+        let data_to_write = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        page.set_data(data_to_write.clone());
 
         dm.write_page(page_id, &page).unwrap();
         let read_page = dm.read_page(page_id).unwrap();
 
         assert_eq!(read_page.id(), page_id);
+        assert_eq!(read_page.data()[16..16 + data_to_write.len()], data_to_write[..]);
+    }
+
+    #[test]
+    fn test_multiple_pages_in_different_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let dm = DiskManager::new(temp_dir.path()).unwrap();
+
+        // Page in the first file
+        let page_id_1 = PageId(0);
+        let mut page_1 = Page::new(page_id_1);
+        let data_1 = vec![10; 100];
+        page_1.set_data(data_1.clone());
+        dm.write_page(page_id_1, &page_1).unwrap();
+
+        // Page in the same file, different offset
+        let page_id_2 = PageId(1);
+        let mut page_2 = Page::new(page_id_2);
+        let data_2 = vec![20; 100];
+        page_2.set_data(data_2.clone());
+        dm.write_page(page_id_2, &page_2).unwrap();
+
+        // Page in a different file
+        let page_id_3 = PageId(1001); // Should be in data_1.db
+        let mut page_3 = Page::new(page_id_3);
+        let data_3 = vec![30; 100];
+        page_3.set_data(data_3.clone());
+        dm.write_page(page_id_3, &page_3).unwrap();
+
+        // Read and verify
+        let read_page_1 = dm.read_page(page_id_1).unwrap();
+        assert_eq!(read_page_1.id(), page_id_1);
+        assert_eq!(read_page_1.data()[16..16 + data_1.len()], data_1[..]);
+
+        let read_page_2 = dm.read_page(page_id_2).unwrap();
+        assert_eq!(read_page_2.id(), page_id_2);
+        assert_eq!(read_page_2.data()[16..16 + data_2.len()], data_2[..]);
+
+        let read_page_3 = dm.read_page(page_id_3).unwrap();
+        assert_eq!(read_page_3.id(), page_id_3);
+        assert_eq!(read_page_3.data()[16..16 + data_3.len()], data_3[..]);
     }
 
     #[test]

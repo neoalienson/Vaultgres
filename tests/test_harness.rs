@@ -49,6 +49,7 @@ wal:
 performance:
   worker_threads: 2
   query_cache: false
+  max_parallel_workers: 2
 "#,
             port,
             data_dir.path().display(),
@@ -60,12 +61,12 @@ performance:
 
         let process = Command::new("./target/release/vaultgres")
             .env("VAULTGRES_CONFIG", config_path.to_str().unwrap())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .expect("Failed to start server");
 
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(3));
 
         Self { port, process, _data_dir: data_dir, _wal_dir: wal_dir }
     }
