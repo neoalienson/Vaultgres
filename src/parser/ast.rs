@@ -458,6 +458,7 @@ pub enum Expr {
         column: String,
     },
     Number(i64),
+    Float(f64),
     String(String),
     Star,
     Parameter(usize),
@@ -537,6 +538,10 @@ pub enum BinaryOperator {
     Some,
     Between,
     Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
     StringConcat,
 }
 

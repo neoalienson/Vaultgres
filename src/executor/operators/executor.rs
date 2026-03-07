@@ -16,6 +16,7 @@ pub enum ExecutorError {
     StorageError(String),
     InternalError(String),
     InvalidInput(String),
+    DivisionByZero,
 }
 
 impl fmt::Display for ExecutorError {
@@ -33,6 +34,7 @@ impl fmt::Display for ExecutorError {
             ExecutorError::StorageError(msg) => write!(f, "Storage error: {}", msg),
             ExecutorError::InternalError(msg) => write!(f, "Internal error: {}", msg),
             ExecutorError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
+            ExecutorError::DivisionByZero => write!(f, "Division by zero"),
         }
     }
 }

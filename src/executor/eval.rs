@@ -22,6 +22,7 @@ impl Eval {
                 tuple.get(name).cloned().ok_or_else(|| ExecutorError::ColumnNotFound(name.clone()))
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
             Expr::Star => Err(ExecutorError::UnsupportedExpression(
                 "* not allowed in this context".to_string(),
@@ -240,9 +241,55 @@ impl Eval {
             // Arithmetic operators
             BinaryOperator::Add => match (left, right) {
                 (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l + *r)),
+                (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l + *r)),
                 (Value::Text(l), Value::Text(r)) => Ok(Value::Text(format!("{}{}", l, r))),
                 _ => Err(ExecutorError::TypeMismatch(
                     "ADD requires numeric or text operands".to_string(),
+                )),
+            },
+            BinaryOperator::Subtract => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l - *r)),
+                (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l - *r)),
+                _ => Err(ExecutorError::TypeMismatch(
+                    "SUBTRACT requires numeric operands".to_string(),
+                )),
+            },
+            BinaryOperator::Multiply => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l * *r)),
+                (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l * *r)),
+                _ => Err(ExecutorError::TypeMismatch(
+                    "MULTIPLY requires numeric operands".to_string(),
+                )),
+            },
+            BinaryOperator::Divide => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => {
+                    if *r == 0 {
+                        Err(ExecutorError::DivisionByZero)
+                    } else {
+                        Ok(Value::Int(*l / *r))
+                    }
+                }
+                (Value::Float(l), Value::Float(r)) => {
+                    if *r == 0.0 {
+                        Err(ExecutorError::DivisionByZero)
+                    } else {
+                        Ok(Value::Float(*l / *r))
+                    }
+                }
+                _ => Err(ExecutorError::TypeMismatch(
+                    "DIVIDE requires numeric operands".to_string(),
+                )),
+            },
+            BinaryOperator::Modulo => match (left, right) {
+                (Value::Int(l), Value::Int(r)) => {
+                    if *r == 0 {
+                        Err(ExecutorError::DivisionByZero)
+                    } else {
+                        Ok(Value::Int(*l % *r))
+                    }
+                }
+                _ => Err(ExecutorError::TypeMismatch(
+                    "MODULO requires integer operands".to_string(),
                 )),
             },
             BinaryOperator::StringConcat => {
@@ -307,6 +354,7 @@ impl Eval {
     {
         match (left, right) {
             (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(cmp_fn(l.cmp(r)))),
+            (Value::Float(l), Value::Float(r)) => Ok(Value::Bool(cmp_fn(l.partial_cmp(r).unwrap()))),
             (Value::Text(l), Value::Text(r)) => Ok(Value::Bool(cmp_fn(l.cmp(r)))),
             _ => {
                 Err(ExecutorError::TypeMismatch("Comparison requires compatible types".to_string()))

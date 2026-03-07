@@ -14,6 +14,7 @@ impl<'a> ExprEvaluator<'a> {
     pub fn eval(&self, expr: &Expr) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
             Expr::Column(name) => self
                 .variables
@@ -97,12 +98,26 @@ impl<'a> ExprEvaluator<'a> {
                 BinaryOperator::LessThan => Ok(Value::Bool(l < r)),
                 BinaryOperator::GreaterThanOrEqual => Ok(Value::Bool(l >= r)),
                 BinaryOperator::LessThanOrEqual => Ok(Value::Bool(l <= r)),
+                BinaryOperator::Add => Ok(Value::Int(l + r)),
+                BinaryOperator::Subtract => Ok(Value::Int(l - r)),
+                BinaryOperator::Multiply => Ok(Value::Int(l * r)),
+                BinaryOperator::Divide => {
+                    if *r == 0 {
+                        Err("Division by zero".to_string())
+                    } else {
+                        Ok(Value::Int(l / r))
+                    }
+                }
+                BinaryOperator::Modulo => {
+                    if *r == 0 {
+                        Err("Division by zero".to_string())
+                    } else {
+                        Ok(Value::Int(l % r))
+                    }
+                }
                 BinaryOperator::And => Ok(Value::Bool(*l != 0 && *r != 0)),
                 BinaryOperator::Or => Ok(Value::Bool(*l != 0 || *r != 0)),
-                _ => {
-                    let op_str = format!("{:?}", op);
-                    self.eval_arithmetic(l, &op_str, r)
-                }
+                _ => Err(format!("Operator {:?} not supported for INT", op)),
             },
             (Value::Float(l), Value::Float(r)) => match op {
                 BinaryOperator::Equals => Ok(Value::Bool((l - r).abs() < f64::EPSILON)),
@@ -110,10 +125,17 @@ impl<'a> ExprEvaluator<'a> {
                 BinaryOperator::LessThan => Ok(Value::Bool(l < r)),
                 BinaryOperator::GreaterThanOrEqual => Ok(Value::Bool(l >= r)),
                 BinaryOperator::LessThanOrEqual => Ok(Value::Bool(l <= r)),
-                _ => {
-                    let op_str = format!("{:?}", op);
-                    self.eval_float_arithmetic(l, &op_str, r)
+                BinaryOperator::Add => Ok(Value::Float(l + r)),
+                BinaryOperator::Subtract => Ok(Value::Float(l - r)),
+                BinaryOperator::Multiply => Ok(Value::Float(l * r)),
+                BinaryOperator::Divide => {
+                    if *r == 0.0 {
+                        Err("Division by zero".to_string())
+                    } else {
+                        Ok(Value::Float(l / r))
+                    }
                 }
+                _ => Err(format!("Operator {:?} not supported for FLOAT", op)),
             },
             (Value::Bool(l), Value::Bool(r)) => match op {
                 BinaryOperator::And => Ok(Value::Bool(*l && *r)),
@@ -139,48 +161,6 @@ impl<'a> ExprEvaluator<'a> {
                 _ => Err(format!("Operator {:?} not supported for TEXT", op)),
             },
             _ => Err("Type mismatch in binary operation".to_string()),
-        }
-    }
-
-    fn eval_arithmetic(&self, left: &i64, op: &str, right: &i64) -> Result<Value, String> {
-        if op.contains("Add") || op.contains("+") {
-            Ok(Value::Int(left + right))
-        } else if op.contains("Sub") || op.contains("-") {
-            Ok(Value::Int(left - right))
-        } else if op.contains("Mul") || op.contains("*") {
-            Ok(Value::Int(left * right))
-        } else if op.contains("Div") || op.contains("/") {
-            if *right == 0 {
-                Err("Division by zero".to_string())
-            } else {
-                Ok(Value::Int(left / right))
-            }
-        } else if op.contains("Mod") || op.contains("%") {
-            if *right == 0 {
-                Err("Division by zero".to_string())
-            } else {
-                Ok(Value::Int(left % right))
-            }
-        } else {
-            Err(format!("Unknown operator: {}", op))
-        }
-    }
-
-    fn eval_float_arithmetic(&self, left: &f64, op: &str, right: &f64) -> Result<Value, String> {
-        if op.contains("Add") {
-            Ok(Value::Float(left + right))
-        } else if op.contains("Sub") {
-            Ok(Value::Float(left - right))
-        } else if op.contains("Mul") {
-            Ok(Value::Float(left * right))
-        } else if op.contains("Div") {
-            if *right == 0.0 {
-                Err("Division by zero".to_string())
-            } else {
-                Ok(Value::Float(left / right))
-            }
-        } else {
-            Err(format!("Unknown operator: {}", op))
         }
     }
 }

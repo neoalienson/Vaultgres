@@ -32,6 +32,13 @@ impl Value {
             Value::Null => vec![],
         }
     }
+
+    pub fn as_float(&self) -> Result<f64, String> {
+        match self {
+            Value::Float(f) => Ok(*f),
+            _ => Err(format!("Cannot convert {:?} to f64", self)),
+        }
+    }
 }
 
 impl Eq for Value {}
