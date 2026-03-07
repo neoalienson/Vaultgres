@@ -305,11 +305,11 @@ fn test_pet_store_high_volume_sales() {
     let env = TestEnv::new().with_vaultgres().start();
     let db = env.vaultgres();
 
-    db.execute("CREATE TABLE sales (id INT, product TEXT, amount INT, timestamp INT)").unwrap();
+    db.execute("CREATE TABLE sales (id INT, product TEXT, amount INT, ts INT)").unwrap();
 
     eprintln!("[PetStore] Recording 100 sales transactions...");
     let start = Instant::now();
-    
+
     for i in 0..100 {
         let product = match i % 5 {
             0 => "Dog Food",
@@ -319,22 +319,22 @@ fn test_pet_store_high_volume_sales() {
             _ => "Pet Toys",
         };
         let amount = (i % 10 + 1) * 10;
-        
+
         db.execute(&format!(
             "INSERT INTO sales VALUES ({}, '{}', {}, {})",
             i, product, amount, i
         )).ok();
     }
-    
+
     let duration = start.elapsed();
     let tps = 100.0 / duration.as_secs_f64();
-    
+
     eprintln!("[PetStore] Completed 100 sales in {:?}", duration);
     eprintln!("[PetStore] Throughput: {:.2} transactions/sec", tps);
-    
+
     assert!(tps > 5.0, "Transaction throughput too low: {:.2} TPS", tps);
-    
+
     db.execute("DROP TABLE sales").ok();
-    
+
     eprintln!("=== Test PASSED ===");
 }

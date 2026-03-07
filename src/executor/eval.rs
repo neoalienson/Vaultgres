@@ -30,14 +30,15 @@ impl Eval {
 
             // Binary operations
             Expr::BinaryOp { left, op, right } => {
-                let left_val = Self::eval_expr(left, tuple)?;
+                let left_val = Self::eval_expr_with_catalog(left, tuple, catalog)?;
 
-                // Special handling for IN with List
+                // Special handling for IN with List or Subquery
                 if *op == BinaryOperator::In {
                     if let Expr::List(values) = right.as_ref() {
                         let mut found = false;
                         for val_expr in values {
-                            if let Ok(val) = Self::eval_expr(val_expr, tuple) {
+                            if let Ok(val) = Self::eval_expr_with_catalog(val_expr, tuple, catalog)
+                            {
                                 if val == left_val {
                                     found = true;
                                     break;
@@ -46,25 +47,63 @@ impl Eval {
                         }
                         return Ok(Value::Bool(found));
                     }
+                    // Handle IN with subquery
+                    if let Expr::Subquery(stmt) = right.as_ref() {
+                        if let Some(catalog) = catalog {
+                            let subquery_result = Self::eval_scalar_subquery(catalog, stmt);
+                            // For IN subquery, we need to check if left_val is in the result set
+                            // Execute the subquery and get all results
+                            let catalog_arc = Arc::new(catalog.clone());
+                            let result = crate::catalog::Catalog::select_with_catalog(
+                                &catalog_arc,
+                                &stmt.from,
+                                stmt.distinct,
+                                stmt.columns.clone(),
+                                stmt.where_clause.clone(),
+                                stmt.group_by.clone(),
+                                stmt.having.clone(),
+                                stmt.order_by.clone(),
+                                stmt.limit,
+                                stmt.offset,
+                            );
+                            match result {
+                                Ok(rows) => {
+                                    let found =
+                                        rows.iter().any(|row| row.len() == 1 && row[0] == left_val);
+                                    return Ok(Value::Bool(found));
+                                }
+                                Err(e) => {
+                                    return Err(ExecutorError::InternalError(format!(
+                                        "IN subquery failed: {}",
+                                        e
+                                    )));
+                                }
+                            }
+                        } else {
+                            return Err(ExecutorError::UnsupportedExpression(
+                                "IN subqueries require catalog".to_string(),
+                            ));
+                        }
+                    }
                 }
 
-                let right_val = Self::eval_expr(right, tuple)?;
+                let right_val = Self::eval_expr_with_catalog(right, tuple, catalog)?;
                 Self::eval_binary_op(&left_val, op, &right_val)
             }
 
             // Unary operations
             Expr::UnaryOp { op, expr } => {
-                let val = Self::eval_expr(expr, tuple)?;
+                let val = Self::eval_expr_with_catalog(expr, tuple, catalog)?;
                 Self::eval_unary_op(op, &val)
             }
 
             // NULL checks
             Expr::IsNull(inner) => {
-                let val = Self::eval_expr(inner, tuple)?;
+                let val = Self::eval_expr_with_catalog(inner, tuple, catalog)?;
                 Ok(Value::Bool(matches!(val, Value::Null)))
             }
             Expr::IsNotNull(inner) => {
-                let val = Self::eval_expr(inner, tuple)?;
+                let val = Self::eval_expr_with_catalog(inner, tuple, catalog)?;
                 Ok(Value::Bool(!matches!(val, Value::Null)))
             }
 
@@ -72,7 +111,7 @@ impl Eval {
             Expr::FunctionCall { name, args } => {
                 let mut evaluated_args = Vec::new();
                 for arg in args {
-                    evaluated_args.push(Self::eval_expr(arg, tuple)?);
+                    evaluated_args.push(Self::eval_expr_with_catalog(arg, tuple, catalog)?);
                 }
                 Self::eval_function(name, evaluated_args)
             }
@@ -85,27 +124,27 @@ impl Eval {
                 if matches!(arg.as_ref(), Expr::Star) {
                     Ok(Value::Int(1))
                 } else {
-                    Self::eval_expr(arg, tuple)
+                    Self::eval_expr_with_catalog(arg, tuple, catalog)
                 }
             }
 
             // CASE expression
             Expr::Case { conditions, else_expr } => {
                 for (condition, result) in conditions {
-                    let cond_val = Self::eval_expr(condition, tuple)?;
+                    let cond_val = Self::eval_expr_with_catalog(condition, tuple, catalog)?;
                     if let Value::Bool(true) = cond_val {
-                        return Self::eval_expr(result, tuple);
+                        return Self::eval_expr_with_catalog(result, tuple, catalog);
                     }
                 }
                 if let Some(else_expr) = else_expr {
-                    Self::eval_expr(else_expr, tuple)
+                    Self::eval_expr_with_catalog(else_expr, tuple, catalog)
                 } else {
                     Ok(Value::Null)
                 }
             }
 
             // Aliased expressions
-            Expr::Alias { expr, alias: _ } => Self::eval_expr(expr, tuple),
+            Expr::Alias { expr, alias: _ } => Self::eval_expr_with_catalog(expr, tuple, catalog),
 
             // Unsupported in this context
             Expr::QualifiedColumn { table, column } => {

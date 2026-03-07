@@ -6,4 +6,7 @@ mod interpreter;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod evaluator_tests;
+
 pub use interpreter::PlPgSqlInterpreter;
