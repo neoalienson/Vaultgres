@@ -1,5 +1,5 @@
 use super::error::Result;
-use super::writer::{RecordType, WALWriter, LSN};
+use super::writer::{LSN, RecordType, WALWriter};
 use crate::storage::BufferPool;
 use crate::transaction::TransactionManager;
 use std::sync::Arc;

@@ -1,5 +1,5 @@
 use super::error::Result;
-use super::writer::{RecordType, WALRecord, LSN};
+use super::writer::{LSN, RecordType, WALRecord};
 use crate::storage::PageId;
 use crate::transaction::TransactionId;
 use std::collections::HashSet;

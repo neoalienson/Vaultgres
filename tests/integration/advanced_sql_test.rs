@@ -87,11 +87,7 @@ fn test_correlated_exists_filter() {
 
     let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
         if let Value::Int(id) = row[0] {
-            if id % 2 == 1 {
-                Ok(vec![vec![Value::Int(1)]])
-            } else {
-                Ok(vec![])
-            }
+            if id % 2 == 1 { Ok(vec![vec![Value::Int(1)]]) } else { Ok(vec![]) }
         } else {
             Ok(vec![])
         }
@@ -108,11 +104,7 @@ fn test_correlated_scalar_join() {
     let outer = vec![vec![Value::Int(1)], vec![Value::Int(2)], vec![Value::Int(3)]];
 
     let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-        if let Value::Int(n) = row[0] {
-            Ok(vec![vec![Value::Int(n * 10)]])
-        } else {
-            Ok(vec![])
-        }
+        if let Value::Int(n) = row[0] { Ok(vec![vec![Value::Int(n * 10)]]) } else { Ok(vec![]) }
     };
 
     let result = CorrelatedExecutor::execute_scalar(&outer, &subquery_fn).unwrap();
@@ -656,9 +648,9 @@ mod advanced_sql_new_tests {
 
         assert!(registry.resolve("json_object", &[]).is_some());
         assert!(registry.resolve("json_array", &[]).is_some());
-        assert!(registry
-            .resolve("json_extract", &["JSON".to_string(), "TEXT".to_string()])
-            .is_some());
+        assert!(
+            registry.resolve("json_extract", &["JSON".to_string(), "TEXT".to_string()]).is_some()
+        );
 
         let obj = BuiltinFunctions::execute("json_object", vec![]).unwrap();
         assert_eq!(obj, Value::Json("{}".to_string()));

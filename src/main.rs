@@ -35,7 +35,10 @@ fn main() -> std::io::Result<()> {
             .join(",")
     };
 
-    env::set_var("RUST_LOG", filter);
+    // SAFETY: set_var is not thread-safe, but we are in the main thread and no other threads have been spawned yet.
+    unsafe {
+        env::set_var("RUST_LOG", filter);
+    }
     env_logger::init();
 
     let addr = format!("{}:{}", config.server.host, config.server.port);

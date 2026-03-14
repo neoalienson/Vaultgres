@@ -1,6 +1,6 @@
 use super::error::Result;
-use super::writer::{WALRecord, LSN};
-use std::fs::{create_dir_all, File, OpenOptions};
+use super::writer::{LSN, WALRecord};
+use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;

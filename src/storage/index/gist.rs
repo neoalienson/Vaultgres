@@ -112,11 +112,7 @@ impl Index for GiSTIndex {
         match &self.root {
             Some(root) => {
                 let result = self.search_node(root, key);
-                if result.is_empty() {
-                    Err(IndexError::KeyNotFound)
-                } else {
-                    Ok(result)
-                }
+                if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
             }
             None => Err(IndexError::KeyNotFound),
         }
@@ -151,11 +147,7 @@ impl Index for GiSTIndex {
         match &self.root {
             Some(root) => {
                 let result = search_range(root, &query_box);
-                if result.is_empty() {
-                    Err(IndexError::KeyNotFound)
-                } else {
-                    Ok(result)
-                }
+                if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
             }
             None => Err(IndexError::KeyNotFound),
         }

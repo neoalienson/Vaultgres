@@ -55,7 +55,7 @@ impl BRINIndex {
 
 impl Index for BRINIndex {
     fn insert(&mut self, key: &[u8], tid: TupleId) -> Result<(), IndexError> {
-        let page = tid.0 .0;
+        let page = tid.0.0;
         self.update_range_bounds(page, key);
         let range = self.get_or_create_range(page);
         range.tids.push(tid);
@@ -63,7 +63,7 @@ impl Index for BRINIndex {
     }
 
     fn delete(&mut self, _key: &[u8], tid: TupleId) -> Result<bool, IndexError> {
-        let page = tid.0 .0;
+        let page = tid.0.0;
         let range_idx = (page as usize) / self.pages_per_range;
 
         if range_idx < self.ranges.len() {
@@ -90,11 +90,7 @@ impl Index for BRINIndex {
             }
         }
 
-        if result.is_empty() {
-            Err(IndexError::KeyNotFound)
-        } else {
-            Ok(result)
-        }
+        if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
     }
 
     fn range_search(&self, start: &[u8], end: &[u8]) -> Result<Vec<TupleId>, IndexError> {
@@ -111,11 +107,7 @@ impl Index for BRINIndex {
             }
         }
 
-        if result.is_empty() {
-            Err(IndexError::KeyNotFound)
-        } else {
-            Ok(result)
-        }
+        if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
     }
 
     fn index_type(&self) -> IndexType {

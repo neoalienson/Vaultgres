@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use vaultgres::catalog::Catalog;
-    use vaultgres::parser::ast::*;
     use vaultgres::parser::Parser;
+    use vaultgres::parser::ast::*;
 
     fn setup_users_table(catalog: &Catalog) {
         catalog

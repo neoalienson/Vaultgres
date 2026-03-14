@@ -58,14 +58,18 @@ mod tests {
         assert!(registry.resolve("upper", &["TEXT".to_string()]).is_some());
         assert!(registry.resolve("lower", &["TEXT".to_string()]).is_some());
         assert!(registry.resolve("length", &["TEXT".to_string()]).is_some());
-        assert!(registry
-            .resolve("substring", &["TEXT".to_string(), "INT".to_string(), "INT".to_string()])
-            .is_some());
+        assert!(
+            registry
+                .resolve("substring", &["TEXT".to_string(), "INT".to_string(), "INT".to_string()])
+                .is_some()
+        );
         assert!(registry.resolve("concat", &["TEXT".to_string(), "TEXT".to_string()]).is_some());
         assert!(registry.resolve("trim", &["TEXT".to_string()]).is_some());
-        assert!(registry
-            .resolve("replace", &["TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string()])
-            .is_some());
+        assert!(
+            registry
+                .resolve("replace", &["TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string()])
+                .is_some()
+        );
         assert!(registry.resolve("abs", &["INT".to_string()]).is_some());
         assert!(registry.resolve("power", &["INT".to_string(), "INT".to_string()]).is_some());
         assert!(registry.resolve("sqrt", &["INT".to_string()]).is_some());
@@ -74,15 +78,17 @@ mod tests {
         assert!(registry.resolve("ceil", &["INT".to_string()]).is_some());
         assert!(registry.resolve("floor", &["INT".to_string()]).is_some());
         assert!(registry.resolve("random", &[]).is_some());
-        assert!(registry
-            .resolve("split_part", &["TEXT".to_string(), "TEXT".to_string(), "INT".to_string()])
-            .is_some());
+        assert!(
+            registry
+                .resolve("split_part", &["TEXT".to_string(), "TEXT".to_string(), "INT".to_string()])
+                .is_some()
+        );
         assert!(registry.resolve("now", &[]).is_some());
         assert!(registry.resolve("current_date", &[]).is_some());
         assert!(registry.resolve("array_length", &["ARRAY".to_string()]).is_some());
-        assert!(registry
-            .resolve("array_append", &["ARRAY".to_string(), "INT".to_string()])
-            .is_some());
+        assert!(
+            registry.resolve("array_append", &["ARRAY".to_string(), "INT".to_string()]).is_some()
+        );
     }
 
     #[test]

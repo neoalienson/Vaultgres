@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use vaultgres::parser::ast::{Expr, Statement};
-    use vaultgres::parser::Parser;
     use vaultgres::PreparedStatementManager;
+    use vaultgres::parser::Parser;
+    use vaultgres::parser::ast::{Expr, Statement};
 
     #[test]
     fn test_parse_prepare() {

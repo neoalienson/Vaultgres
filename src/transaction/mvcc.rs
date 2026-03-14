@@ -1,4 +1,4 @@
-use super::manager::{TransactionId, TransactionManager, FROZEN_XID};
+use super::manager::{FROZEN_XID, TransactionId, TransactionManager};
 use super::snapshot::Snapshot;
 
 /// Tuple header for MVCC

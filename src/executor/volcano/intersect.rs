@@ -4,8 +4,8 @@
 //! Duplicates are removed (INTERSECT DISTINCT semantics).
 
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 pub struct IntersectExecutor {

@@ -1,8 +1,8 @@
 use super::error::{Result, TransactionError};
 use super::snapshot::Snapshot;
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Transaction ID type
 pub type TransactionId = u64;

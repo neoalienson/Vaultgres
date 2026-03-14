@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use vaultgres::catalog::Catalog;
+    use vaultgres::parser::Parser;
     use vaultgres::parser::ast::Statement;
     use vaultgres::parser::ast::{ColumnDef, DataType, Expr};
-    use vaultgres::parser::Parser;
 
     #[test]
     fn test_create_table_with_serial() {

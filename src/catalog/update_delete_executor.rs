@@ -231,29 +231,37 @@ mod tests {
     // --- validate_type tests ---
     #[test]
     fn test_validate_type_success() {
-        assert!(UpdateDeleteExecutor::validate_type(&DataType::Int, &Value::Int(10), "col").is_ok());
-        assert!(UpdateDeleteExecutor::validate_type(
-            &DataType::Text,
-            &Value::Text("hello".to_string()),
-            "col"
-        )
-        .is_ok());
-        assert!(UpdateDeleteExecutor::validate_type(
-            &DataType::Varchar(10),
-            &Value::Text("short".to_string()),
-            "col"
-        )
-        .is_ok());
+        assert!(
+            UpdateDeleteExecutor::validate_type(&DataType::Int, &Value::Int(10), "col").is_ok()
+        );
+        assert!(
+            UpdateDeleteExecutor::validate_type(
+                &DataType::Text,
+                &Value::Text("hello".to_string()),
+                "col"
+            )
+            .is_ok()
+        );
+        assert!(
+            UpdateDeleteExecutor::validate_type(
+                &DataType::Varchar(10),
+                &Value::Text("short".to_string()),
+                "col"
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn test_validate_type_mismatch() {
-        assert!(UpdateDeleteExecutor::validate_type(
-            &DataType::Int,
-            &Value::Text("hello".to_string()),
-            "col"
-        )
-        .is_err());
+        assert!(
+            UpdateDeleteExecutor::validate_type(
+                &DataType::Int,
+                &Value::Text("hello".to_string()),
+                "col"
+            )
+            .is_err()
+        );
         assert_eq!(
             UpdateDeleteExecutor::validate_type(
                 &DataType::Int,

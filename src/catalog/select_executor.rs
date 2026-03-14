@@ -273,11 +273,7 @@ impl SelectExecutor {
 
             results.sort_by(|a, b| {
                 let cmp = a[col_idx].cmp(&b[col_idx]);
-                if order_expr.ascending {
-                    cmp
-                } else {
-                    cmp.reverse()
-                }
+                if order_expr.ascending { cmp } else { cmp.reverse() }
             });
         }
         Ok(())

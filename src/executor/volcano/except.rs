@@ -4,8 +4,8 @@
 //! in the right child. Duplicates are removed from the result.
 
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 pub struct ExceptExecutor {

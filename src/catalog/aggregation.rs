@@ -1,4 +1,4 @@
-use super::{predicate::PredicateEvaluator, Catalog, TableSchema, Tuple, Value};
+use super::{Catalog, TableSchema, Tuple, Value, predicate::PredicateEvaluator};
 use crate::parser::ast::Expr;
 use crate::transaction::TransactionManager;
 use std::sync::Arc;
@@ -130,11 +130,7 @@ impl Aggregator {
                 if let Expr::Column(col_name) = col_expr {
                     // Check if the select column is one of the group by columns
                     if group_cols.iter().any(|g_expr| {
-                        if let Expr::Column(g_name) = g_expr {
-                            g_name == col_name
-                        } else {
-                            false
-                        }
+                        if let Expr::Column(g_name) = g_expr { g_name == col_name } else { false }
                     }) {
                         let idx = group_cols
                             .iter()

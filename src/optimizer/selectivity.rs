@@ -8,11 +8,7 @@ impl SelectivityEstimator {
     }
 
     pub fn estimate_equality(&self, stats: &ColumnStats) -> f64 {
-        if stats.n_distinct > 0.0 {
-            1.0 / stats.n_distinct
-        } else {
-            0.1
-        }
+        if stats.n_distinct > 0.0 { 1.0 / stats.n_distinct } else { 0.1 }
     }
 
     pub fn estimate_range(&self, _stats: &ColumnStats, _lower: i64, _upper: i64) -> f64 {

@@ -20,19 +20,11 @@ impl PartialIndex {
 
 impl Index for PartialIndex {
     fn insert(&mut self, key: &[u8], tid: TupleId) -> Result<(), IndexError> {
-        if self.should_index(key) {
-            self.inner.insert(key, tid)
-        } else {
-            Ok(())
-        }
+        if self.should_index(key) { self.inner.insert(key, tid) } else { Ok(()) }
     }
 
     fn delete(&mut self, key: &[u8], tid: TupleId) -> Result<bool, IndexError> {
-        if self.should_index(key) {
-            self.inner.delete(key, tid)
-        } else {
-            Ok(false)
-        }
+        if self.should_index(key) { self.inner.delete(key, tid) } else { Ok(false) }
     }
 
     fn search(&self, key: &[u8]) -> Result<Vec<TupleId>, IndexError> {

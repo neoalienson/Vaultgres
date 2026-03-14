@@ -29,7 +29,7 @@ pub mod page;
 pub use buffer_pool::BufferPool;
 pub use disk::DiskManager;
 pub use error::{Result, StorageError};
-pub use page::{Page, PageId, PAGE_SIZE};
+pub use page::{PAGE_SIZE, Page, PageId};
 
 #[cfg(test)]
 mod edge_tests;

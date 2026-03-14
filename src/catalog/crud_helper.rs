@@ -128,13 +128,17 @@ mod tests {
         let type_name = "Item";
 
         // Create item1
-        assert!(CrudHelper::create(&store, "item1".to_string(), "value1".to_string(), type_name)
-            .is_ok());
+        assert!(
+            CrudHelper::create(&store, "item1".to_string(), "value1".to_string(), type_name)
+                .is_ok()
+        );
         assert_eq!(CrudHelper::get(&store, "item1"), Some("value1".to_string()));
 
         // Create item2
-        assert!(CrudHelper::create(&store, "item2".to_string(), "value2".to_string(), type_name)
-            .is_ok());
+        assert!(
+            CrudHelper::create(&store, "item2".to_string(), "value2".to_string(), type_name)
+                .is_ok()
+        );
         assert_eq!(CrudHelper::get(&store, "item2"), Some("value2".to_string()));
 
         // Drop item1
@@ -143,13 +147,10 @@ mod tests {
         assert_eq!(CrudHelper::get(&store, "item2"), Some("value2".to_string())); // item2 still exists
 
         // Try to create item1 again
-        assert!(CrudHelper::create(
-            &store,
-            "item1".to_string(),
-            "new_value1".to_string(),
-            type_name
-        )
-        .is_ok());
+        assert!(
+            CrudHelper::create(&store, "item1".to_string(), "new_value1".to_string(), type_name)
+                .is_ok()
+        );
         assert_eq!(CrudHelper::get(&store, "item1"), Some("new_value1".to_string()));
     }
 }

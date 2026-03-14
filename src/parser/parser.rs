@@ -232,7 +232,7 @@ impl Parser {
     }
 
     fn parse_with(&mut self) -> Result<Statement> {
-        use crate::parser::ast::{WithStmt, CTE};
+        use crate::parser::ast::{CTE, WithStmt};
 
         self.expect(Token::With)?;
 

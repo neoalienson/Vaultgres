@@ -302,8 +302,8 @@ mod tests {
         // Incorrect type
         let resolved = registry.resolve_with_defaults("only_int", &["TEXT".to_string()]);
         assert!(resolved.is_some()); // `resolve_with_defaults` only checks count, not type.
-                                     // This indicates a potential design choice that needs to be understood.
-                                     // For now, testing its current behavior.
+        // This indicates a potential design choice that needs to be understood.
+        // For now, testing its current behavior.
     }
 
     #[test]

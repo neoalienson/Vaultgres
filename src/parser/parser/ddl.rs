@@ -1,5 +1,5 @@
-use super::select;
 use super::Parser;
+use super::select;
 use crate::parser::ast::{
     CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
     CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,

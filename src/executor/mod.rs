@@ -103,7 +103,7 @@ pub use unnest::UnnestExecutor;
 
 #[cfg(test)]
 pub use test_helpers::{
-    compare_executors, count_results, create_multi_column_schema, create_simple_schema,
-    run_executor, test_executor_lifecycle, tuple_with_value, MockExecutor as TestMockExecutor,
-    TupleBuilder,
+    MockExecutor as TestMockExecutor, TupleBuilder, compare_executors, count_results,
+    create_multi_column_schema, create_simple_schema, run_executor, test_executor_lifecycle,
+    tuple_with_value,
 };
