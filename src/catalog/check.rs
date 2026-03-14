@@ -53,7 +53,7 @@ impl CheckValidator {
                 BinaryOperator::GreaterThan => l > r,
                 BinaryOperator::GreaterThanOrEqual => l >= r,
                 BinaryOperator::And | BinaryOperator::Or => {
-                    return Err("Logical operators require boolean operands".to_string())
+                    return Err("Logical operators require boolean operands".to_string());
                 }
                 _ => return Err(format!("Unsupported operator: {:?}", op)),
             }),

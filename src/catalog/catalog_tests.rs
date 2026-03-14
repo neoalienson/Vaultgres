@@ -7,10 +7,7 @@
 mod tests {
 
     use crate::catalog::Catalog;
-    use crate::catalog::TableSchema;
-    use crate::parser::ast::{
-        ColumnDef, DataType, Expr, ForeignKeyAction, ForeignKeyDef, SelectStmt,
-    };
+    use crate::parser::ast::{ColumnDef, DataType, Expr, SelectStmt};
     use tempfile;
 
     fn create_mock_table(catalog: &Catalog, table_name: &str) -> Result<(), String> {

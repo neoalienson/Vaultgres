@@ -8,9 +8,9 @@ mod tests {
 
     #[test]
     fn test_morsel_large_table() {
-        let gen = MorselGenerator::new(1_000_000, 10_000);
+        let r#gen = MorselGenerator::new(1_000_000, 10_000);
         let mut count = 0;
-        while gen.next_morsel().is_some() {
+        while r#gen.next_morsel().is_some() {
             count += 1;
         }
         assert_eq!(count, 100);
@@ -18,9 +18,9 @@ mod tests {
 
     #[test]
     fn test_morsel_odd_size() {
-        let gen = MorselGenerator::new(1001, 100);
+        let r#gen = MorselGenerator::new(1001, 100);
         let mut total = 0;
-        while let Some(range) = gen.next_morsel() {
+        while let Some(range) = r#gen.next_morsel() {
             total += range.end - range.start;
         }
         assert_eq!(total, 1001);
@@ -82,11 +82,11 @@ mod tests {
         use std::sync::Arc;
         use std::thread;
 
-        let gen = Arc::new(MorselGenerator::new(1000, 10));
+        let r#gen = Arc::new(MorselGenerator::new(1000, 10));
         let mut handles = vec![];
 
         for _ in 0..4 {
-            let gen_clone = Arc::clone(&gen);
+            let r#gen_clone = Arc::clone(&r#gen);
             let handle = thread::spawn(move || {
                 let mut count = 0;
                 while gen_clone.next_morsel().is_some() {
@@ -112,14 +112,14 @@ mod tests {
 
     #[test]
     fn test_morsel_reset() {
-        let gen = MorselGenerator::new(100, 10);
+        let r#gen = MorselGenerator::new(100, 10);
 
         for _ in 0..5 {
-            gen.next_morsel();
+            r#gen.next_morsel();
         }
 
-        gen.reset();
-        let first = gen.next_morsel().unwrap();
+        r#gen.reset();
+        let first = r#gen.next_morsel().unwrap();
         assert_eq!(first.start, 0);
         assert_eq!(first.end, 10);
     }
@@ -144,10 +144,10 @@ mod tests {
 
     #[test]
     fn test_morsel_single_large_morsel() {
-        let gen = MorselGenerator::new(100, 1000);
-        let morsel = gen.next_morsel().unwrap();
+        let r#gen = MorselGenerator::new(100, 1000);
+        let morsel = r#gen.next_morsel().unwrap();
         assert_eq!(morsel.start, 0);
         assert_eq!(morsel.end, 100);
-        assert!(gen.next_morsel().is_none());
+        assert!(r#gen.next_morsel().is_none());
     }
 }

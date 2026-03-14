@@ -21,7 +21,7 @@ impl UpdateDeleteExecutor {
                 continue;
             }
 
-            if let Some(ref predicate) = where_clause {
+            if let Some(predicate) = where_clause {
                 if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
                     continue;
                 }
@@ -80,7 +80,7 @@ impl UpdateDeleteExecutor {
                 continue;
             }
 
-            if let Some(ref predicate) = where_clause {
+            if let Some(predicate) = where_clause {
                 if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
                     continue;
                 }
@@ -168,7 +168,7 @@ mod tests {
                 continue;
             }
 
-            if let Some(ref predicate) = where_clause {
+            if let Some(predicate) = where_clause {
                 if !MockPredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
                     continue;
                 }
@@ -194,7 +194,7 @@ mod tests {
                 continue;
             }
 
-            if let Some(ref predicate) = where_clause {
+            if let Some(predicate) = where_clause {
                 if !MockPredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
                     continue;
                 }

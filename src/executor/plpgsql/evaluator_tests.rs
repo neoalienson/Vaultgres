@@ -29,14 +29,20 @@ mod tests {
     fn test_eval_float_positive() {
         let vars = HashMap::new();
         let evaluator = ExprEvaluator::new(&vars);
-        assert_eq!(evaluator.eval(&Expr::Float(3.14159)).unwrap(), Value::Float(3.14159));
+        assert_eq!(
+            evaluator.eval(&Expr::Float(std::f64::consts::PI)).unwrap(),
+            Value::Float(std::f64::consts::PI)
+        );
     }
 
     #[test]
     fn test_eval_float_negative() {
         let vars = HashMap::new();
         let evaluator = ExprEvaluator::new(&vars);
-        assert_eq!(evaluator.eval(&Expr::Float(-2.71828)).unwrap(), Value::Float(-2.71828));
+        assert_eq!(
+            evaluator.eval(&Expr::Float(-std::f64::consts::E)).unwrap(),
+            Value::Float(-std::f64::consts::E)
+        );
     }
 
     #[test]
@@ -354,9 +360,9 @@ mod tests {
         let vars = HashMap::new();
         let evaluator = ExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Float(3.14159)),
+            left: Box::new(Expr::Float(std::f64::consts::PI)),
             op: BinaryOperator::Equals,
-            right: Box::new(Expr::Float(3.14159)),
+            right: Box::new(Expr::Float(std::f64::consts::PI)),
         };
         assert_eq!(evaluator.eval(&expr).unwrap(), Value::Bool(true));
     }

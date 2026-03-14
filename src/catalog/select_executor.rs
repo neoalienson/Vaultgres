@@ -302,8 +302,6 @@ impl SelectExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::ColumnDef;
-    use crate::parser::ast::DataType;
 
     // --- apply_limit_offset tests ---
 

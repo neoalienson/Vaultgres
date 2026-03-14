@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_type_mapping_float() {
-        let value = Value::Float(3.14);
+        let value = Value::Float(std::f64::consts::PI);
         let (oid, size) = value_to_pg_type(&value);
         assert_eq!(oid, pg_types::FLOAT8);
         assert_eq!(size, 8);

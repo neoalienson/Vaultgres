@@ -39,7 +39,7 @@ impl PlPgSqlInterpreter {
             match executor.execute(stmt)? {
                 ControlFlow::Return(val) => return Ok(val),
                 ControlFlow::Exit | ControlFlow::Continue => {
-                    return Err("EXIT/CONTINUE outside loop".to_string())
+                    return Err("EXIT/CONTINUE outside loop".to_string());
                 }
                 ControlFlow::None => {}
             }

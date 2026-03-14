@@ -28,16 +28,19 @@ impl SeqScanExecutor {
 
 impl Executor for SeqScanExecutor {
     fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
-        while self.current_idx < self.data.len() {
+        loop {
+            if self.current_idx >= self.data.len() {
+                return Ok(None);
+            }
+
             let catalog_tuple = &self.data[self.current_idx];
             self.current_idx += 1;
 
             // Check tuple visibility using transaction manager
-            // For now, skip visibility check to debug aggregation issues
-            // let snapshot = self.txn_mgr.get_snapshot();
-            // if !catalog_tuple.header.is_visible(&snapshot, &self.txn_mgr) {
-            //     continue; // Skip invisible tuples
-            // }
+            let snapshot = self.txn_mgr.get_snapshot();
+            if !catalog_tuple.header.is_visible(&snapshot, &self.txn_mgr) {
+                continue; // Skip invisible tuples
+            }
 
             // Convert catalog tuple to HashMap format
             let mut tuple_map = HashMap::new();
@@ -47,7 +50,5 @@ impl Executor for SeqScanExecutor {
 
             return Ok(Some(tuple_map));
         }
-
-        Ok(None)
     }
 }

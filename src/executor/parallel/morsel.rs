@@ -46,40 +46,40 @@ mod tests {
 
     #[test]
     fn test_morsel_generation() {
-        let gen = MorselGenerator::new(100, 10);
-        let m1 = gen.next_morsel().unwrap();
+        let r#gen = MorselGenerator::new(100, 10);
+        let m1 = r#gen.next_morsel().unwrap();
         assert_eq!(m1.start, 0);
         assert_eq!(m1.end, 10);
 
-        let m2 = gen.next_morsel().unwrap();
+        let m2 = r#gen.next_morsel().unwrap();
         assert_eq!(m2.start, 10);
         assert_eq!(m2.end, 20);
     }
 
     #[test]
     fn test_morsel_boundary() {
-        let gen = MorselGenerator::new(95, 10);
+        let r#gen = MorselGenerator::new(95, 10);
         for _ in 0..9 {
-            gen.next_morsel();
+            r#gen.next_morsel();
         }
-        let last = gen.next_morsel().unwrap();
+        let last = r#gen.next_morsel().unwrap();
         assert_eq!(last.start, 90);
         assert_eq!(last.end, 95);
-        assert!(gen.next_morsel().is_none());
+        assert!(r#gen.next_morsel().is_none());
     }
 
     #[test]
     fn test_empty_table() {
-        let gen = MorselGenerator::new(0, 10);
-        assert!(gen.next_morsel().is_none());
+        let r#gen = MorselGenerator::new(0, 10);
+        assert!(r#gen.next_morsel().is_none());
     }
 
     #[test]
     fn test_single_tuple() {
-        let gen = MorselGenerator::new(1, 10);
-        let m = gen.next_morsel().unwrap();
+        let r#gen = MorselGenerator::new(1, 10);
+        let m = r#gen.next_morsel().unwrap();
         assert_eq!(m.start, 0);
         assert_eq!(m.end, 1);
-        assert!(gen.next_morsel().is_none());
+        assert!(r#gen.next_morsel().is_none());
     }
 }

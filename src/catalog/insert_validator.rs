@@ -190,7 +190,7 @@ impl InsertValidator {
 mod tests {
     use super::*;
     use crate::catalog::{TableSchema, Value};
-    use crate::parser::ast::{ColumnDef, DataType, Expr, UniqueConstraint};
+    use crate::parser::ast::{ColumnDef, DataType, Expr};
     use std::sync::{Arc, RwLock};
 
     // Helper function to create a ColumnDef

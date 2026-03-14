@@ -665,22 +665,22 @@ mod evaluator_tests {
     // is_true tests
     #[test]
     fn test_is_true_int() {
-        assert_eq!(ExprEvaluator::is_true(&Value::Int(1)), true);
-        assert_eq!(ExprEvaluator::is_true(&Value::Int(0)), false);
-        assert_eq!(ExprEvaluator::is_true(&Value::Int(-1)), true);
+        assert!(ExprEvaluator::is_true(&Value::Int(1)));
+        assert!(!ExprEvaluator::is_true(&Value::Int(0)));
+        assert!(ExprEvaluator::is_true(&Value::Int(-1)));
     }
 
     #[test]
     fn test_is_true_bool() {
-        assert_eq!(ExprEvaluator::is_true(&Value::Bool(true)), true);
-        assert_eq!(ExprEvaluator::is_true(&Value::Bool(false)), false);
+        assert!(ExprEvaluator::is_true(&Value::Bool(true)));
+        assert!(!ExprEvaluator::is_true(&Value::Bool(false)));
     }
 
     #[test]
     fn test_is_true_other_types() {
-        assert_eq!(ExprEvaluator::is_true(&Value::Text("hello".to_string())), false);
-        assert_eq!(ExprEvaluator::is_true(&Value::Float(1.0)), false);
-        assert_eq!(ExprEvaluator::is_true(&Value::Array(vec![])), false);
-        assert_eq!(ExprEvaluator::is_true(&Value::Null), false);
+        assert!(!ExprEvaluator::is_true(&Value::Text("hello".to_string())));
+        assert!(!ExprEvaluator::is_true(&Value::Float(1.0)));
+        assert!(!ExprEvaluator::is_true(&Value::Array(vec![])));
+        assert!(!ExprEvaluator::is_true(&Value::Null));
     }
 }

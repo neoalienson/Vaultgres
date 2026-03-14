@@ -60,7 +60,7 @@ impl BTree {
         }
 
         // Simple insertion without splitting for now
-        if let Some(Node::Leaf(ref mut leaf)) = self.root.as_deref_mut() {
+        if let Some(Node::Leaf(leaf)) = self.root.as_deref_mut() {
             let pos = leaf.keys.binary_search(&key).unwrap_or_else(|e| e);
             leaf.keys.insert(pos, key);
             leaf.values.insert(pos, value);
@@ -81,7 +81,7 @@ impl BTree {
 
     /// Deletes a key from the tree
     pub fn delete(&mut self, key: &Key) -> Result<bool> {
-        if let Some(Node::Leaf(ref mut leaf)) = self.root.as_deref_mut() {
+        if let Some(Node::Leaf(leaf)) = self.root.as_deref_mut() {
             if let Ok(idx) = leaf.keys.binary_search(key) {
                 leaf.keys.remove(idx);
                 leaf.values.remove(idx);

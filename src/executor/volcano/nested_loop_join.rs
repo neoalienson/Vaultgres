@@ -47,36 +47,29 @@ impl NestedLoopJoinExecutor {
 
 impl Executor for NestedLoopJoinExecutor {
     fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
-        loop {
-            // If no current left tuple, get one
-            if self.current_left.is_none() {
-                self.current_left = self.left.next()?;
-                self.right_index = 0;
-
-                // No more left tuples - join is complete
-                if self.current_left.is_none() {
-                    return Ok(None);
-                }
-            }
-
-            // If we've exhausted right tuples, get next left tuple
-            if self.right_index >= self.right_tuples.len() {
-                self.current_left = self.left.next()?;
-                self.right_index = 0;
-
-                if self.current_left.is_none() {
-                    return Ok(None);
-                }
-            }
-
-            // Get next right tuple and produce result
-            let right_tuple = &self.right_tuples[self.right_index];
-            self.right_index += 1;
-
-            let left_tuple = self.current_left.as_ref().unwrap();
-            let result = Self::merge_tuples(left_tuple, right_tuple);
-            return Ok(Some(result));
+        if self.right_tuples.is_empty() {
+            return Ok(None);
         }
+
+        // Advance left tuple if needed
+        if self.current_left.is_none() || self.right_index >= self.right_tuples.len() {
+            self.current_left = self.left.next()?;
+            self.right_index = 0;
+        }
+
+        // If left is exhausted, we are done
+        if self.current_left.is_none() {
+            return Ok(None);
+        }
+
+        // Produce the next joined tuple
+        let right_tuple = &self.right_tuples[self.right_index];
+        self.right_index += 1;
+
+        let left_tuple = self.current_left.as_ref().unwrap();
+        let result = Self::merge_tuples(left_tuple, right_tuple);
+
+        Ok(Some(result))
     }
 }
 
