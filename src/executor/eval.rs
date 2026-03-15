@@ -66,7 +66,7 @@ impl Eval {
                     // Handle IN with subquery
                     if let Expr::Subquery(stmt) = right.as_ref() {
                         if let Some(catalog) = catalog {
-                            let subquery_result = Self::eval_scalar_subquery(catalog, stmt);
+                            let _subquery_result = Self::eval_scalar_subquery(catalog, stmt);
                             // For IN subquery, we need to check if left_val is in the result set
                             // Execute the subquery and get all results
                             let catalog_arc = Arc::new(catalog.clone());

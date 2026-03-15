@@ -185,10 +185,7 @@ impl LockManager {
 
     /// Checks if two lock modes are compatible
     fn is_compatible(&self, mode1: LockMode, mode2: LockMode) -> bool {
-        match (mode1, mode2) {
-            (LockMode::Shared, LockMode::Shared) => true,
-            _ => false,
-        }
+        matches!((mode1, mode2), (LockMode::Shared, LockMode::Shared))
     }
 }
 

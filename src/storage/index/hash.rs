@@ -55,15 +55,13 @@ impl Index for HashIndex {
         let bucket_idx = self.bucket_index(hash);
         let bucket = &mut self.buckets[bucket_idx];
 
-        for i in 0..bucket.entries.len() {
-            if bucket.entries[i].key == key {
-                if let Some(pos) = bucket.entries[i].tids.iter().position(|&t| t == tid) {
-                    bucket.entries[i].tids.remove(pos);
-                    if bucket.entries[i].tids.is_empty() {
-                        bucket.entries.remove(i);
-                    }
-                    return Ok(true);
+        if let Some(i) = bucket.entries.iter().position(|e| e.key == key) {
+            if let Some(pos) = bucket.entries[i].tids.iter().position(|&t| t == tid) {
+                bucket.entries[i].tids.remove(pos);
+                if bucket.entries[i].tids.is_empty() {
+                    bucket.entries.remove(i);
                 }
+                return Ok(true);
             }
         }
         Ok(false)

@@ -40,7 +40,7 @@ impl ParallelSort {
         Ok(self.merge_sorted_runs(runs))
     }
 
-    pub fn local_sort(&self, mut morsel: Morsel) -> Result<Vec<Tuple>, ExecutorError> {
+    pub fn local_sort(&self, morsel: Morsel) -> Result<Vec<Tuple>, ExecutorError> {
         let child_result = self.child.process_morsel(morsel)?;
         let mut tuples = child_result.tuples;
 

@@ -80,15 +80,15 @@ impl ParallelHashAgg {
 
     pub fn execute(
         &self,
-        config: &ParallelConfig,
-        row_count: usize,
+        _config: &ParallelConfig,
+        _row_count: usize,
     ) -> Result<Vec<Tuple>, ExecutorError> {
         // TODO: Implement proper parallel aggregation with Tuple (HashMap)
         // For now, return empty results
         Ok(Vec::new())
     }
 
-    pub fn local_aggregate(&self, morsel: Morsel, worker_id: usize) -> Result<(), ExecutorError> {
+    pub fn local_aggregate(&self, _morsel: Morsel, _worker_id: usize) -> Result<(), ExecutorError> {
         // TODO: Implement proper local aggregation with Tuple (HashMap)
         Ok(())
     }

@@ -324,7 +324,7 @@ impl PredicateEvaluator {
     fn evaluate_expr_tuple_map(
         expr: &Expr,
         tuple_map: &HashMap<String, Value>,
-        schema: &TableSchema,
+        _schema: &TableSchema,
     ) -> Result<Value, String> {
         match expr {
             Expr::Column(name) => tuple_map

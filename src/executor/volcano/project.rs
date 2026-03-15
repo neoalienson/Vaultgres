@@ -40,7 +40,7 @@ impl ProjectExecutor {
                     name.clone()
                 }
             }
-            Expr::QualifiedColumn { table, column } => {
+            Expr::QualifiedColumn { table: _, column } => {
                 // For qualified columns, use just the column name
                 column.clone()
             }

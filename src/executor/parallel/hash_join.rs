@@ -108,7 +108,7 @@ impl ParallelHashJoin {
         Ok(all_tuples)
     }
 
-    pub fn build_phase(&self, morsel: Morsel) -> Result<(), ExecutorError> {
+    pub fn build_phase(&self, _morsel: Morsel) -> Result<(), ExecutorError> {
         // TODO: Implement proper build phase with Tuple (HashMap)
         Ok(())
     }

@@ -21,7 +21,7 @@ impl NestedLoopJoinExecutor {
     /// * `left` - Left child executor (outer loop)
     /// * `right` - Right child executor (inner loop)
     pub fn new(
-        mut left: Box<dyn Executor>,
+        left: Box<dyn Executor>,
         mut right: Box<dyn Executor>,
     ) -> Result<Self, ExecutorError> {
         // Buffer all right tuples

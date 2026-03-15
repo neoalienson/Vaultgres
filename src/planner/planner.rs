@@ -5,7 +5,7 @@ use crate::executor::volcano::{
     DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType, LimitExecutor,
     ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
 };
-use crate::parser::ast::{AggregateFunc, BinaryOperator, ColumnDef, DataType, Expr, SelectStmt};
+use crate::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr, SelectStmt};
 
 use std::sync::Arc;
 
