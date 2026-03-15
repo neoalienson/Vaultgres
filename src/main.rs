@@ -88,7 +88,7 @@ fn main() -> std::io::Result<()> {
         use std::thread;
 
         let server_for_signal = server_clone.clone();
-        
+
         thread::spawn(move || {
             log::info!("📡 Signal handler thread started, waiting for SIGTERM/SIGINT");
             let mut signals = Signals::new(&[SIGTERM, SIGINT]).unwrap();

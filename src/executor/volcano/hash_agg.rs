@@ -80,7 +80,13 @@ impl HashAggExecutor {
             // Update aggregate states
             for (i, agg_expr) in aggregates.iter().enumerate() {
                 if let Expr::Aggregate { func: _func, arg } = agg_expr {
-                    let arg_val = Eval::eval_expr(arg, &tuple)?;
+                    // Handle COUNT(*) specially - it counts all rows regardless of NULL
+                    let arg_val = if matches!(arg.as_ref(), Expr::Star) {
+                        // For COUNT(*), we use a non-null value to always increment count
+                        Value::Int(1)
+                    } else {
+                        Eval::eval_expr(arg, &tuple)?
+                    };
 
                     match &mut entry.1[i] {
                         AggregateState::Count(c) => {
@@ -462,5 +468,97 @@ mod tests {
         assert_eq!(result.get("count(a)"), Some(&Value::Int(2)));
         assert_eq!(result.get("sum(a)"), Some(&Value::Int(30)));
         assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_count_star() {
+        // Test COUNT(*) - should count all rows including those with NULL values
+        let tuples = vec![
+            [("a".to_string(), Value::Int(10))].into(),
+            [("a".to_string(), Value::Null)].into(),
+            [("a".to_string(), Value::Int(20))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates =
+            vec![Expr::Aggregate { func: AggregateFunc::Count, arg: Box::new(Expr::Star) }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        // COUNT(*) should return 3 (all rows), not 2 (non-null values)
+        assert_eq!(result.get("count(*)"), Some(&Value::Int(3)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_count_star_empty_input() {
+        // Test COUNT(*) with empty input - should return 0
+        let tuples = vec![];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates =
+            vec![Expr::Aggregate { func: AggregateFunc::Count, arg: Box::new(Expr::Star) }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("count(*)"), Some(&Value::Int(0)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_count_star_with_group_by() {
+        // Test COUNT(*) with GROUP BY
+        let tuples = vec![
+            [
+                ("category".to_string(), Value::Text("A".to_string())),
+                ("value".to_string(), Value::Int(1)),
+            ]
+            .into(),
+            [
+                ("category".to_string(), Value::Text("A".to_string())),
+                ("value".to_string(), Value::Int(2)),
+            ]
+            .into(),
+            [
+                ("category".to_string(), Value::Text("B".to_string())),
+                ("value".to_string(), Value::Int(3)),
+            ]
+            .into(),
+            [
+                ("category".to_string(), Value::Text("B".to_string())),
+                ("value".to_string(), Value::Null),
+            ]
+            .into(),
+            [
+                ("category".to_string(), Value::Text("B".to_string())),
+                ("value".to_string(), Value::Int(4)),
+            ]
+            .into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let group_by = vec![Expr::Column("category".to_string())];
+        let aggregates =
+            vec![Expr::Aggregate { func: AggregateFunc::Count, arg: Box::new(Expr::Star) }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, group_by, aggregates, output_schema).unwrap();
+
+        let mut results: Vec<Tuple> = Vec::new();
+        while let Some(tuple) = agg_executor.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 2);
+        for r in results {
+            if r.get("category") == Some(&Value::Text("A".to_string())) {
+                assert_eq!(r.get("count(*)"), Some(&Value::Int(2)));
+            } else if r.get("category") == Some(&Value::Text("B".to_string())) {
+                assert_eq!(r.get("count(*)"), Some(&Value::Int(3)));
+            } else {
+                panic!("Unexpected group key");
+            }
+        }
     }
 }

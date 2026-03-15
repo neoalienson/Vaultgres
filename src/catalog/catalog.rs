@@ -89,9 +89,11 @@ impl Catalog {
 
                 let tables_clone = tables.read().unwrap().clone();
                 let data_clone = data.read().unwrap().clone();
-                log::debug!("Background save: saving {} tables with {} rows total", 
-                    tables_clone.len(), 
-                    data_clone.values().map(|v| v.len()).sum::<usize>());
+                log::debug!(
+                    "Background save: saving {} tables with {} rows total",
+                    tables_clone.len(),
+                    data_clone.values().map(|v| v.len()).sum::<usize>()
+                );
                 if let Err(e) = Persistence::save(&dir, &tables_clone, &data_clone) {
                     log::error!("Async save failed: {}", e);
                 } else {
@@ -139,10 +141,12 @@ impl Catalog {
         {
             log::error!("📂 Failed to load catalog from {}: {}", data_dir, e);
         } else {
-            log::info!("✅ Loaded {} tables with {} rows total from {}",
+            log::info!(
+                "✅ Loaded {} tables with {} rows total from {}",
                 tables_lock.len(),
                 data_lock.values().map(|v| v.len()).sum::<usize>(),
-                data_dir);
+                data_dir
+            );
         }
         drop(tables_lock);
         drop(data_lock);
@@ -155,7 +159,11 @@ impl Catalog {
         }
 
         if let Ok(materialized_views) = Persistence::load_materialized_views(data_dir) {
-            log::info!("📂 Loaded {} materialized views from {}", materialized_views.len(), data_dir);
+            log::info!(
+                "📂 Loaded {} materialized views from {}",
+                materialized_views.len(),
+                data_dir
+            );
             *catalog.materialized_views.write().unwrap() = materialized_views;
         } else {
             log::debug!("No materialized views found at {}", data_dir);
@@ -187,7 +195,10 @@ impl Catalog {
 
     pub fn flush_saves(&self) {
         if self.data_dir.is_some() {
-            log::info!("flush_saves: waiting for background save to complete, data_dir={:?}", self.data_dir);
+            log::info!(
+                "flush_saves: waiting for background save to complete, data_dir={:?}",
+                self.data_dir
+            );
             // Wait longer to ensure background save completes
             std::thread::sleep(std::time::Duration::from_secs(2));
             log::info!("flush_saves: done waiting for background save");
@@ -338,7 +349,10 @@ impl Catalog {
         mvs.insert(name.clone(), (query, data, column_names));
         drop(mvs);
 
-        log::debug!("create_materialized_view: created materialized view '{}', triggering synchronous save", name);
+        log::debug!(
+            "create_materialized_view: created materialized view '{}', triggering synchronous save",
+            name
+        );
         self.force_save()?;
         Ok(())
     }
@@ -570,7 +584,11 @@ impl Catalog {
         drop(data);
 
         self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        log::debug!("batch_insert: inserted {} rows into '{}', triggering synchronous save", count, table);
+        log::debug!(
+            "batch_insert: inserted {} rows into '{}', triggering synchronous save",
+            count,
+            table
+        );
         // Force immediate synchronous save after batch insert
         self.force_save()?;
         Ok(count)
@@ -766,9 +784,11 @@ impl Catalog {
         log::info!("💾 save_to_disk: saving to data_dir={}", data_dir);
         let tables = self.tables.read().unwrap();
         let data = self.data.read().unwrap();
-        log::info!("💾 save_to_disk: {} tables, {} total rows", 
-            tables.len(), 
-            data.values().map(|v| v.len()).sum::<usize>());
+        log::info!(
+            "💾 save_to_disk: {} tables, {} total rows",
+            tables.len(),
+            data.values().map(|v| v.len()).sum::<usize>()
+        );
         let result = Persistence::save(data_dir, &tables, &data);
         if result.is_ok() {
             log::info!("✅ save_to_disk: save completed successfully");
@@ -783,10 +803,10 @@ impl Catalog {
     pub fn force_save(&self) -> Result<(), String> {
         if let Some(ref data_dir) = self.data_dir {
             log::info!("💾 force_save: forcing immediate synchronous save to {}", data_dir);
-            
+
             // Wait for any pending background saves to complete
             std::thread::sleep(std::time::Duration::from_millis(500));
-            
+
             // Do a direct synchronous save to ensure data is persisted
             let tables = self.tables.read().unwrap();
             let data = self.data.read().unwrap();
@@ -795,11 +815,13 @@ impl Catalog {
             let triggers = self.triggers.read().unwrap();
             let indexes = self.indexes.read().unwrap();
             let functions = self.functions.read().unwrap();
-            
-            log::info!("💾 force_save: saving {} tables with {} rows", 
+
+            log::info!(
+                "💾 force_save: saving {} tables with {} rows",
                 tables.len(),
-                data.values().map(|v| v.len()).sum::<usize>());
-            
+                data.values().map(|v| v.len()).sum::<usize>()
+            );
+
             // Save all catalog components
             Persistence::save(data_dir, &tables, &data)?;
             Persistence::save_views(data_dir, &views)?;
@@ -807,7 +829,7 @@ impl Catalog {
             Persistence::save_triggers(data_dir, &triggers)?;
             Persistence::save_indexes(data_dir, &indexes)?;
             Persistence::save_functions(data_dir, &functions)?;
-            
+
             log::info!("✅ force_save: synchronous save completed successfully");
             return Ok(());
         }
@@ -821,9 +843,11 @@ impl Catalog {
         let mut data = self.data.write().unwrap();
         let result = Persistence::load(data_dir, &mut tables, &mut data, &self.txn_mgr);
         if result.is_ok() {
-            log::info!("✅ load_from_disk: loaded {} tables, {} total rows", 
-                tables.len(), 
-                data.values().map(|v| v.len()).sum::<usize>());
+            log::info!(
+                "✅ load_from_disk: loaded {} tables, {} total rows",
+                tables.len(),
+                data.values().map(|v| v.len()).sum::<usize>()
+            );
         } else {
             log::error!("❌ load_from_disk: load failed: {:?}", result);
         }

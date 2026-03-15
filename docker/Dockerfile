@@ -23,25 +23,22 @@ COPY tests ./tests
 COPY benches ./benches
 
 # Build release binary with static linking
-# RUN cargo build --release --target x86_64-unknown-linux-musl
-# Build binary with static linking
-RUN cargo build --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
 # Runtime stage - use distroless for minimal attack surface
 FROM gcr.io/distroless/static:nonroot
 
 # Copy binary from builder
-# COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/vaultgres /usr/local/bin/vaultgres
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/debug/vaultgres /usr/local/bin/vaultgres
+COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/vaultgres /usr/local/bin/vaultgres
 
 # Copy config file
 COPY docker/config.yaml /etc/vaultgres/config.yaml
 
-# Create data directory
-WORKDIR /var/lib/vaultgres
+# Use root user to allow writing to mounted volumes
+USER root
 
-# Use non-root user (from distroless)
-USER nonroot:nonroot
+# Set working directory
+WORKDIR /var/lib/vaultgres
 
 # Expose PostgreSQL port
 EXPOSE 5432
