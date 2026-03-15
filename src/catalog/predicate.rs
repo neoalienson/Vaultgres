@@ -266,6 +266,7 @@ impl PredicateEvaluator {
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
             Expr::Subquery(select) => {
                 log::debug!("Evaluating subquery for table: {}", select.from);
                 subquery_eval(select)

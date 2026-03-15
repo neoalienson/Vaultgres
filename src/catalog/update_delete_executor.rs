@@ -48,6 +48,7 @@ impl UpdateDeleteExecutor {
             let value = match expr {
                 Expr::Number(n) => Value::Int(*n),
                 Expr::String(s) => Value::Text(s.clone()),
+                Expr::Null => Value::Null,
                 _ => return Err("Invalid value expression".to_string()),
             };
 

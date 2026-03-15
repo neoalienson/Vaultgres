@@ -39,6 +39,7 @@ impl CheckValidator {
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
             _ => Err("Unsupported value expression in CHECK".to_string()),
         }
     }

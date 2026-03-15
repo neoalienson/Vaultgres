@@ -25,15 +25,16 @@ pub fn run_select_tests(db: &DbConnection) {
 
 fn test_select_with_nulls(db: &DbConnection) {
     eprintln!("[PetStore] Testing SELECT with NULL values...");
-    db.execute("CREATE TABLE nullable_select (id INT, value INT, text TEXT)").unwrap();
+    // Note: Using "txt" instead of "text" because TEXT is a reserved keyword
+    db.execute("CREATE TABLE nullable_select (id INT, value INT, txt TEXT)").unwrap();
     db.execute("INSERT INTO nullable_select VALUES (1, 10, 'hello'), (2, NULL, 'world'), (3, 30, NULL)").unwrap();
-    
+
     let result = db.execute("SELECT * FROM nullable_select WHERE value IS NULL");
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("world"), "Should find row with NULL value");
-    
-    let result = db.execute("SELECT * FROM nullable_select WHERE text IS NULL");
+
+    let result = db.execute("SELECT * FROM nullable_select WHERE txt IS NULL");
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("30"), "Should find row with NULL text");

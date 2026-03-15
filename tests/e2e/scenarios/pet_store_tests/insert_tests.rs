@@ -37,8 +37,9 @@ fn test_insert_multiple_rows(db: &DbConnection) {
 
 fn test_insert_with_null(db: &DbConnection) {
     eprintln!("[PetStore] Testing INSERT with NULL...");
-    db.execute("CREATE TABLE insert_null_test (id INT, value INT, text TEXT)").unwrap();
-    let result = db.execute("INSERT INTO insert_null_test (id, value, text) VALUES (1, NULL, 'hello'), (2, 10, NULL)");
+    // Note: Using "txt" instead of "text" because TEXT is a reserved keyword
+    db.execute("CREATE TABLE insert_null_test (id INT, value INT, txt TEXT)").unwrap();
+    let result = db.execute("INSERT INTO insert_null_test (id, value, txt) VALUES (1, NULL, 'hello'), (2, 10, NULL)");
     assert!(result.is_ok());
 }
 

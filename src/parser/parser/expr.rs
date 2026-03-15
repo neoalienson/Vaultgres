@@ -184,6 +184,10 @@ pub fn parse_primary(parser: &mut Parser) -> Result<Expr> {
             parser.advance();
             Ok(Expr::String(s))
         }
+        Token::Null => {
+            parser.advance();
+            Ok(Expr::Null)
+        }
         Token::Star => {
             parser.advance();
             Ok(Expr::Star)

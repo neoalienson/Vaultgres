@@ -40,6 +40,7 @@ impl Eval {
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
             Expr::Star => Err(ExecutorError::UnsupportedExpression(
                 "* not allowed in this context".to_string(),
             )),

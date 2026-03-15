@@ -460,6 +460,7 @@ pub enum Expr {
     Number(i64),
     Float(f64),
     String(String),
+    Null,
     Star,
     Parameter(usize),
     Alias {

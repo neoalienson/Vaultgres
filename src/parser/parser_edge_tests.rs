@@ -525,3 +525,123 @@ fn test_parse_multiple_foreign_keys() {
         _ => panic!("Expected CREATE TABLE"),
     }
 }
+
+// NULL Expression Tests
+#[test]
+fn test_parse_null_literal() {
+    let result = parse("SELECT NULL");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(stmt.columns[0], Expr::Null));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_in_where_clause() {
+    let result = parse("SELECT * FROM users WHERE value IS NULL");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(stmt.where_clause, Some(Expr::IsNull(_))));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_is_not_null() {
+    let result = parse("SELECT * FROM users WHERE value IS NOT NULL");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(stmt.where_clause, Some(Expr::IsNotNull(_))));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_in_insert() {
+    let result = parse("INSERT INTO users VALUES (1, NULL, 'test')");
+    assert!(result.is_ok());
+    if let Statement::Insert(stmt) = result.unwrap() {
+        assert!(matches!(stmt.values[1], Expr::Null));
+    } else {
+        panic!("Expected INSERT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_in_update() {
+    let result = parse("UPDATE users SET value = NULL WHERE id = 1");
+    assert!(result.is_ok());
+    if let Statement::Update(stmt) = result.unwrap() {
+        assert!(matches!(stmt.assignments[0].1, Expr::Null));
+    } else {
+        panic!("Expected UPDATE statement");
+    }
+}
+
+#[test]
+fn test_parse_null_in_case() {
+    let result = parse("SELECT CASE WHEN value IS NULL THEN 'missing' ELSE value END FROM users");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(stmt.columns[0], Expr::Case { .. }));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_in_coalesce() {
+    let result = parse("SELECT COALESCE(NULL, NULL, 'default')");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(&stmt.columns[0], Expr::FunctionCall { name, .. } if name == "COALESCE"));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_comparison() {
+    let result = parse("SELECT * FROM users WHERE value = NULL");
+    assert!(result.is_ok());
+    if let Statement::Select(stmt) = result.unwrap() {
+        assert!(matches!(
+            stmt.where_clause,
+            Some(Expr::BinaryOp { right, .. }) if matches!(*right, Expr::Null)
+        ));
+    } else {
+        panic!("Expected SELECT statement");
+    }
+}
+
+#[test]
+fn test_parse_multiple_nulls() {
+    let result = parse("INSERT INTO users VALUES (NULL, NULL, NULL)");
+    assert!(result.is_ok());
+    if let Statement::Insert(stmt) = result.unwrap() {
+        for expr in &stmt.values {
+            assert!(matches!(expr, Expr::Null));
+        }
+    } else {
+        panic!("Expected INSERT statement");
+    }
+}
+
+#[test]
+fn test_parse_null_with_other_values() {
+    let result = parse("INSERT INTO users VALUES (1, NULL, 'test', NULL, 42)");
+    assert!(result.is_ok());
+    if let Statement::Insert(stmt) = result.unwrap() {
+        assert!(matches!(stmt.values[0], Expr::Number(1)));
+        assert!(matches!(stmt.values[1], Expr::Null));
+        assert!(matches!(stmt.values[2], Expr::String(_)));
+        assert!(matches!(stmt.values[3], Expr::Null));
+        assert!(matches!(stmt.values[4], Expr::Number(42)));
+    } else {
+        panic!("Expected INSERT statement");
+    }
+}

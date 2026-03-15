@@ -218,8 +218,18 @@ impl<S: Read + Write> Connection<S> {
                 }
             }
             Statement::Insert(insert) => {
-                self.catalog.insert(&insert.table, insert.values)?;
-                Ok(ExecutionResult::CommandComplete("INSERT 0 1".to_string()))
+                // Handle multi-row INSERT using batch_insert if there are additional rows
+                if insert.batch_values.is_empty() {
+                    // Single row INSERT
+                    self.catalog.insert(&insert.table, insert.values)?;
+                    Ok(ExecutionResult::CommandComplete(format!("INSERT 0 1")))
+                } else {
+                    // Multi-row INSERT: combine first row with batch_values
+                    let mut all_rows = vec![insert.values];
+                    all_rows.extend(insert.batch_values);
+                    let count = self.catalog.batch_insert(&insert.table, all_rows)?;
+                    Ok(ExecutionResult::CommandComplete(format!("INSERT 0 {}", count)))
+                }
             }
             Statement::Select(select_stmt) => {
                 // Renamed 'select' to 'select_stmt' to avoid shadowing
@@ -748,6 +758,61 @@ mod tests {
         // Expected: RowDescription (T), DataRow (D), CommandComplete (C), ReadyForQuery (Z)
         // We check for the SELECT 1 command complete tag, but since we run multiple queries, we can't guarantee the whole buffer
         assert!(output.ends_with(b"C\0\0\0\rSELECT 1\0Z\0\0\0\x05I")); // CommandComplete SELECT 1 + ReadyForQuery
+    }
+
+    #[test]
+    fn test_handle_query_multi_row_insert_with_nulls() {
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // Create table with nullable columns
+        let create_table_sql = "CREATE TABLE nullable_test (id INT, value INT, txt TEXT);";
+        conn.handle_query(create_table_sql).unwrap();
+
+        // Multi-row INSERT with NULL values
+        let insert_sql =
+            "INSERT INTO nullable_test VALUES (1, 10, 'hello'), (2, NULL, 'world'), (3, 30, NULL);";
+        conn.handle_query(insert_sql).unwrap();
+
+        // Verify 3 rows were inserted
+        assert_eq!(catalog.row_count("nullable_test"), 3);
+
+        // Select rows where value IS NULL
+        let select_sql = "SELECT * FROM nullable_test WHERE value IS NULL;";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        let output_str = String::from_utf8_lossy(&output);
+        // Should contain the row with id=2 and txt='world'
+        assert!(output_str.contains("world"), "Should find row with NULL value");
+    }
+
+    #[test]
+    fn test_handle_query_is_not_null() {
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // Create table
+        let create_table_sql = "CREATE TABLE test_null (id INT, value INT);";
+        conn.handle_query(create_table_sql).unwrap();
+
+        // Insert data with NULLs
+        let insert_sql = "INSERT INTO test_null VALUES (1, 10), (2, NULL), (3, 30);";
+        conn.handle_query(insert_sql).unwrap();
+
+        // Select rows where value IS NOT NULL
+        let select_sql = "SELECT * FROM test_null WHERE value IS NOT NULL;";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        let output_str = String::from_utf8_lossy(&output);
+        // Should contain rows with id=1 and id=3, but not id=2
+        assert!(output_str.contains("10"), "Should find row with value 10");
+        assert!(output_str.contains("30"), "Should find row with value 30");
     }
 
     #[test]

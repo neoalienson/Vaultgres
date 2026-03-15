@@ -39,6 +39,7 @@ mod parallel_executor_test;
 // mod parallel_ops_test; // Disabled
 mod parallel_scan_test;
 mod parallel_test;
+mod parser_reserved_keywords_test;
 mod parser_test;
 mod partial_index_test;
 mod persistence_data_test;

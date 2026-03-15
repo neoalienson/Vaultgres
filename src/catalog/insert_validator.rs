@@ -29,12 +29,17 @@ impl InsertValidator {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
             _ => Err("Invalid value expression".to_string()),
         }
     }
 
     fn parse_and_validate_value(expr: &Expr, col: &ColumnDef) -> Result<Value, String> {
         let val = Self::parse_value(expr)?;
+        // NULL values are allowed for nullable columns
+        if matches!(val, Value::Null) {
+            return Ok(val);
+        }
         match (&col.data_type, &val) {
             (DataType::Int, Value::Int(_))
             | (DataType::Serial, Value::Int(_))
