@@ -261,3 +261,193 @@ impl Executor for HashAggExecutor {
         Ok(Some(tuple))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::TableSchema;
+    use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
+    use crate::parser::ast::{AggregateFunc, Expr};
+
+    // A mock executor to feed tuples to the HashAggExecutor
+    struct MockExecutor {
+        tuples: Vec<Tuple>,
+        idx: usize,
+    }
+
+    impl MockExecutor {
+        fn new(tuples: Vec<Tuple>) -> Self {
+            Self { tuples, idx: 0 }
+        }
+    }
+
+    impl Executor for MockExecutor {
+        fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
+            if self.idx >= self.tuples.len() {
+                Ok(None)
+            } else {
+                self.idx += 1;
+                Ok(Some(self.tuples[self.idx - 1].clone()))
+            }
+        }
+    }
+
+    #[test]
+    fn test_simple_count() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(1))].into(),
+            [("a".to_string(), Value::Int(2))].into(),
+            [("a".to_string(), Value::Int(3))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates = vec![Expr::Aggregate {
+            func: AggregateFunc::Count,
+            arg: Box::new(Expr::Column("a".to_string())),
+        }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("count(a)"), Some(&Value::Int(3)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_sum_and_avg() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(10))].into(),
+            [("a".to_string(), Value::Int(20))].into(),
+            [("a".to_string(), Value::Int(30))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates = vec![
+            Expr::Aggregate {
+                func: AggregateFunc::Sum,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+            Expr::Aggregate {
+                func: AggregateFunc::Avg,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+        ];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("sum(a)"), Some(&Value::Int(60)));
+        assert_eq!(result.get("avg(a)"), Some(&Value::Int(20)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_min_max() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(10))].into(),
+            [("a".to_string(), Value::Int(5))].into(),
+            [("a".to_string(), Value::Int(20))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates = vec![
+            Expr::Aggregate {
+                func: AggregateFunc::Min,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+            Expr::Aggregate {
+                func: AggregateFunc::Max,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+        ];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("min(a)"), Some(&Value::Int(5)));
+        assert_eq!(result.get("max(a)"), Some(&Value::Int(20)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_group_by_single_column() {
+        let tuples = vec![
+            [("a".to_string(), Value::Text("foo".to_string())), ("b".to_string(), Value::Int(10))]
+                .into(),
+            [("a".to_string(), Value::Text("bar".to_string())), ("b".to_string(), Value::Int(20))]
+                .into(),
+            [("a".to_string(), Value::Text("foo".to_string())), ("b".to_string(), Value::Int(30))]
+                .into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let group_by = vec![Expr::Column("a".to_string())];
+        let aggregates = vec![Expr::Aggregate {
+            func: AggregateFunc::Sum,
+            arg: Box::new(Expr::Column("b".to_string())),
+        }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, group_by, aggregates, output_schema).unwrap();
+
+        let mut results: Vec<Tuple> = Vec::new();
+        while let Some(tuple) = agg_executor.next().unwrap() {
+            results.push(tuple);
+        }
+
+        assert_eq!(results.len(), 2);
+        for r in results {
+            if r.get("a") == Some(&Value::Text("foo".to_string())) {
+                assert_eq!(r.get("sum(b)"), Some(&Value::Int(40)));
+            } else if r.get("a") == Some(&Value::Text("bar".to_string())) {
+                assert_eq!(r.get("sum(b)"), Some(&Value::Int(20)));
+            } else {
+                panic!("Unexpected group key");
+            }
+        }
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let tuples = vec![];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates = vec![Expr::Aggregate {
+            func: AggregateFunc::Count,
+            arg: Box::new(Expr::Column("a".to_string())),
+        }];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("count(a)"), Some(&Value::Int(0)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_null_values() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(10))].into(),
+            [("a".to_string(), Value::Null)].into(),
+            [("a".to_string(), Value::Int(20))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let aggregates = vec![
+            Expr::Aggregate {
+                func: AggregateFunc::Count,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+            Expr::Aggregate {
+                func: AggregateFunc::Sum,
+                arg: Box::new(Expr::Column("a".to_string())),
+            },
+        ];
+        let output_schema = TableSchema::new("agg".to_string(), vec![]);
+        let mut agg_executor =
+            HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
+
+        let result = agg_executor.next().unwrap().unwrap();
+        assert_eq!(result.get("count(a)"), Some(&Value::Int(2)));
+        assert_eq!(result.get("sum(a)"), Some(&Value::Int(30)));
+        assert!(agg_executor.next().unwrap().is_none());
+    }
+}

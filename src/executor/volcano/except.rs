@@ -257,4 +257,31 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].get("val"), Some(&crate::catalog::Value::Int(1)));
     }
+
+    #[test]
+    fn test_except_with_various_types() {
+        let left_tuples = vec![
+            TupleBuilder::new().with_float("val", 1.1).build(),
+            TupleBuilder::new().with_text("val", "hello").build(),
+            TupleBuilder::new().with_bool("val", true).build(),
+            TupleBuilder::new().with_null("val").build(),
+        ];
+
+        let right_tuples = vec![
+            TupleBuilder::new().with_text("val", "hello").build(),
+            TupleBuilder::new().with_null("val").build(),
+        ];
+
+        let left = MockExecutor::with_tuples(left_tuples.clone());
+        let right = MockExecutor::with_tuples(right_tuples.clone());
+        let mut except = ExceptExecutor::new(Box::new(left), Box::new(right));
+
+        let mut results = Vec::new();
+        while let Some(tuple) = except.next().unwrap() {
+            results.push(tuple);
+        }
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&left_tuples[0]));
+        assert!(results.contains(&left_tuples[2]));
+    }
 }

@@ -83,3 +83,104 @@ impl Executor for DistinctExecutor {
         Ok(Some(tuple))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::Value;
+    use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
+
+    struct MockExecutor {
+        tuples: Vec<Tuple>,
+        idx: usize,
+    }
+
+    impl MockExecutor {
+        fn new(tuples: Vec<Tuple>) -> Self {
+            Self { tuples, idx: 0 }
+        }
+    }
+
+    impl Executor for MockExecutor {
+        fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
+            if self.idx >= self.tuples.len() {
+                Ok(None)
+            } else {
+                self.idx += 1;
+                Ok(Some(self.tuples[self.idx - 1].clone()))
+            }
+        }
+    }
+
+    #[test]
+    fn test_distinct_with_duplicates() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(1)), ("b".to_string(), Value::Text("x".to_string()))]
+                .into(),
+            [("a".to_string(), Value::Int(2)), ("b".to_string(), Value::Text("y".to_string()))]
+                .into(),
+            [("a".to_string(), Value::Int(1)), ("b".to_string(), Value::Text("x".to_string()))]
+                .into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let mut distinct_executor = DistinctExecutor::new(child).unwrap();
+
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_distinct_no_duplicates() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(1))].into(),
+            [("a".to_string(), Value::Int(2))].into(),
+            [("a".to_string(), Value::Int(3))].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let mut distinct_executor = DistinctExecutor::new(child).unwrap();
+
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_distinct_empty() {
+        let tuples = vec![];
+        let child = Box::new(MockExecutor::new(tuples));
+        let mut distinct_executor = DistinctExecutor::new(child).unwrap();
+        assert!(distinct_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_distinct_different_column_order() {
+        let tuples = vec![
+            [("a".to_string(), Value::Int(1)), ("b".to_string(), Value::Text("x".to_string()))]
+                .into(),
+            [("b".to_string(), Value::Text("x".to_string())), ("a".to_string(), Value::Int(1))]
+                .into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let mut distinct_executor = DistinctExecutor::new(child).unwrap();
+
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_distinct_with_nulls() {
+        let tuples = vec![
+            [("a".to_string(), Value::Null)].into(),
+            [("a".to_string(), Value::Int(1))].into(),
+            [("a".to_string(), Value::Null)].into(),
+        ];
+        let child = Box::new(MockExecutor::new(tuples));
+        let mut distinct_executor = DistinctExecutor::new(child).unwrap();
+
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_some());
+        assert!(distinct_executor.next().unwrap().is_none());
+    }
+}

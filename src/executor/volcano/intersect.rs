@@ -13,6 +13,7 @@ pub struct IntersectExecutor {
     right: Box<dyn Executor>,
     right_set: HashSet<u64>,
     right_loaded: bool,
+    seen: HashSet<u64>,
 }
 
 impl IntersectExecutor {
@@ -22,7 +23,7 @@ impl IntersectExecutor {
     /// * `left` - Left child executor
     /// * `right` - Right child executor
     pub fn new(left: Box<dyn Executor>, right: Box<dyn Executor>) -> Self {
-        Self { left, right, right_set: HashSet::new(), right_loaded: false }
+        Self { left, right, right_set: HashSet::new(), right_loaded: false, seen: HashSet::new() }
     }
 
     /// Load all right tuples into a hash set
@@ -121,7 +122,7 @@ impl Executor for IntersectExecutor {
         // Return tuples from left that exist in right
         while let Some(tuple) = self.left.next()? {
             let hash = Self::hash_tuple(&tuple);
-            if self.right_set.contains(&hash) {
+            if self.right_set.contains(&hash) && self.seen.insert(hash) {
                 return Ok(Some(tuple));
             }
         }
@@ -230,17 +231,17 @@ mod tests {
 
     #[test]
     fn test_intersect_removes_duplicates() {
-        // Intersect returns each matching tuple from left side
-        // The right side is a hash set, so duplicates in right are removed
+        // INTERSECT should behave like INTERSECT DISTINCT, removing duplicates from the final result.
         let left = MockExecutor::with_tuples(vec![
             TupleBuilder::new().with_int("val", 1).build(),
-            TupleBuilder::new().with_int("val", 1).build(),
+            TupleBuilder::new().with_int("val", 1).build(), // Duplicate on left
             TupleBuilder::new().with_int("val", 2).build(),
         ]);
 
         let right = MockExecutor::with_tuples(vec![
             TupleBuilder::new().with_int("val", 1).build(),
             TupleBuilder::new().with_int("val", 2).build(),
+            TupleBuilder::new().with_int("val", 2).build(), // Duplicate on right
         ]);
 
         let mut intersect = IntersectExecutor::new(Box::new(left), Box::new(right));
@@ -249,7 +250,34 @@ mod tests {
         while let Some(tuple) = intersect.next().unwrap() {
             results.push(tuple);
         }
-        // Returns each matching tuple from left (1 appears twice in left, 2 appears once)
-        assert_eq!(results.len(), 3);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_intersect_with_various_types() {
+        let left_tuples = vec![
+            TupleBuilder::new().with_float("val", 1.1).build(),
+            TupleBuilder::new().with_text("val", "hello").build(),
+            TupleBuilder::new().with_bool("val", true).build(),
+            TupleBuilder::new().with_null("val").build(),
+        ];
+
+        let right_tuples = vec![
+            TupleBuilder::new().with_text("val", "hello").build(),
+            TupleBuilder::new().with_null("val").build(),
+            TupleBuilder::new().with_float("val", 2.2).build(),
+        ];
+
+        let left = MockExecutor::with_tuples(left_tuples.clone());
+        let right = MockExecutor::with_tuples(right_tuples.clone());
+        let mut intersect = IntersectExecutor::new(Box::new(left), Box::new(right));
+
+        let mut results = Vec::new();
+        while let Some(tuple) = intersect.next().unwrap() {
+            results.push(tuple);
+        }
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&left_tuples[1]));
+        assert!(results.contains(&left_tuples[3]));
     }
 }

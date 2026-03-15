@@ -307,4 +307,40 @@ mod tests {
         }
         assert_eq!(results.len(), 1);
     }
+
+    #[test]
+    fn test_union_with_various_types() {
+        let left_tuples = vec![
+            TupleBuilder::new().with_float("val", 1.1).build(),
+            TupleBuilder::new().with_text("val", "hello").build(),
+        ];
+
+        let right_tuples = vec![
+            TupleBuilder::new().with_bool("val", true).build(),
+            TupleBuilder::new().with_null("val").build(),
+            TupleBuilder::new().with_text("val", "hello").build(), // Duplicate
+        ];
+
+        // Test UNION DISTINCT
+        let left = MockExecutor::with_tuples(left_tuples.clone());
+        let right = MockExecutor::with_tuples(right_tuples.clone());
+        let mut union_distinct = UnionExecutor::distinct(Box::new(left), Box::new(right));
+
+        let mut results = Vec::new();
+        while let Some(tuple) = union_distinct.next().unwrap() {
+            results.push(tuple);
+        }
+        assert_eq!(results.len(), 4);
+
+        // Test UNION ALL
+        let left = MockExecutor::with_tuples(left_tuples.clone());
+        let right = MockExecutor::with_tuples(right_tuples.clone());
+        let mut union_all = UnionExecutor::all(Box::new(left), Box::new(right));
+
+        let mut results = Vec::new();
+        while let Some(tuple) = union_all.next().unwrap() {
+            results.push(tuple);
+        }
+        assert_eq!(results.len(), 5);
+    }
 }

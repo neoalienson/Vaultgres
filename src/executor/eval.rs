@@ -536,6 +536,118 @@ impl Eval {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
+
+    fn create_test_tuple() -> Tuple {
+        [
+            ("a".to_string(), Value::Int(10)),
+            ("b".to_string(), Value::Text("hello".to_string())),
+            ("c".to_string(), Value::Bool(true)),
+            ("d".to_string(), Value::Null),
+        ]
+        .into()
+    }
+
+    #[test]
+    fn test_eval_literals() {
+        let tuple = create_test_tuple();
+        assert_eq!(Eval::eval_expr(&Expr::Number(123), &tuple).unwrap(), Value::Int(123));
+        assert_eq!(
+            Eval::eval_expr(&Expr::String("test".to_string()), &tuple).unwrap(),
+            Value::Text("test".to_string())
+        );
+    }
+
+    #[test]
+    fn test_eval_column() {
+        let tuple = create_test_tuple();
+        assert_eq!(
+            Eval::eval_expr(&Expr::Column("a".to_string()), &tuple).unwrap(),
+            Value::Int(10)
+        );
+        assert_eq!(
+            Eval::eval_expr(&Expr::Column("b".to_string()), &tuple).unwrap(),
+            Value::Text("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn test_eval_binary_op_add() {
+        let tuple = create_test_tuple();
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Column("a".to_string())),
+            op: BinaryOperator::Add,
+            right: Box::new(Expr::Number(5)),
+        };
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Int(15));
+    }
+
+    #[test]
+    fn test_eval_binary_op_equals() {
+        let tuple = create_test_tuple();
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Column("a".to_string())),
+            op: BinaryOperator::Equals,
+            right: Box::new(Expr::Number(10)),
+        };
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Bool(true));
+    }
+
+    #[test]
+    fn test_eval_unary_op_not() {
+        let tuple = create_test_tuple();
+        let expr =
+            Expr::UnaryOp { op: UnaryOperator::Not, expr: Box::new(Expr::Column("c".to_string())) };
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Bool(false));
+    }
+
+    #[test]
+    fn test_is_null() {
+        let tuple = create_test_tuple();
+        let expr = Expr::IsNull(Box::new(Expr::Column("d".to_string())));
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Bool(true));
+
+        let expr_not_null = Expr::IsNotNull(Box::new(Expr::Column("a".to_string())));
+        assert_eq!(Eval::eval_expr(&expr_not_null, &tuple).unwrap(), Value::Bool(true));
+    }
+
+    #[test]
+    fn test_case_expression() {
+        let tuple = create_test_tuple();
+        let expr = Expr::Case {
+            conditions: vec![
+                (
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("a".to_string())),
+                        op: BinaryOperator::Equals,
+                        right: Box::new(Expr::Number(5)),
+                    },
+                    Expr::String("five".to_string()),
+                ),
+                (
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("a".to_string())),
+                        op: BinaryOperator::Equals,
+                        right: Box::new(Expr::Number(10)),
+                    },
+                    Expr::String("ten".to_string()),
+                ),
+            ],
+            else_expr: Some(Box::new(Expr::String("other".to_string()))),
+        };
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Text("ten".to_string()));
+    }
+
+    #[test]
+    fn test_in_operator() {
+        let tuple = create_test_tuple();
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Column("a".to_string())),
+            op: BinaryOperator::In,
+            right: Box::new(Expr::List(vec![Expr::Number(5), Expr::Number(10), Expr::Number(15)])),
+        };
+        assert_eq!(Eval::eval_expr(&expr, &tuple).unwrap(), Value::Bool(true));
+    }
 
     #[test]
     fn test_concat_two_strings() {
