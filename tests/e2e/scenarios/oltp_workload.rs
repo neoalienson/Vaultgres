@@ -2,7 +2,6 @@ use e2e::*;
 use std::thread;
 use std::time::Instant;
 
-mod pet_store;
 mod referential_integrity;
 
 #[test]

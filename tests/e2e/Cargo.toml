@@ -19,6 +19,10 @@ name = "scenarios"
 path = "scenarios/oltp_workload.rs"
 
 [[test]]
+name = "pet_store"
+path = "scenarios/pet_store.rs"
+
+[[test]]
 name = "comparison"
 path = "comparison/benchmark.rs"
 
