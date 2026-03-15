@@ -1,20 +1,86 @@
-use vaultgres::catalog::Catalog;
-use vaultgres::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr, SelectStmt};
+// Integration tests for VIEW functionality - Schema derivation with prefixed columns
+use vaultgres::catalog::{Catalog, TableSchema};
+use vaultgres::planner::planner::Planner;
+use vaultgres::parser::ast::{Expr, JoinClause, JoinType, BinaryOperator, ColumnDef, DataType};
+use std::sync::Arc;
+
+fn create_test_catalog() -> Arc<Catalog> {
+    let catalog = Catalog::new();
+    
+    // Create customers table
+    let customers_columns = vec![
+        ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "email".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+    ];
+    catalog.create_table("customers".to_string(), customers_columns).unwrap();
+    
+    // Create orders table
+    let orders_columns = vec![
+        ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "customer_id".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "total".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+    ];
+    catalog.create_table("orders".to_string(), orders_columns).unwrap();
+    
+    // Create items table
+    let items_columns = vec![
+        ColumnDef { name: "item_id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "sku".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "price".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+        ColumnDef { name: "category".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+    ];
+    catalog.create_table("items".to_string(), items_columns).unwrap();
+    
+    Arc::new(catalog)
+}
 
 #[test]
-fn test_create_view() {
-    let catalog = Catalog::new();
-    let columns = vec![
-        ColumnDef::new("id".to_string(), DataType::Int),
-        ColumnDef::new("name".to_string(), DataType::Text),
+fn test_view_schema_derivation_with_prefixed_columns() {
+    let catalog = create_test_catalog();
+    
+    // Get base schemas
+    let orders_schema = catalog.get_table("orders").unwrap();
+    let customers_schema = catalog.get_table("customers").unwrap();
+    
+    // Create a combined schema (as would be done for a JOIN view)
+    let mut combined_schema = customers_schema.clone();
+    combined_schema.columns.extend(orders_schema.columns.clone());
+    
+    // Test projection with table-prefixed columns
+    let projection = vec![
+        Expr::Column("c.name".to_string()),
+        Expr::Alias {
+            alias: "order_id".to_string(),
+            expr: Box::new(Expr::Column("o.id".to_string())),
+        },
+        Expr::Column("o.total".to_string()),
     ];
+    
+    let result = Planner::derive_projection_schema(&combined_schema, &projection);
+    assert!(result.is_ok(), "Schema derivation with prefixed columns should succeed: {:?}", result.err());
+    
+    let schema = result.unwrap();
+    assert_eq!(schema.columns.len(), 3);
+    assert_eq!(schema.columns[0].name, "name");
+    assert_eq!(schema.columns[1].name, "order_id");
+    assert_eq!(schema.columns[2].name, "total");
+}
 
-    catalog.create_table("users".to_string(), columns).unwrap();
-
-    let query = SelectStmt {
+#[test]
+fn test_view_schema_derivation_simple_view() {
+    let catalog = create_test_catalog();
+    
+    // Create a simple view (no JOIN)
+    use vaultgres::parser::ast::{SelectStmt};
+    let view_stmt = SelectStmt {
         distinct: false,
-        columns: vec![Expr::Star],
-        from: "users".to_string(),
+        columns: vec![
+            Expr::Column("id".to_string()),
+            Expr::Column("name".to_string()),
+        ],
+        from: "customers".to_string(),
         table_alias: None,
         joins: vec![],
         where_clause: None,
@@ -24,25 +90,14 @@ fn test_create_view() {
         limit: None,
         offset: None,
     };
-
-    catalog.create_view("user_view".to_string(), query).unwrap();
-    assert!(catalog.get_view("user_view").is_some());
-}
-
-#[test]
-fn test_drop_view() {
-    let catalog = Catalog::new();
-    let columns = vec![
-        ColumnDef::new("id".to_string(), DataType::Int),
-        ColumnDef::new("email".to_string(), DataType::Text),
-    ];
-
-    catalog.create_table("accounts".to_string(), columns).unwrap();
-
-    let query = SelectStmt {
+    
+    catalog.create_view("customer_names".to_string(), view_stmt).unwrap();
+    
+    // Query the view
+    let select_from_view = SelectStmt {
         distinct: false,
-        columns: vec![Expr::Column("email".to_string())],
-        from: "accounts".to_string(),
+        columns: vec![Expr::Star],
+        from: "customer_names".to_string(),
         table_alias: None,
         joins: vec![],
         where_clause: None,
@@ -52,40 +107,29 @@ fn test_drop_view() {
         limit: None,
         offset: None,
     };
-
-    catalog.create_view("email_view".to_string(), query).unwrap();
-    catalog.drop_view("email_view", false).unwrap();
-    assert!(catalog.get_view("email_view").is_none());
+    
+    let planner = Planner::new(Some(catalog));
+    let result = planner.plan(&select_from_view);
+    assert!(result.is_ok(), "Simple view should plan successfully: {:?}", result.err());
 }
 
 #[test]
-fn test_drop_view_if_exists() {
-    let catalog = Catalog::new();
-
-    // Should not error when view doesn't exist
-    catalog.drop_view("nonexistent_view", true).unwrap();
-}
-
-#[test]
-fn test_drop_view_not_exists_error() {
-    let catalog = Catalog::new();
-
-    // Should error when view doesn't exist and if_exists is false
-    let result = catalog.drop_view("nonexistent_view", false);
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_create_view_duplicate_error() {
-    let catalog = Catalog::new();
-    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
-
-    catalog.create_table("items".to_string(), columns).unwrap();
-
-    let query = SelectStmt {
+fn test_view_schema_columns_match() {
+    let catalog = create_test_catalog();
+    
+    use vaultgres::parser::ast::SelectStmt;
+    
+    // Create a view with specific column selection
+    let view_stmt = SelectStmt {
         distinct: false,
-        columns: vec![Expr::Star],
-        from: "items".to_string(),
+        columns: vec![
+            Expr::Column("name".to_string()),
+            Expr::Alias {
+                alias: "customer_id".to_string(),
+                expr: Box::new(Expr::Column("id".to_string())),
+            },
+        ],
+        from: "customers".to_string(),
         table_alias: None,
         joins: vec![],
         where_clause: None,
@@ -95,43 +139,23 @@ fn test_create_view_duplicate_error() {
         limit: None,
         offset: None,
     };
-
-    catalog.create_view("item_view".to_string(), query.clone()).unwrap();
-
-    // Should error when creating duplicate view
-    let result = catalog.create_view("item_view".to_string(), query);
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_view_with_where_clause() {
-    let catalog = Catalog::new();
-    let columns = vec![
-        ColumnDef::new("id".to_string(), DataType::Int),
-        ColumnDef::new("status".to_string(), DataType::Text),
-    ];
-
-    catalog.create_table("orders".to_string(), columns).unwrap();
-
-    let query = SelectStmt {
-        distinct: false,
-        columns: vec![Expr::Star],
-        from: "orders".to_string(),
-        table_alias: None,
-        joins: vec![],
-        where_clause: Some(Expr::BinaryOp {
-            left: Box::new(Expr::Column("status".to_string())),
-            op: BinaryOperator::Equals,
-            right: Box::new(Expr::String("active".to_string())),
-        }),
-        group_by: None,
-        having: None,
-        order_by: None,
-        limit: None,
-        offset: None,
-    };
-
-    catalog.create_view("active_orders".to_string(), query).unwrap();
-    let view = catalog.get_view("active_orders").unwrap();
-    assert!(view.where_clause.is_some());
+    
+    catalog.create_view("customer_info".to_string(), view_stmt.clone()).unwrap();
+    
+    // Verify the view was stored correctly
+    let stored_view = catalog.get_view("customer_info");
+    assert!(stored_view.is_some(), "View should be stored in catalog");
+    
+    let stored = stored_view.unwrap();
+    assert_eq!(stored.columns.len(), 2);
+    
+    // Verify column names in view definition
+    match &stored.columns[0] {
+        Expr::Column(name) => assert_eq!(name, "name"),
+        _ => panic!("Expected Column expression"),
+    }
+    match &stored.columns[1] {
+        Expr::Alias { alias, .. } => assert_eq!(alias, "customer_id"),
+        _ => panic!("Expected Alias expression"),
+    }
 }

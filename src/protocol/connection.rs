@@ -418,6 +418,7 @@ impl<S: Read + Write> Connection<S> {
         exprs: &[crate::parser::ast::Expr],
         schemas: &[(String, crate::catalog::TableSchema)],
     ) -> Result<Vec<Vec<crate::catalog::Value>>, String> {
+        log::debug!("[PROJ] Projecting {} expressions, {} rows", exprs.len(), rows.len());
         if exprs.is_empty() || (exprs.len() == 1 && matches!(exprs[0], Expr::Star)) {
             return Ok(rows.to_vec());
         }
@@ -426,12 +427,13 @@ impl<S: Read + Write> Connection<S> {
         for row in rows {
             let mut projected = Vec::new();
             for expr in exprs {
+                log::debug!("[PROJ] Processing expression: {:?}", expr);
                 match expr {
                     Expr::QualifiedColumn { table, column } => {
                         let mut offset = 0;
                         let mut found = false;
                         for (tbl_alias, schema) in schemas {
-                            log::info!(
+                            log::debug!(
                                 "[PROJ] Checking alias '{}' for '{}.{}', schema has {} cols",
                                 tbl_alias,
                                 table,
@@ -439,7 +441,7 @@ impl<S: Read + Write> Connection<S> {
                                 schema.columns.len()
                             );
                             if tbl_alias == table {
-                                log::info!(
+                                log::debug!(
                                     "[PROJ] Alias matched! Looking for column '{}' in {:?}",
                                     column,
                                     schema.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
@@ -447,7 +449,7 @@ impl<S: Read + Write> Connection<S> {
                                 if let Some(idx) =
                                     schema.columns.iter().position(|c| &c.name == column)
                                 {
-                                    log::info!("[PROJ] Found at offset {} + idx {}", offset, idx);
+                                    log::debug!("[PROJ] Found at offset {} + idx {}", offset, idx);
                                     projected.push(row[offset + idx].clone());
                                     found = true;
                                     break;
@@ -460,10 +462,24 @@ impl<S: Read + Write> Connection<S> {
                         }
                     }
                     Expr::Column(name) => {
+                        // Handle table-prefixed column names (e.g., "o.total" -> "total")
+                        let lookup_name = if let Some(dot_pos) = name.find('.') {
+                            &name[dot_pos + 1..]
+                        } else {
+                            name.as_str()
+                        };
+
                         let mut offset = 0;
                         let mut found = false;
                         for (_, schema) in schemas {
-                            if let Some(idx) = schema.columns.iter().position(|c| &c.name == name) {
+                            log::debug!(
+                                "[PROJ] Looking for column '{}' (lookup: '{}') in schema with {} cols",
+                                name,
+                                lookup_name,
+                                schema.columns.len()
+                            );
+                            if let Some(idx) = schema.columns.iter().position(|c| c.name == lookup_name) {
+                                log::debug!("[PROJ] Found at offset {} + idx {}", offset, idx);
                                 projected.push(row[offset + idx].clone());
                                 found = true;
                                 break;

@@ -47,11 +47,6 @@ case $MODE in
         fi
         ;;
 
-    pet_store)
-        echo -e "${YELLOW}Note: pet_store tests are part of scenarios${NC}"
-        echo -e "${YELLOW}Use: ./run_all.sh scenarios pet_store_basic_operations${NC}"
-        exit 1
-        ;;
 
     full)
         echo -e "${GREEN}Running full test suite${NC}"

@@ -72,8 +72,21 @@ impl FunctionRegistry {
     }
 
     fn matches_signature(&self, func: &Function, arg_types: &[String]) -> bool {
-        func.parameters.len() == arg_types.len()
-            && func.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)
+        if func.is_variadic {
+            // For variadic functions, check that we have at least the required parameters
+            // and that all provided arguments match the parameter type
+            let required = func.parameters.iter().filter(|p| p.default.is_none()).count();
+            if arg_types.len() < required {
+                return false;
+            }
+            // All arguments should match the variadic parameter type
+            func.parameters.iter().all(|p| {
+                arg_types.iter().all(|t| &p.data_type == t)
+            })
+        } else {
+            func.parameters.len() == arg_types.len()
+                && func.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)
+        }
     }
 }
 

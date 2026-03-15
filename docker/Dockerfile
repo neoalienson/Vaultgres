@@ -1,8 +1,11 @@
 # Multi-stage build for minimal and secure image
-FROM rust:1.82-alpine AS builder
+FROM rust:1.85 AS builder
 
 # Install build dependencies
-RUN apk add --no-cache musl-dev
+RUN apt-get update && apt-get install -y musl-dev && rm -rf /var/lib/apt/lists/*
+
+# Add musl target for static linking
+RUN rustup target add x86_64-unknown-linux-musl
 
 # Set git hash build-arg
 ARG GIT_HASH

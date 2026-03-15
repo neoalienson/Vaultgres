@@ -243,10 +243,16 @@ impl PredicateEvaluator {
         log::trace!("evaluate_expr_with_subquery: expr variant={:?}", std::mem::discriminant(expr));
         match expr {
             Expr::Column(name) => {
+                // Handle table-prefixed column names (e.g., "o.total" -> "total")
+                let lookup_name = if let Some(dot_pos) = name.find('.') {
+                    &name[dot_pos + 1..]
+                } else {
+                    name.as_str()
+                };
                 let idx = schema
                     .columns
                     .iter()
-                    .position(|c| &c.name == name)
+                    .position(|c| c.name == lookup_name)
                     .ok_or_else(|| format!("Column '{}' not found", name))?;
                 Ok(tuple[idx].clone())
             }

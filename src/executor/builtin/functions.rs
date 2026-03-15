@@ -97,12 +97,7 @@ impl BuiltinFunctions {
                 name: "concat".to_string(),
                 parameters: vec![
                     Parameter {
-                        name: "a".to_string(),
-                        data_type: "TEXT".to_string(),
-                        default: None,
-                    },
-                    Parameter {
-                        name: "b".to_string(),
+                        name: "args".to_string(),
                         data_type: "TEXT".to_string(),
                         default: None,
                     },
@@ -110,7 +105,7 @@ impl BuiltinFunctions {
                 return_type: "TEXT".to_string(),
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:concat".to_string(),
-                is_variadic: false,
+                is_variadic: true,
                 cost: 100.0,
                 rows: 1,
                 volatility: crate::catalog::FunctionVolatility::Immutable,
@@ -552,11 +547,16 @@ impl BuiltinFunctions {
                 }
             }
             "concat" => {
-                if let (Value::Text(a), Value::Text(b)) = (&args[0], &args[1]) {
-                    Ok(Value::Text(format!("{}{}", a, b)))
-                } else {
-                    Err("Expected TEXT, TEXT".to_string())
+                let mut result = String::new();
+                for val in args {
+                    match val {
+                        Value::Text(s) => result.push_str(&s),
+                        Value::Int(i) => result.push_str(&i.to_string()),
+                        Value::Null => continue,
+                        _ => return Err("CONCAT requires text or numeric values".to_string()),
+                    }
                 }
+                Ok(Value::Text(result))
             }
             "trim" => {
                 if let Value::Text(s) = &args[0] {

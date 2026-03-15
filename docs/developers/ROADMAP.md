@@ -81,8 +81,6 @@ VaultGres development roadmap with planned features and milestones.
 
 **Phase 0: Preparation & Infrastructure** ✅ COMPLETED
 - ✅ Adapter utilities for type conversion (SimpleTuple ↔ Tuple, bytes ↔ Value)
-- ✅ OldExecutor → Executor adapter (OldExecutorAdapter)
-- ✅ Executor → OldExecutor adapter (ExecutorWrapper)
 - ✅ Enhanced test infrastructure with MockExecutor and TupleBuilder
 - ✅ Feature flag infrastructure (executor-migration)
 
@@ -128,14 +126,6 @@ VaultGres development roadmap with planned features and milestones.
 - ⏸️ ParallelHashJoin (infrastructure complete, join logic needs Tuple key extraction refactor)
 - ⏸️ ParallelHashAgg (infrastructure complete, aggregation logic needs Tuple-based grouping refactor)
 
-**Phase 7: Cleanup & Finalization** ✅ COMPLETED
-- ✅ Removed OldExecutor trait
-- ✅ Removed SimpleTuple type
-- ✅ Removed legacy mock executors
-- ✅ Removed adapter utilities
-- ✅ Removed feature flags
-- ✅ All 1039 tests passing
-- ✅ No legacy code remaining
 
 ## Version 0.2.0 (Current - Alpha)
 

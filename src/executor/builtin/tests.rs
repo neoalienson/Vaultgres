@@ -112,6 +112,136 @@ mod tests {
     }
 
     #[test]
+    fn test_concat_variadic_three_args() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![
+                Value::Text("hello".to_string()),
+                Value::Text(" ".to_string()),
+                Value::Text("world".to_string()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("hello world".to_string()));
+    }
+
+    #[test]
+    fn test_concat_variadic_many_args() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![
+                Value::Text("a".to_string()),
+                Value::Text("b".to_string()),
+                Value::Text("c".to_string()),
+                Value::Text("d".to_string()),
+                Value::Text("e".to_string()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("abcde".to_string()));
+    }
+
+    #[test]
+    fn test_concat_with_int() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![
+                Value::Text("Value: ".to_string()),
+                Value::Int(42),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("Value: 42".to_string()));
+    }
+
+    #[test]
+    fn test_concat_mixed_types() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![
+                Value::Text("SKU".to_string()),
+                Value::Text(" - ".to_string()),
+                Value::Int(123),
+                Value::Text(" - ".to_string()),
+                Value::Text("Product".to_string()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("SKU - 123 - Product".to_string()));
+    }
+
+    #[test]
+    fn test_concat_with_null() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![
+                Value::Text("hello".to_string()),
+                Value::Null,
+                Value::Text("world".to_string()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("helloworld".to_string()));
+    }
+
+    #[test]
+    fn test_concat_all_nulls() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![Value::Null, Value::Null, Value::Null],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("".to_string()));
+    }
+
+    #[test]
+    fn test_concat_empty_args() {
+        let result = BuiltinFunctions::execute("concat", vec![]).unwrap();
+        assert_eq!(result, Value::Text("".to_string()));
+    }
+
+    #[test]
+    fn test_concat_single_arg() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![Value::Text("single".to_string())],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Text("single".to_string()));
+    }
+
+    #[test]
+    fn test_concat_invalid_type() {
+        let result = BuiltinFunctions::execute(
+            "concat",
+            vec![Value::Bool(true)],
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("CONCAT requires text or numeric values"));
+    }
+
+    #[test]
+    fn test_concat_variadic_in_registry() {
+        let mut registry = FunctionRegistry::new();
+        BuiltinFunctions::register_all(&mut registry);
+
+        // Test that concat resolves with 2 args
+        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "TEXT".to_string()]).is_some());
+        
+        // Test that concat resolves with 3 args
+        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string()]).is_some());
+        
+        // Test that concat resolves with 5 args
+        assert!(registry.resolve_with_defaults("concat", &[
+            "TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string(), 
+            "TEXT".to_string(), "TEXT".to_string()
+        ]).is_some());
+        
+        // Test that concat resolves with mixed types (TEXT and INT)
+        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "INT".to_string()]).is_some());
+    }
+
+    #[test]
     fn test_trim() {
         let result =
             BuiltinFunctions::execute("trim", vec![Value::Text("  hello  ".to_string())]).unwrap();
