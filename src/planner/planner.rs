@@ -35,6 +35,24 @@ impl Planner {
         // Get catalog reference if available
         let catalog = self.catalog.as_ref();
 
+        // Handle SELECT without FROM clause (e.g., SELECT COALESCE(...), SELECT 1+1)
+        // These are constant expression evaluations that don't require a table scan
+        if from_table_name.is_empty() {
+            // Create a dummy single-row executor for constant expression evaluation
+            let mut dummy_tuple = crate::executor::operators::executor::Tuple::new();
+            dummy_tuple.insert("dummy".to_string(), crate::catalog::Value::Int(1));
+
+            // Create a minimal schema
+            current_schema = TableSchema::new("dummy".to_string(), vec![]);
+
+            let plan: Box<dyn Executor> =
+                Box::new(crate::executor::operators::constant_scan::ConstantScanExecutor::new(
+                    vec![dummy_tuple],
+                ));
+
+            return self.build_plan_from_scan(plan, current_schema, stmt, catalog);
+        }
+
         // 1. SeqScan or SubqueryScan (for views)
         let mut plan: Box<dyn Executor> = if let Some(cat) = catalog {
             if let Some(view_stmt) = cat.get_view(from_table_name) {
@@ -81,6 +99,17 @@ impl Planner {
             return Err(ExecutorError::InternalError("Catalog required for planning".to_string()));
         };
 
+        return self.build_plan_from_scan(plan, current_schema, stmt, catalog);
+    }
+
+    /// Build the rest of the query plan after the initial table scan
+    fn build_plan_from_scan(
+        &self,
+        mut plan: Box<dyn Executor>,
+        mut current_schema: TableSchema,
+        stmt: &SelectStmt,
+        catalog: Option<&Arc<crate::catalog::Catalog>>,
+    ) -> Result<Box<dyn Executor>, ExecutorError> {
         // Handle JOINs if present
         if !stmt.joins.is_empty() {
             if let Some(cat) = catalog {
@@ -186,7 +215,18 @@ impl Planner {
             );
         }
 
-        // 5. Project (SELECT list)
+        // 5. Order By (BEFORE projection so ORDER BY can reference non-selected columns)
+        if let Some(order_by_exprs) = &stmt.order_by {
+            if !order_by_exprs.is_empty() {
+                plan = Box::new(SortExecutor::new(
+                    plan,
+                    order_by_exprs.clone(),
+                    current_schema.clone(),
+                )?);
+            }
+        }
+
+        // 6. Project (SELECT list)
         log::debug!("Planner: Processing {} SELECT columns", stmt.columns.len());
 
         // After aggregation, the projection should use the aggregate output columns
@@ -233,20 +273,9 @@ impl Planner {
 
         plan = Box::new(ProjectExecutor::new(plan, final_projection_exprs));
 
-        // 6. Distinct
+        // 7. Distinct
         if stmt.distinct {
             plan = Box::new(DistinctExecutor::new(plan)?);
-        }
-
-        // 7. Order By
-        if let Some(order_by_exprs) = &stmt.order_by {
-            if !order_by_exprs.is_empty() {
-                plan = Box::new(SortExecutor::new(
-                    plan,
-                    order_by_exprs.clone(),
-                    current_schema.clone(),
-                )?);
-            }
         }
 
         // 8. Limit and Offset
@@ -1009,5 +1038,70 @@ mod tests {
         let result_schema = result.unwrap();
         assert_eq!(result_schema.columns.len(), 2);
         assert_eq!(result_schema.columns[1].name, "count(id)");
+    }
+
+    #[test]
+    fn test_order_by_with_non_selected_column() {
+        // Test that ORDER BY can reference columns not in SELECT list
+        // This is standard SQL behavior: SELECT name FROM items ORDER BY price
+        let catalog = create_test_catalog();
+        let planner = Planner::new(Some(catalog.clone()));
+
+        // SELECT name FROM items ORDER BY price ASC
+        let select_stmt = SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Column("name".to_string())],
+            from: "items".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: Some(vec![crate::parser::ast::OrderByExpr {
+                column: "price".to_string(),
+                ascending: true,
+            }]),
+            limit: None,
+            offset: None,
+        };
+
+        let result = planner.plan(&select_stmt);
+        assert!(
+            result.is_ok(),
+            "ORDER BY with non-selected column should work: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_order_by_limit_offset_with_non_selected_column() {
+        // Test ORDER BY with LIMIT/OFFSET when ORDER BY column is not in SELECT
+        let catalog = create_test_catalog();
+        let planner = Planner::new(Some(catalog.clone()));
+
+        // SELECT name FROM items ORDER BY price ASC LIMIT 1 OFFSET 1
+        let select_stmt = SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Column("name".to_string())],
+            from: "items".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: Some(vec![crate::parser::ast::OrderByExpr {
+                column: "price".to_string(),
+                ascending: true,
+            }]),
+            limit: Some(1),
+            offset: Some(1),
+        };
+
+        let result = planner.plan(&select_stmt);
+        assert!(
+            result.is_ok(),
+            "ORDER BY + LIMIT + OFFSET with non-selected column should work: {:?}",
+            result.err()
+        );
     }
 }

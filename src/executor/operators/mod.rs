@@ -1,3 +1,4 @@
+pub mod constant_scan;
 pub mod executor;
 pub mod filter;
 pub mod project;

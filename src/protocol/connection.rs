@@ -816,6 +816,101 @@ mod tests {
     }
 
     #[test]
+    fn test_handle_query_order_by_with_non_selected_column() {
+        // Test ORDER BY with column not in SELECT list
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // Create table
+        let create_table_sql = "CREATE TABLE products (id INT, name TEXT, price INT);";
+        conn.handle_query(create_table_sql).unwrap();
+
+        // Insert data
+        let insert_sql =
+            "INSERT INTO products VALUES (1, 'Apple', 100), (2, 'Banana', 50), (3, 'Cherry', 200);";
+        conn.handle_query(insert_sql).unwrap();
+
+        // SELECT name ORDER BY price (price is not in SELECT list)
+        let select_sql = "SELECT name FROM products ORDER BY price ASC;";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        let output_str = String::from_utf8_lossy(&output);
+        // Should be ordered by price: Banana (50), Apple (100), Cherry (200)
+        let banana_pos = output_str.find("Banana").unwrap_or(usize::MAX);
+        let apple_pos = output_str.find("Apple").unwrap_or(usize::MAX);
+        let cherry_pos = output_str.find("Cherry").unwrap_or(usize::MAX);
+        assert!(banana_pos < apple_pos && apple_pos < cherry_pos, "Should be ordered by price ASC");
+    }
+
+    #[test]
+    fn test_handle_query_order_by_limit_offset_with_non_selected_column() {
+        // Test ORDER BY + LIMIT + OFFSET with column not in SELECT list
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // Create table
+        let create_table_sql = "CREATE TABLE items (id INT, name TEXT, price INT);";
+        conn.handle_query(create_table_sql).unwrap();
+
+        // Insert data
+        let insert_sql =
+            "INSERT INTO items VALUES (1, 'Cheap', 10), (2, 'Medium', 50), (3, 'Expensive', 100);";
+        conn.handle_query(insert_sql).unwrap();
+
+        // SELECT name ORDER BY price ASC LIMIT 1 OFFSET 1
+        // Should return the second cheapest item: "Medium"
+        let select_sql = "SELECT name FROM items ORDER BY price ASC LIMIT 1 OFFSET 1;";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        let output_str = String::from_utf8_lossy(&output);
+        // Should return only "Medium" (the second cheapest)
+        assert!(output_str.contains("Medium"), "Should return Medium (second cheapest)");
+        assert!(!output_str.contains("Cheap"), "Should not return Cheap (cheapest)");
+        assert!(!output_str.contains("Expensive"), "Should not return Expensive (most expensive)");
+    }
+
+    #[test]
+    fn test_handle_query_select_without_from_clause() {
+        // Test SELECT without FROM clause (e.g., SELECT COALESCE(...), SELECT 1+1)
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // SELECT COALESCE(NULL, NULL, 'default_value') - no FROM clause
+        let select_sql = "SELECT COALESCE(NULL, NULL, 'default_value');";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        let output_str = String::from_utf8_lossy(&output);
+        // Should contain the default value
+        assert!(output_str.contains("default_value"), "COALESCE should return first non-NULL");
+    }
+
+    #[test]
+    fn test_handle_query_select_expression_without_from() {
+        // Test SELECT with expression but no FROM clause
+        let catalog = Arc::new(Catalog::new());
+        let mut stream = MockStream::new(Vec::new());
+        let mut conn = Connection::new(&mut stream, catalog.clone());
+        conn.authenticated = true;
+
+        // SELECT 1 + 1 - no FROM clause
+        let select_sql = "SELECT 1 + 1;";
+        conn.handle_query(select_sql).unwrap();
+
+        let output = stream.get_output();
+        // Should return a result (we just check it doesn't error)
+        assert!(!output.is_empty(), "Should return a result");
+    }
+
+    #[test]
     fn test_handle_query_syntax_error() {
         let invalid_sql = "SELECT FROM users;"; // Missing column list
         let mut stream = MockStream::new(Vec::new());
