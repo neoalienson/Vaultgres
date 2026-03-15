@@ -25,11 +25,17 @@ impl Eval {
                 } else {
                     name.as_str()
                 };
-                tuple.get(lookup_name).cloned().ok_or_else(|| ExecutorError::ColumnNotFound(name.clone()))
+                tuple
+                    .get(lookup_name)
+                    .cloned()
+                    .ok_or_else(|| ExecutorError::ColumnNotFound(name.clone()))
             }
             Expr::QualifiedColumn { table: _, column } => {
                 // For qualified columns, just use the column name
-                tuple.get(column).cloned().ok_or_else(|| ExecutorError::ColumnNotFound(column.clone()))
+                tuple
+                    .get(column)
+                    .cloned()
+                    .ok_or_else(|| ExecutorError::ColumnNotFound(column.clone()))
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::Float(f) => Ok(Value::Float(*f)),
@@ -500,9 +506,11 @@ impl Eval {
                         Value::Text(s) => result.push_str(&s),
                         Value::Int(i) => result.push_str(&i.to_string()),
                         Value::Null => continue,
-                        _ => return Err(ExecutorError::TypeMismatch(
-                            "CONCAT requires text or numeric values".to_string(),
-                        )),
+                        _ => {
+                            return Err(ExecutorError::TypeMismatch(
+                                "CONCAT requires text or numeric values".to_string(),
+                            ));
+                        }
                     }
                 }
                 Ok(Value::Text(result))
@@ -514,8 +522,12 @@ impl Eval {
                     ));
                 }
                 let length = if args.len() == 3 { Some(args[2].clone()) } else { None };
-                string_functions::StringFunctions::substring(args[0].clone(), args[1].clone(), length)
-                    .map_err(ExecutorError::TypeMismatch)
+                string_functions::StringFunctions::substring(
+                    args[0].clone(),
+                    args[1].clone(),
+                    length,
+                )
+                .map_err(ExecutorError::TypeMismatch)
             }
             _ => Err(ExecutorError::FunctionNotFound(format!("Function '{}' not found", name))),
         }
@@ -528,58 +540,59 @@ mod tests {
 
     #[test]
     fn test_concat_two_strings() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("hello".to_string()),
-            Value::Text("world".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "CONCAT",
+            vec![Value::Text("hello".to_string()), Value::Text("world".to_string())],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("helloworld".to_string()));
     }
 
     #[test]
     fn test_concat_three_strings() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("hello".to_string()),
-            Value::Text(" ".to_string()),
-            Value::Text("world".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "CONCAT",
+            vec![
+                Value::Text("hello".to_string()),
+                Value::Text(" ".to_string()),
+                Value::Text("world".to_string()),
+            ],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("hello world".to_string()));
     }
 
     #[test]
     fn test_concat_with_int() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("Value: ".to_string()),
-            Value::Int(42),
-        ]).unwrap();
+        let result =
+            Eval::eval_function("CONCAT", vec![Value::Text("Value: ".to_string()), Value::Int(42)])
+                .unwrap();
         assert_eq!(result, Value::Text("Value: 42".to_string()));
     }
 
     #[test]
     fn test_concat_mixed_types() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("SKU".to_string()),
-            Value::Text(" - ".to_string()),
-            Value::Int(123),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "CONCAT",
+            vec![Value::Text("SKU".to_string()), Value::Text(" - ".to_string()), Value::Int(123)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("SKU - 123".to_string()));
     }
 
     #[test]
     fn test_concat_with_null() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("hello".to_string()),
-            Value::Null,
-            Value::Text("world".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "CONCAT",
+            vec![Value::Text("hello".to_string()), Value::Null, Value::Text("world".to_string())],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("helloworld".to_string()));
     }
 
     #[test]
     fn test_concat_all_nulls() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Null,
-            Value::Null,
-        ]).unwrap();
+        let result = Eval::eval_function("CONCAT", vec![Value::Null, Value::Null]).unwrap();
         assert_eq!(result, Value::Text("".to_string()));
     }
 
@@ -591,137 +604,131 @@ mod tests {
 
     #[test]
     fn test_concat_single_arg() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Text("single".to_string()),
-        ]).unwrap();
+        let result =
+            Eval::eval_function("CONCAT", vec![Value::Text("single".to_string())]).unwrap();
         assert_eq!(result, Value::Text("single".to_string()));
     }
 
     #[test]
     fn test_concat_invalid_type() {
-        let result = Eval::eval_function("CONCAT", vec![
-            Value::Bool(true),
-        ]);
+        let result = Eval::eval_function("CONCAT", vec![Value::Bool(true)]);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("CONCAT requires text or numeric values"));
     }
 
     #[test]
     fn test_substring_two_args() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello world".to_string()),
-            Value::Int(1),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "SUBSTRING",
+            vec![Value::Text("hello world".to_string()), Value::Int(1)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("hello world".to_string()));
     }
 
     #[test]
     fn test_substring_three_args() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello world".to_string()),
-            Value::Int(1),
-            Value::Int(5),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "SUBSTRING",
+            vec![Value::Text("hello world".to_string()), Value::Int(1), Value::Int(5)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("hello".to_string()));
     }
 
     #[test]
     fn test_substring_invalid_args() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello".to_string()),
-        ]);
+        let result = Eval::eval_function("SUBSTRING", vec![Value::Text("hello".to_string())]);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("SUBSTRING takes 2 or 3 arguments"));
     }
 
     #[test]
     fn test_substring_from_start() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello world".to_string()),
-            Value::Int(1),
-            Value::Int(5),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "SUBSTRING",
+            vec![Value::Text("hello world".to_string()), Value::Int(1), Value::Int(5)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("hello".to_string()));
     }
 
     #[test]
     fn test_substring_middle() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello world".to_string()),
-            Value::Int(7),
-            Value::Int(5),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "SUBSTRING",
+            vec![Value::Text("hello world".to_string()), Value::Int(7), Value::Int(5)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("world".to_string()));
     }
 
     #[test]
     fn test_substring_without_length() {
-        let result = Eval::eval_function("SUBSTRING", vec![
-            Value::Text("hello world".to_string()),
-            Value::Int(7),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "SUBSTRING",
+            vec![Value::Text("hello world".to_string()), Value::Int(7)],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("world".to_string()));
     }
 
     #[test]
     fn test_upper_function() {
-        let result = Eval::eval_function("UPPER", vec![
-            Value::Text("hello".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function("UPPER", vec![Value::Text("hello".to_string())]).unwrap();
         assert_eq!(result, Value::Text("HELLO".to_string()));
     }
 
     #[test]
     fn test_lower_function() {
-        let result = Eval::eval_function("LOWER", vec![
-            Value::Text("HELLO".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function("LOWER", vec![Value::Text("HELLO".to_string())]).unwrap();
         assert_eq!(result, Value::Text("hello".to_string()));
     }
 
     #[test]
     fn test_length_function() {
-        let result = Eval::eval_function("LENGTH", vec![
-            Value::Text("hello".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function("LENGTH", vec![Value::Text("hello".to_string())]).unwrap();
         assert_eq!(result, Value::Int(5));
     }
 
     #[test]
     fn test_coalesce_returns_first_non_null() {
-        let result = Eval::eval_function("COALESCE", vec![
-            Value::Null,
-            Value::Null,
-            Value::Text("found".to_string()),
-            Value::Text("ignored".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "COALESCE",
+            vec![
+                Value::Null,
+                Value::Null,
+                Value::Text("found".to_string()),
+                Value::Text("ignored".to_string()),
+            ],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("found".to_string()));
     }
 
     #[test]
     fn test_coalesce_all_nulls() {
-        let result = Eval::eval_function("COALESCE", vec![
-            Value::Null,
-            Value::Null,
-        ]).unwrap();
+        let result = Eval::eval_function("COALESCE", vec![Value::Null, Value::Null]).unwrap();
         assert_eq!(result, Value::Null);
     }
 
     #[test]
     fn test_nullif_equal_returns_null() {
-        let result = Eval::eval_function("NULLIF", vec![
-            Value::Text("same".to_string()),
-            Value::Text("same".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "NULLIF",
+            vec![Value::Text("same".to_string()), Value::Text("same".to_string())],
+        )
+        .unwrap();
         assert_eq!(result, Value::Null);
     }
 
     #[test]
     fn test_nullif_different_returns_first() {
-        let result = Eval::eval_function("NULLIF", vec![
-            Value::Text("first".to_string()),
-            Value::Text("second".to_string()),
-        ]).unwrap();
+        let result = Eval::eval_function(
+            "NULLIF",
+            vec![Value::Text("first".to_string()), Value::Text("second".to_string())],
+        )
+        .unwrap();
         assert_eq!(result, Value::Text("first".to_string()));
     }
 }

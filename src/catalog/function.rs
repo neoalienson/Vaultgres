@@ -80,9 +80,7 @@ impl FunctionRegistry {
                 return false;
             }
             // All arguments should match the variadic parameter type
-            func.parameters.iter().all(|p| {
-                arg_types.iter().all(|t| &p.data_type == t)
-            })
+            func.parameters.iter().all(|p| arg_types.iter().all(|t| &p.data_type == t))
         } else {
             func.parameters.len() == arg_types.len()
                 && func.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)

@@ -145,10 +145,7 @@ mod tests {
     fn test_concat_with_int() {
         let result = BuiltinFunctions::execute(
             "concat",
-            vec![
-                Value::Text("Value: ".to_string()),
-                Value::Int(42),
-            ],
+            vec![Value::Text("Value: ".to_string()), Value::Int(42)],
         )
         .unwrap();
         assert_eq!(result, Value::Text("Value: 42".to_string()));
@@ -174,11 +171,7 @@ mod tests {
     fn test_concat_with_null() {
         let result = BuiltinFunctions::execute(
             "concat",
-            vec![
-                Value::Text("hello".to_string()),
-                Value::Null,
-                Value::Text("world".to_string()),
-            ],
+            vec![Value::Text("hello".to_string()), Value::Null, Value::Text("world".to_string())],
         )
         .unwrap();
         assert_eq!(result, Value::Text("helloworld".to_string()));
@@ -186,11 +179,9 @@ mod tests {
 
     #[test]
     fn test_concat_all_nulls() {
-        let result = BuiltinFunctions::execute(
-            "concat",
-            vec![Value::Null, Value::Null, Value::Null],
-        )
-        .unwrap();
+        let result =
+            BuiltinFunctions::execute("concat", vec![Value::Null, Value::Null, Value::Null])
+                .unwrap();
         assert_eq!(result, Value::Text("".to_string()));
     }
 
@@ -202,20 +193,14 @@ mod tests {
 
     #[test]
     fn test_concat_single_arg() {
-        let result = BuiltinFunctions::execute(
-            "concat",
-            vec![Value::Text("single".to_string())],
-        )
-        .unwrap();
+        let result =
+            BuiltinFunctions::execute("concat", vec![Value::Text("single".to_string())]).unwrap();
         assert_eq!(result, Value::Text("single".to_string()));
     }
 
     #[test]
     fn test_concat_invalid_type() {
-        let result = BuiltinFunctions::execute(
-            "concat",
-            vec![Value::Bool(true)],
-        );
+        let result = BuiltinFunctions::execute("concat", vec![Value::Bool(true)]);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("CONCAT requires text or numeric values"));
     }
@@ -226,19 +211,44 @@ mod tests {
         BuiltinFunctions::register_all(&mut registry);
 
         // Test that concat resolves with 2 args
-        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "TEXT".to_string()]).is_some());
-        
+        assert!(
+            registry
+                .resolve_with_defaults("concat", &["TEXT".to_string(), "TEXT".to_string()])
+                .is_some()
+        );
+
         // Test that concat resolves with 3 args
-        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string()]).is_some());
-        
+        assert!(
+            registry
+                .resolve_with_defaults(
+                    "concat",
+                    &["TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string()]
+                )
+                .is_some()
+        );
+
         // Test that concat resolves with 5 args
-        assert!(registry.resolve_with_defaults("concat", &[
-            "TEXT".to_string(), "TEXT".to_string(), "TEXT".to_string(), 
-            "TEXT".to_string(), "TEXT".to_string()
-        ]).is_some());
-        
+        assert!(
+            registry
+                .resolve_with_defaults(
+                    "concat",
+                    &[
+                        "TEXT".to_string(),
+                        "TEXT".to_string(),
+                        "TEXT".to_string(),
+                        "TEXT".to_string(),
+                        "TEXT".to_string()
+                    ]
+                )
+                .is_some()
+        );
+
         // Test that concat resolves with mixed types (TEXT and INT)
-        assert!(registry.resolve_with_defaults("concat", &["TEXT".to_string(), "INT".to_string()]).is_some());
+        assert!(
+            registry
+                .resolve_with_defaults("concat", &["TEXT".to_string(), "INT".to_string()])
+                .is_some()
+        );
     }
 
     #[test]

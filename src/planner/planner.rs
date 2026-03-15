@@ -1,11 +1,11 @@
+use crate::catalog::Value;
 use crate::catalog::{Catalog, TableSchema};
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
 use crate::executor::volcano::{
-    DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType, LimitExecutor, ProjectExecutor,
-    SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
+    DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType, LimitExecutor,
+    ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
 };
 use crate::parser::ast::{AggregateFunc, BinaryOperator, ColumnDef, DataType, Expr, SelectStmt};
-use crate::catalog::Value;
 
 use std::sync::Arc;
 
@@ -57,7 +57,8 @@ impl Planner {
                     }
                 }
                 // Project the schema based on view's SELECT columns
-                current_schema = Self::derive_projection_schema(&combined_schema, &view_stmt.columns)?;
+                current_schema =
+                    Self::derive_projection_schema(&combined_schema, &view_stmt.columns)?;
                 Box::new(SubqueryScanExecutor::new(sub_plan))
             } else {
                 current_schema = cat
@@ -94,34 +95,34 @@ impl Planner {
                             ))
                         })?
                         .clone();
-                    
+
                     let right_plan: Box<dyn Executor> = Box::new(SeqScanExecutor::new(
                         join.table.clone(),
                         right_schema.clone(),
                         Arc::clone(&cat.data),
                         Arc::clone(&cat.txn_mgr),
                     ));
-                    
+
                     // Create join condition - evaluate against combined tuple
                     let join_condition = join.on.clone();
-                    
+
                     // Build combined schema for this join step
                     let mut combined_schema_for_join = current_schema.clone();
                     combined_schema_for_join.columns.extend(right_schema.columns.clone());
-                    
+
                     let condition = move |left: &Tuple, right: &Tuple| -> bool {
                         // Combine left and right tuples for predicate evaluation
                         let mut combined = left.clone();
                         for (k, v) in right.iter() {
                             combined.insert(k.clone(), v.clone());
                         }
-                        
+
                         match crate::executor::Eval::eval_expr(&join_condition, &combined) {
                             Ok(Value::Bool(b)) => b,
                             _ => false,
                         }
                     };
-                    
+
                     let join_executor = JoinExecutor::new(
                         plan,
                         right_plan,
@@ -134,7 +135,7 @@ impl Planner {
                         Box::new(condition),
                     );
                     plan = Box::new(join_executor);
-                    
+
                     // Update current schema to include right table columns
                     current_schema.columns.extend(right_schema.columns.clone());
                 }
@@ -187,7 +188,7 @@ impl Planner {
 
         // 5. Project (SELECT list)
         log::debug!("Planner: Processing {} SELECT columns", stmt.columns.len());
-        
+
         // After aggregation, the projection should use the aggregate output columns
         let mut final_projection_exprs = Vec::new();
         if has_group_by || has_aggregates {
@@ -208,7 +209,10 @@ impl Planner {
                     // Convert QualifiedColumn to simple Column since all columns are merged
                     match expr {
                         Expr::QualifiedColumn { column, .. } => {
-                            log::debug!("Planner: Converting QualifiedColumn to Column '{}'", column);
+                            log::debug!(
+                                "Planner: Converting QualifiedColumn to Column '{}'",
+                                column
+                            );
                             final_projection_exprs.push(Expr::Column(column.clone()));
                         }
                         _ => {
@@ -353,7 +357,8 @@ impl Planner {
                         col_name.as_str()
                     };
 
-                    if let Some(col_def) = input_schema.columns.iter().find(|c| c.name == lookup_name)
+                    if let Some(col_def) =
+                        input_schema.columns.iter().find(|c| c.name == lookup_name)
                     {
                         projected_columns.push(col_def.clone());
                     } else {
@@ -365,8 +370,7 @@ impl Planner {
                 }
                 Expr::QualifiedColumn { column, .. } => {
                     // For qualified columns, just use the column name
-                    if let Some(col_def) = input_schema.columns.iter().find(|c| &c.name == column)
-                    {
+                    if let Some(col_def) = input_schema.columns.iter().find(|c| &c.name == column) {
                         projected_columns.push(col_def.clone());
                     } else {
                         return Err(ExecutorError::ColumnNotFound(format!(
@@ -465,7 +469,7 @@ impl Planner {
         input_schema: &TableSchema,
     ) -> Result<(), ExecutorError> {
         let available_cols: Vec<&String> = input_schema.columns.iter().map(|c| &c.name).collect();
-        
+
         for expr in projection_exprs {
             match expr {
                 Expr::Column(col_name) => {
@@ -511,7 +515,7 @@ impl Planner {
                 _ => {}
             }
         }
-        
+
         Ok(())
     }
 
@@ -535,52 +539,162 @@ impl Planner {
 mod tests {
     use super::*;
     use crate::catalog::{Catalog, TableSchema};
-    use crate::parser::ast::{Expr, SelectStmt, JoinClause, JoinType, BinaryOperator, ColumnDef, DataType};
+    use crate::parser::ast::{
+        BinaryOperator, ColumnDef, DataType, Expr, JoinClause, JoinType, SelectStmt,
+    };
     use std::sync::Arc;
 
     fn create_test_catalog() -> Arc<Catalog> {
         let catalog = Catalog::new();
-        
+
         // Create customers table
         let customers_columns = vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "email".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+            ColumnDef {
+                name: "id".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: true,
+                is_unique: true,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "name".to_string(),
+                data_type: DataType::Text,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "email".to_string(),
+                data_type: DataType::Text,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
         ];
         catalog.create_table("customers".to_string(), customers_columns).unwrap();
-        
+
         // Create orders table
         let orders_columns = vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "customer_id".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "total".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+            ColumnDef {
+                name: "id".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: true,
+                is_unique: true,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "customer_id".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "total".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
         ];
         catalog.create_table("orders".to_string(), orders_columns).unwrap();
-        
+
         // Create items table
         let items_columns = vec![
-            ColumnDef { name: "item_id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "sku".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "price".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
+            ColumnDef {
+                name: "item_id".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: true,
+                is_unique: true,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "sku".to_string(),
+                data_type: DataType::Text,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "name".to_string(),
+                data_type: DataType::Text,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
+            ColumnDef {
+                name: "price".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: false,
+                is_unique: false,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            },
         ];
         catalog.create_table("items".to_string(), items_columns).unwrap();
-        
+
         Arc::new(catalog)
     }
 
     #[test]
     fn test_derive_projection_schema_simple_columns() {
-        let schema = TableSchema::new("test".to_string(), vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-        ]);
-        
-        let projection = vec![
-            Expr::Column("id".to_string()),
-            Expr::Column("name".to_string()),
-        ];
-        
+        let schema = TableSchema::new(
+            "test".to_string(),
+            vec![
+                ColumnDef {
+                    name: "id".to_string(),
+                    data_type: DataType::Int,
+                    is_primary_key: true,
+                    is_unique: true,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+                ColumnDef {
+                    name: "name".to_string(),
+                    data_type: DataType::Text,
+                    is_primary_key: false,
+                    is_unique: false,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+            ],
+        );
+
+        let projection = vec![Expr::Column("id".to_string()), Expr::Column("name".to_string())];
+
         let result = Planner::derive_projection_schema(&schema, &projection).unwrap();
         assert_eq!(result.columns.len(), 2);
         assert_eq!(result.columns[0].name, "id");
@@ -591,17 +705,36 @@ mod tests {
 
     #[test]
     fn test_derive_projection_schema_with_table_prefix() {
-        let schema = TableSchema::new("test".to_string(), vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "total".to_string(), data_type: DataType::Int, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-        ]);
-        
+        let schema = TableSchema::new(
+            "test".to_string(),
+            vec![
+                ColumnDef {
+                    name: "id".to_string(),
+                    data_type: DataType::Int,
+                    is_primary_key: true,
+                    is_unique: true,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+                ColumnDef {
+                    name: "total".to_string(),
+                    data_type: DataType::Int,
+                    is_primary_key: false,
+                    is_unique: false,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+            ],
+        );
+
         // Test with table-prefixed column names (e.g., "o.total")
-        let projection = vec![
-            Expr::Column("o.id".to_string()),
-            Expr::Column("o.total".to_string()),
-        ];
-        
+        let projection =
+            vec![Expr::Column("o.id".to_string()), Expr::Column("o.total".to_string())];
+
         let result = Planner::derive_projection_schema(&schema, &projection).unwrap();
         assert_eq!(result.columns.len(), 2);
         assert_eq!(result.columns[0].name, "id");
@@ -612,17 +745,25 @@ mod tests {
 
     #[test]
     fn test_derive_projection_schema_with_alias() {
-        let schema = TableSchema::new("test".to_string(), vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-        ]);
-        
-        let projection = vec![
-            Expr::Alias {
-                alias: "order_id".to_string(),
-                expr: Box::new(Expr::Column("o.id".to_string())),
-            },
-        ];
-        
+        let schema = TableSchema::new(
+            "test".to_string(),
+            vec![ColumnDef {
+                name: "id".to_string(),
+                data_type: DataType::Int,
+                is_primary_key: true,
+                is_unique: true,
+                is_auto_increment: false,
+                is_not_null: false,
+                default_value: None,
+                foreign_key: None,
+            }],
+        );
+
+        let projection = vec![Expr::Alias {
+            alias: "order_id".to_string(),
+            expr: Box::new(Expr::Column("o.id".to_string())),
+        }];
+
         let result = Planner::derive_projection_schema(&schema, &projection).unwrap();
         assert_eq!(result.columns.len(), 1);
         assert_eq!(result.columns[0].name, "order_id");
@@ -631,13 +772,34 @@ mod tests {
 
     #[test]
     fn test_derive_projection_schema_star() {
-        let schema = TableSchema::new("test".to_string(), vec![
-            ColumnDef { name: "id".to_string(), data_type: DataType::Int, is_primary_key: true, is_unique: true, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-            ColumnDef { name: "name".to_string(), data_type: DataType::Text, is_primary_key: false, is_unique: false, is_auto_increment: false, is_not_null: false, default_value: None, foreign_key: None },
-        ]);
-        
+        let schema = TableSchema::new(
+            "test".to_string(),
+            vec![
+                ColumnDef {
+                    name: "id".to_string(),
+                    data_type: DataType::Int,
+                    is_primary_key: true,
+                    is_unique: true,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+                ColumnDef {
+                    name: "name".to_string(),
+                    data_type: DataType::Text,
+                    is_primary_key: false,
+                    is_unique: false,
+                    is_auto_increment: false,
+                    is_not_null: false,
+                    default_value: None,
+                    foreign_key: None,
+                },
+            ],
+        );
+
         let projection = vec![Expr::Star];
-        
+
         let result = Planner::derive_projection_schema(&schema, &projection).unwrap();
         assert_eq!(result.columns.len(), 2);
         assert_eq!(result.columns[0].name, "id");
@@ -648,14 +810,11 @@ mod tests {
     fn test_view_schema_derivation_simple() {
         let catalog = create_test_catalog();
         let planner = Planner::new(Some(catalog.clone()));
-        
+
         // Create a simple view: SELECT id, name FROM customers
         let view_stmt = SelectStmt {
             distinct: false,
-            columns: vec![
-                Expr::Column("id".to_string()),
-                Expr::Column("name".to_string()),
-            ],
+            columns: vec![Expr::Column("id".to_string()), Expr::Column("name".to_string())],
             from: "customers".to_string(),
             table_alias: None,
             joins: vec![],
@@ -666,7 +825,7 @@ mod tests {
             limit: None,
             offset: None,
         };
-        
+
         let result = planner.plan(&view_stmt);
         assert!(result.is_ok());
     }
@@ -676,15 +835,15 @@ mod tests {
         // Note: This test verifies that the view schema derivation handles prefixed columns
         // The actual JOIN execution is handled separately
         let catalog = create_test_catalog();
-        
+
         // Test that derive_projection_schema handles prefixed columns correctly
         let orders_schema = catalog.get_table("orders").unwrap();
         let customers_schema = catalog.get_table("customers").unwrap();
-        
+
         // Create a combined schema (as would be done for a JOIN view)
         let mut combined_schema = customers_schema.clone();
         combined_schema.columns.extend(orders_schema.columns.clone());
-        
+
         let projection = vec![
             Expr::Column("c.name".to_string()),
             Expr::Alias {
@@ -693,10 +852,14 @@ mod tests {
             },
             Expr::Column("o.total".to_string()),
         ];
-        
+
         let result = Planner::derive_projection_schema(&combined_schema, &projection);
-        assert!(result.is_ok(), "Schema derivation with prefixed columns should succeed: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Schema derivation with prefixed columns should succeed: {:?}",
+            result.err()
+        );
+
         let schema = result.unwrap();
         assert_eq!(schema.columns.len(), 3);
         assert_eq!(schema.columns[0].name, "name");
@@ -707,23 +870,25 @@ mod tests {
     #[test]
     fn test_view_schema_derivation_with_prefixed_columns() {
         let catalog = create_test_catalog();
-        
+
         // Test that derive_projection_schema handles prefixed columns correctly
         let orders_schema = catalog.get_table("orders").unwrap();
         let customers_schema = catalog.get_table("customers").unwrap();
-        
+
         // Create a combined schema (as would be done for a JOIN view)
         let mut combined_schema = customers_schema.clone();
         combined_schema.columns.extend(orders_schema.columns.clone());
-        
-        let projection = vec![
-            Expr::Column("c.name".to_string()),
-            Expr::Column("o.total".to_string()),
-        ];
-        
+
+        let projection =
+            vec![Expr::Column("c.name".to_string()), Expr::Column("o.total".to_string())];
+
         let result = Planner::derive_projection_schema(&combined_schema, &projection);
-        assert!(result.is_ok(), "Schema derivation with prefixed columns should succeed: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Schema derivation with prefixed columns should succeed: {:?}",
+            result.err()
+        );
+
         let schema = result.unwrap();
         assert_eq!(schema.columns.len(), 2);
         assert_eq!(schema.columns[0].name, "name");

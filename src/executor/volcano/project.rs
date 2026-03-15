@@ -15,14 +15,17 @@ impl ProjectExecutor {
         for (i, expr) in columns.iter().enumerate() {
             let col_name = Self::get_column_name(expr);
             log::debug!("  [{}] {:?} -> '{}'", i, expr, col_name);
-            
+
             // Early validation - warn about suspicious column names
             if col_name.contains('{') || col_name.contains("QualifiedColumn") {
-                log::warn!("ProjectExecutor: Suspicious column name '{}' from expression {:?}", 
-                    col_name, expr);
+                log::warn!(
+                    "ProjectExecutor: Suspicious column name '{}' from expression {:?}",
+                    col_name,
+                    expr
+                );
             }
         }
-        
+
         Self { child, columns }
     }
 
@@ -36,11 +39,11 @@ impl ProjectExecutor {
                 } else {
                     name.clone()
                 }
-            },
+            }
             Expr::QualifiedColumn { table, column } => {
                 // For qualified columns, use just the column name
                 column.clone()
-            },
+            }
             Expr::FunctionCall { name, .. } => name.to_lowercase(),
             Expr::Aggregate { func, .. } => format!("{:?}", func).to_lowercase(),
             Expr::Alias { alias, .. } => alias.clone(),
@@ -123,10 +126,7 @@ mod tests {
 
     #[test]
     fn test_get_column_name_qualified_column() {
-        let expr = Expr::QualifiedColumn {
-            table: "o".to_string(),
-            column: "total".to_string(),
-        };
+        let expr = Expr::QualifiedColumn { table: "o".to_string(), column: "total".to_string() };
         assert_eq!(ProjectExecutor::get_column_name(&expr), "total");
     }
 
@@ -141,10 +141,7 @@ mod tests {
 
     #[test]
     fn test_get_column_name_function() {
-        let expr = Expr::FunctionCall {
-            name: "CONCAT".to_string(),
-            args: vec![],
-        };
+        let expr = Expr::FunctionCall { name: "CONCAT".to_string(), args: vec![] };
         assert_eq!(ProjectExecutor::get_column_name(&expr), "concat");
     }
 
@@ -153,16 +150,13 @@ mod tests {
         let mut input_tuple = Tuple::new();
         input_tuple.insert("id".to_string(), crate::catalog::Value::Int(1));
         input_tuple.insert("name".to_string(), crate::catalog::Value::Text("Alice".to_string()));
-        
+
         let mock_executor = MockExecutor::new(vec![input_tuple]);
         let mut projector = ProjectExecutor::new(
             Box::new(mock_executor),
-            vec![
-                Expr::Column("id".to_string()),
-                Expr::Column("name".to_string()),
-            ],
+            vec![Expr::Column("id".to_string()), Expr::Column("name".to_string())],
         );
-        
+
         let result = projector.next().unwrap().unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result.get("id"), Some(&crate::catalog::Value::Int(1)));
@@ -175,16 +169,13 @@ mod tests {
         let mut input_tuple = Tuple::new();
         input_tuple.insert("id".to_string(), crate::catalog::Value::Int(1));
         input_tuple.insert("total".to_string(), crate::catalog::Value::Int(100));
-        
+
         let mock_executor = MockExecutor::new(vec![input_tuple]);
         let mut projector = ProjectExecutor::new(
             Box::new(mock_executor),
-            vec![
-                Expr::Column("o.id".to_string()),
-                Expr::Column("o.total".to_string()),
-            ],
+            vec![Expr::Column("o.id".to_string()), Expr::Column("o.total".to_string())],
         );
-        
+
         let result = projector.next().unwrap().unwrap();
         // Output should have stripped prefix
         assert_eq!(result.len(), 2);
@@ -196,7 +187,7 @@ mod tests {
     fn test_project_executor_with_alias() {
         let mut input_tuple = Tuple::new();
         input_tuple.insert("id".to_string(), crate::catalog::Value::Int(1));
-        
+
         let mock_executor = MockExecutor::new(vec![input_tuple]);
         let mut projector = ProjectExecutor::new(
             Box::new(mock_executor),
@@ -205,7 +196,7 @@ mod tests {
                 expr: Box::new(Expr::Column("o.id".to_string())),
             }],
         );
-        
+
         let result = projector.next().unwrap().unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result.get("order_id"), Some(&crate::catalog::Value::Int(1)));
@@ -214,11 +205,9 @@ mod tests {
     #[test]
     fn test_project_executor_empty_input() {
         let mock_executor = MockExecutor::new(vec![]);
-        let mut projector = ProjectExecutor::new(
-            Box::new(mock_executor),
-            vec![Expr::Column("id".to_string())],
-        );
-        
+        let mut projector =
+            ProjectExecutor::new(Box::new(mock_executor), vec![Expr::Column("id".to_string())]);
+
         let result = projector.next().unwrap();
         assert!(result.is_none());
     }
@@ -227,22 +216,20 @@ mod tests {
     fn test_project_executor_multiple_rows() {
         let mut tuple1 = Tuple::new();
         tuple1.insert("id".to_string(), crate::catalog::Value::Int(1));
-        
+
         let mut tuple2 = Tuple::new();
         tuple2.insert("id".to_string(), crate::catalog::Value::Int(2));
-        
+
         let mock_executor = MockExecutor::new(vec![tuple1, tuple2]);
-        let mut projector = ProjectExecutor::new(
-            Box::new(mock_executor),
-            vec![Expr::Column("id".to_string())],
-        );
-        
+        let mut projector =
+            ProjectExecutor::new(Box::new(mock_executor), vec![Expr::Column("id".to_string())]);
+
         let result1 = projector.next().unwrap().unwrap();
         assert_eq!(result1.get("id"), Some(&crate::catalog::Value::Int(1)));
-        
+
         let result2 = projector.next().unwrap().unwrap();
         assert_eq!(result2.get("id"), Some(&crate::catalog::Value::Int(2)));
-        
+
         let result3 = projector.next().unwrap();
         assert!(result3.is_none());
     }

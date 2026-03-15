@@ -95,13 +95,11 @@ impl BuiltinFunctions {
         registry
             .register(Function {
                 name: "concat".to_string(),
-                parameters: vec![
-                    Parameter {
-                        name: "args".to_string(),
-                        data_type: "TEXT".to_string(),
-                        default: None,
-                    },
-                ],
+                parameters: vec![Parameter {
+                    name: "args".to_string(),
+                    data_type: "TEXT".to_string(),
+                    default: None,
+                }],
                 return_type: "TEXT".to_string(),
                 language: FunctionLanguage::Sql,
                 body: "BUILTIN:concat".to_string(),

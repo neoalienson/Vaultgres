@@ -478,7 +478,9 @@ impl<S: Read + Write> Connection<S> {
                                 lookup_name,
                                 schema.columns.len()
                             );
-                            if let Some(idx) = schema.columns.iter().position(|c| c.name == lookup_name) {
+                            if let Some(idx) =
+                                schema.columns.iter().position(|c| c.name == lookup_name)
+                            {
                                 log::debug!("[PROJ] Found at offset {} + idx {}", offset, idx);
                                 projected.push(row[offset + idx].clone());
                                 found = true;
