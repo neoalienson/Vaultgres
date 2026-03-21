@@ -1,0 +1,22 @@
+# Cargo configuration for VaultGres
+
+# Aliases for common commands
+[alias]
+test-e2e = "test --package e2e --test scenarios"
+test-e2e-ff = "test --package e2e --test scenarios -- --test-threads=1 --fail-fast"
+test-pet-store = "test --package e2e --test pet_store"
+test-pet-store-ff = "test --package e2e --test pet_store -- --test-threads=1 --fail-fast"
+
+# Build configuration
+[build]
+# Use linker for faster builds
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+# Profile for faster testing
+[profile.dev]
+debug = 1
+opt-level = 0
+
+[profile.test]
+debug = 1
+opt-level = 0

@@ -3,7 +3,7 @@ use e2e::*;
 
 pub fn run_persistence_tests(env: &RunningEnv) {
     eprintln!("\n[PetStore] === Testing Persistence Across Restarts ===");
-    
+
     test_graceful_restart(env);
     test_kill_restart(env);
     test_stop_start_restart(env);
@@ -77,7 +77,8 @@ fn test_stop_start_restart(env: &RunningEnv) {
     assert!(result.is_ok(), "Items table should persist after stop/start");
 
     eprintln!("[PetStore] Verifying JOIN queries after restart...");
-    let result = db.execute("SELECT c.name, o.total FROM customers c JOIN orders o ON c.id = o.customer_id");
+    let result =
+        db.execute("SELECT c.name, o.total FROM customers c JOIN orders o ON c.id = o.customer_id");
     assert!(result.is_ok(), "JOIN queries should work after restart");
 }
 

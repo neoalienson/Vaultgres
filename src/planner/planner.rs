@@ -30,7 +30,7 @@ impl Planner {
         let from_table_name = &stmt.from;
 
         // Track the current schema as we build the plan
-        let mut current_schema: TableSchema;
+        let current_schema: TableSchema;
 
         // Get catalog reference if available
         let catalog = self.catalog.as_ref();
@@ -54,7 +54,7 @@ impl Planner {
         }
 
         // 1. SeqScan or SubqueryScan (for views)
-        let mut plan: Box<dyn Executor> = if let Some(cat) = catalog {
+        let plan: Box<dyn Executor> = if let Some(cat) = catalog {
             if let Some(view_stmt) = cat.get_view(from_table_name) {
                 // View expansion: recursively plan the view's query
                 let sub_plan = self.plan(&view_stmt)?;
@@ -113,6 +113,9 @@ impl Planner {
         // Handle JOINs if present
         if !stmt.joins.is_empty() {
             if let Some(cat) = catalog {
+                // Track table aliases for column prefixing
+                let mut left_alias = stmt.table_alias.clone().unwrap_or_else(|| stmt.from.clone());
+
                 // Build plans for each joined table and chain the joins
                 for join in &stmt.joins {
                     let right_schema = cat
@@ -132,15 +135,17 @@ impl Planner {
                         Arc::clone(&cat.txn_mgr),
                     ));
 
-                    // Create join condition - evaluate against combined tuple
-                    let join_condition = join.on.clone();
+                    // Use join alias if provided, otherwise use table name
+                    let right_alias = join.alias.clone().unwrap_or_else(|| join.table.clone());
 
-                    // Build combined schema for this join step
-                    let mut combined_schema_for_join = current_schema.clone();
-                    combined_schema_for_join.columns.extend(right_schema.columns.clone());
+                    // Create join condition - evaluate against combined tuple
+                    // The condition needs to work with prefixed column names
+                    let join_condition = join.on.clone();
 
                     let condition = move |left: &Tuple, right: &Tuple| -> bool {
                         // Combine left and right tuples for predicate evaluation
+                        // Note: The join condition uses qualified column names (e.g., c.id = o.customer_id)
+                        // which will be looked up by stripping the prefix in Eval
                         let mut combined = left.clone();
                         for (k, v) in right.iter() {
                             combined.insert(k.clone(), v.clone());
@@ -162,11 +167,16 @@ impl Planner {
                             crate::parser::ast::JoinType::Full => JoinType::Full,
                         },
                         Box::new(condition),
+                        left_alias.clone(),
+                        right_alias.clone(),
                     );
                     plan = Box::new(join_executor);
 
                     // Update current schema to include right table columns
                     current_schema.columns.extend(right_schema.columns.clone());
+
+                    // Update left alias for next join (use the combined alias)
+                    left_alias = format!("{}_{}", left_alias, right_alias);
                 }
             }
         }
@@ -246,19 +256,9 @@ impl Planner {
                         final_projection_exprs.push(Expr::Column(col.name.clone()));
                     }
                 } else {
-                    // Convert QualifiedColumn to simple Column since all columns are merged
-                    match expr {
-                        Expr::QualifiedColumn { column, .. } => {
-                            log::debug!(
-                                "Planner: Converting QualifiedColumn to Column '{}'",
-                                column
-                            );
-                            final_projection_exprs.push(Expr::Column(column.clone()));
-                        }
-                        _ => {
-                            final_projection_exprs.push(expr.clone());
-                        }
-                    }
+                    // Keep QualifiedColumn as-is for proper column resolution with prefixing
+                    // The Eval module will handle both prefixed and unprefixed lookups
+                    final_projection_exprs.push(expr.clone());
                 }
             }
         }

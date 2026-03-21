@@ -48,13 +48,22 @@ impl HashAggExecutor {
                 let mut group_tuple = Tuple::new();
                 // Initialize group-by columns
                 for expr in &group_by {
-                    let col_name = match expr {
-                        Expr::Column(name) => name,
-                        Expr::QualifiedColumn { column, .. } => column,
-                        _ => continue, // Should be caught by planner
-                    };
-                    if let Some(val) = tuple.get(col_name) {
-                        group_tuple.insert(col_name.clone(), val.clone());
+                    match expr {
+                        Expr::Column(name) => {
+                            if let Some(val) = tuple.get(name) {
+                                group_tuple.insert(name.clone(), val.clone());
+                            }
+                        }
+                        Expr::QualifiedColumn { table, column } => {
+                            // For qualified columns, try prefixed name first, then fall back to unqualified
+                            let qualified_name = format!("{}.{}", table, column);
+                            if let Some(val) =
+                                tuple.get(&qualified_name).or_else(|| tuple.get(column))
+                            {
+                                group_tuple.insert(qualified_name, val.clone());
+                            }
+                        }
+                        _ => {} // Should be caught by planner
                     }
                 }
                 // Initialize aggregate states based on the aggregate function type
@@ -198,18 +207,25 @@ impl HashAggExecutor {
     fn compute_group_key(tuple: &Tuple, group_by: &[Expr]) -> Result<u64, ExecutorError> {
         let mut hasher = DefaultHasher::new();
         for expr in group_by {
-            let col_name = match expr {
-                Expr::Column(name) => name,
-                Expr::QualifiedColumn { column, .. } => column,
+            match expr {
+                Expr::Column(name) => {
+                    if let Some(val) = tuple.get(name) {
+                        Self::hash_value(val, &mut hasher);
+                    }
+                }
+                Expr::QualifiedColumn { table, column } => {
+                    // For qualified columns, try prefixed name first, then fall back to unqualified
+                    let qualified_name = format!("{}.{}", table, column);
+                    if let Some(val) = tuple.get(&qualified_name).or_else(|| tuple.get(column)) {
+                        Self::hash_value(val, &mut hasher);
+                    }
+                }
                 _ => {
                     return Err(ExecutorError::UnsupportedExpression(format!(
                         "Unsupported GROUP BY expression: {:?}",
                         expr
                     )));
                 }
-            };
-            if let Some(val) = tuple.get(col_name) {
-                Self::hash_value(val, &mut hasher);
             }
         }
         Ok(hasher.finish())

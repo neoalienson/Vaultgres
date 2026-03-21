@@ -19,7 +19,7 @@ fn test_basic_insert_select() {
 
     db.execute("CREATE TABLE users (id INT, name TEXT)").unwrap();
     db.execute("INSERT INTO users VALUES (1, 'Alice')").unwrap();
-    
+
     let result = db.execute("SELECT * FROM users");
     assert!(result.is_ok(), "SELECT failed: {:?}", result);
     eprintln!("=== Test PASSED ===");
@@ -32,13 +32,13 @@ fn test_multiple_inserts() {
     let db = env.vaultgres();
 
     db.execute("CREATE TABLE products (id INT, name TEXT)").unwrap();
-    
+
     for i in 0..10 {
         eprintln!("[Test] Inserting row {}", i);
         let result = db.execute(&format!("INSERT INTO products VALUES ({}, 'product{}')", i, i));
         assert!(result.is_ok(), "INSERT {} failed", i);
     }
-    
+
     let result = db.execute("SELECT * FROM products");
     assert!(result.is_ok());
     eprintln!("=== Test PASSED ===");

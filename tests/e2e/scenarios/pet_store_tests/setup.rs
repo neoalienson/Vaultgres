@@ -8,13 +8,18 @@ pub fn setup_schema(db: &DbConnection) {
     db.execute("CREATE INDEX idx_items_current ON items(is_current)").unwrap();
     db.execute("CREATE INDEX idx_items_category ON items(category)").unwrap();
 
-    db.execute("CREATE TABLE customers (id INT, name TEXT, email TEXT, loyalty_points INT)").unwrap();
+    db.execute("CREATE TABLE customers (id INT, name TEXT, email TEXT, loyalty_points INT)")
+        .unwrap();
     db.execute("CREATE INDEX idx_customers_email ON customers(email)").unwrap();
 
-    db.execute("CREATE TABLE orders (id INT, customer_id INT, order_timestamp INT, total INT)").unwrap();
+    db.execute("CREATE TABLE orders (id INT, customer_id INT, order_timestamp INT, total INT)")
+        .unwrap();
     db.execute("CREATE INDEX idx_orders_customer ON orders(customer_id)").unwrap();
 
-    db.execute("CREATE TABLE order_items (id INT, order_id INT, item_id INT, quantity INT, price INT)").unwrap();
+    db.execute(
+        "CREATE TABLE order_items (id INT, order_id INT, item_id INT, quantity INT, price INT)",
+    )
+    .unwrap();
     db.execute("CREATE INDEX idx_order_items_order ON order_items(order_id)").unwrap();
 
     db.execute("CREATE TABLE inventory (item_id INT, stock INT, last_updated INT)").unwrap();
@@ -54,12 +59,18 @@ pub fn setup_transactions(db: &DbConnection) {
 pub fn setup_scd_data(db: &DbConnection) {
     // SCD Type 2: Update item price (create new version)
     eprintln!("[PetStore] SCD Type 2: Updating item price (creating new version)...");
-    db.execute("UPDATE items SET effective_to = 2000, is_current = 0 WHERE item_id = 1 AND is_current = 1").unwrap();
+    db.execute(
+        "UPDATE items SET effective_to = 2000, is_current = 0 WHERE item_id = 1 AND is_current = 1",
+    )
+    .unwrap();
     db.execute("INSERT INTO items VALUES (1, 'DF001', 'Premium Dog Food 10kg', 'Food', 4799, 'PetNutrition Co', 2001, 9999999999, 1, 'manager')").unwrap();
 
     // SCD Type 2: Change supplier
     eprintln!("[PetStore] SCD Type 2: Changing supplier (creating new version)...");
-    db.execute("UPDATE items SET effective_to = 3000, is_current = 0 WHERE item_id = 2 AND is_current = 1").unwrap();
+    db.execute(
+        "UPDATE items SET effective_to = 3000, is_current = 0 WHERE item_id = 2 AND is_current = 1",
+    )
+    .unwrap();
     db.execute("INSERT INTO items VALUES (2, 'CT001', 'Catnip Toy Mouse', 'Toy', 899, 'ToyMakers Ltd', 3001, 9999999999, 1, 'buyer')").unwrap();
 }
 

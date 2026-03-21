@@ -8,6 +8,7 @@ pub type Tuple = HashMap<String, Value>;
 pub enum ExecutorError {
     EndOfData,
     ColumnNotFound(String),
+    AmbiguousColumn(String),
     TypeMismatch(String),
     UnsupportedExpression(String),
     FunctionError(String),
@@ -24,6 +25,7 @@ impl fmt::Display for ExecutorError {
         match self {
             ExecutorError::EndOfData => write!(f, "End of data"),
             ExecutorError::ColumnNotFound(col) => write!(f, "Column not found: {}", col),
+            ExecutorError::AmbiguousColumn(col) => write!(f, "Ambiguous column: {}", col),
             ExecutorError::TypeMismatch(msg) => write!(f, "Type mismatch: {}", msg),
             ExecutorError::UnsupportedExpression(msg) => {
                 write!(f, "Unsupported expression: {}", msg)

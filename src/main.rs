@@ -91,7 +91,7 @@ fn main() -> std::io::Result<()> {
 
         thread::spawn(move || {
             log::info!("📡 Signal handler thread started, waiting for SIGTERM/SIGINT");
-            let mut signals = Signals::new(&[SIGTERM, SIGINT]).unwrap();
+            let mut signals = Signals::new([SIGTERM, SIGINT]).unwrap();
             for signal in &mut signals {
                 match signal {
                     SIGTERM => {

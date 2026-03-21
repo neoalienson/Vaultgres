@@ -148,7 +148,11 @@ pub enum Token {
     Parameter(usize),
 
     // Operators
+    Plus,
+    Minus,
     Star,
+    Slash,
+    Percent,
     Comma,
     Semicolon,
     LeftParen,
@@ -200,9 +204,25 @@ impl Lexer {
         let ch = self.current_char();
 
         match ch {
+            '+' => {
+                self.advance();
+                Ok(Token::Plus)
+            }
+            '-' => {
+                self.advance();
+                Ok(Token::Minus)
+            }
             '*' => {
                 self.advance();
                 Ok(Token::Star)
+            }
+            '/' => {
+                self.advance();
+                Ok(Token::Slash)
+            }
+            '%' => {
+                self.advance();
+                Ok(Token::Percent)
             }
             ',' => {
                 self.advance();

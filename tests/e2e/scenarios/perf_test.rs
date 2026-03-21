@@ -15,13 +15,15 @@ fn test_update_performance() {
     eprintln!("[Perf] Inserting 10 rows...");
     let start = Instant::now();
     for i in 1..=10 {
-        db.execute(&format!("INSERT INTO test_items VALUES ({}, 'Item{}', {}, 1)", i, i, i * 100)).unwrap();
+        db.execute(&format!("INSERT INTO test_items VALUES ({}, 'Item{}', {}, 1)", i, i, i * 100))
+            .unwrap();
     }
     eprintln!("[Perf] 10 INSERTs: {:?}", start.elapsed());
 
     eprintln!("[Perf] Running UPDATE with WHERE clause...");
     let start = Instant::now();
-    let result = db.execute("UPDATE test_items SET status = 0, price = 999 WHERE id = 1 AND status = 1");
+    let result =
+        db.execute("UPDATE test_items SET status = 0, price = 999 WHERE id = 1 AND status = 1");
     let update1_time = start.elapsed();
     eprintln!("[Perf] UPDATE #1: {:?}", update1_time);
     assert!(result.is_ok(), "UPDATE failed: {:?}", result);

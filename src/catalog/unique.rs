@@ -15,7 +15,7 @@ impl UniqueValidator {
 
         // According to SQL standard, if any of the values in the new tuple for the unique constraint
         // are NULL, it does not violate the unique constraint.
-        if new_values.iter().any(|v| *v == Value::Null) {
+        if new_values.contains(&Value::Null) {
             return Ok(());
         }
 
@@ -25,7 +25,7 @@ impl UniqueValidator {
 
             // If any of the values in the existing tuple for the unique constraint are NULL,
             // it also does not cause a violation with the new tuple (due to NULL != NULL)
-            if existing_values.iter().any(|v| *v == Value::Null) {
+            if existing_values.contains(&Value::Null) {
                 continue;
             }
 

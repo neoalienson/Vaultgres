@@ -36,18 +36,22 @@ fn test_oltp_concurrent_inserts() {
 
     db.execute("CREATE TABLE orders (id INT, product TEXT, amount INT)").unwrap();
 
-    let handles: Vec<_> = (0..10).map(|thread_id| {
-        thread::spawn(move || {
-            let db = DbConnection::connect("localhost", 5432);
-            for i in 0..100 {
-                let sql = format!(
-                    "INSERT INTO orders VALUES ({}, 'product{}', {})",
-                    thread_id * 100 + i, i, i * 10
-                );
-                db.execute(&sql).ok();
-            }
+    let handles: Vec<_> = (0..10)
+        .map(|thread_id| {
+            thread::spawn(move || {
+                let db = DbConnection::connect("localhost", 5432);
+                for i in 0..100 {
+                    let sql = format!(
+                        "INSERT INTO orders VALUES ({}, 'product{}', {})",
+                        thread_id * 100 + i,
+                        i,
+                        i * 10
+                    );
+                    db.execute(&sql).ok();
+                }
+            })
         })
-    }).collect();
+        .collect();
 
     for h in handles {
         h.join().unwrap();
@@ -64,7 +68,8 @@ fn test_oltp_read_heavy_workload() {
 
     db.execute("CREATE TABLE products (id INT, name TEXT, price INT)").unwrap();
     for i in 0..100 {
-        db.execute(&format!("INSERT INTO products VALUES ({}, 'product{}', {})", i, i, i * 10)).unwrap();
+        db.execute(&format!("INSERT INTO products VALUES ({}, 'product{}', {})", i, i, i * 10))
+            .unwrap();
     }
 
     let start = Instant::now();

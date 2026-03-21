@@ -3,9 +3,9 @@ use e2e::*;
 
 pub fn run_edge_case_tests(env: &RunningEnv) {
     eprintln!("\n[PetStore] === Testing Edge Cases ===");
-    
+
     let db = env.vaultgres();
-    
+
     test_update_persistence_after_restart(env);
     test_update_with_null_handling(&db);
     test_update_with_case(&db);
@@ -21,14 +21,14 @@ pub fn run_edge_case_tests(env: &RunningEnv) {
 fn test_update_persistence_after_restart(env: &RunningEnv) {
     eprintln!("[PetStore] Testing UPDATE persistence after restart...");
     let db = env.vaultgres();
-    
+
     let result = db.execute("UPDATE accounts SET balance = 1000 WHERE id = 1");
     assert!(result.is_ok());
-    
+
     // Restart and verify update persisted
     env.restart_graceful(5);
     let db = env.vaultgres();
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 1");
     assert!(result.is_ok(), "Account balance should persist after restart");
     let output = result.unwrap();
@@ -39,10 +39,10 @@ fn test_update_with_null_handling(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with NULL handling...");
     db.execute("CREATE TABLE nullable_test (id INT, value INT)").unwrap();
     db.execute("INSERT INTO nullable_test VALUES (1, 10), (2, NULL), (3, 30)").unwrap();
-    
+
     let result = db.execute("UPDATE nullable_test SET value = value + 10 WHERE value IS NOT NULL");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT value FROM nullable_test WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -57,7 +57,8 @@ fn test_update_with_case(db: &DbConnection) {
 
 fn test_update_with_subquery(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with subquery...");
-    let result = db.execute("UPDATE accounts SET balance = (SELECT MAX(balance) FROM accounts) WHERE id = 1");
+    let result = db
+        .execute("UPDATE accounts SET balance = (SELECT MAX(balance) FROM accounts) WHERE id = 1");
     assert!(result.is_ok());
 }
 
@@ -65,7 +66,7 @@ fn test_update_all_rows(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE all rows...");
     let result = db.execute("UPDATE accounts SET balance = 0");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT COUNT(*) FROM accounts WHERE balance = 0");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -76,7 +77,7 @@ fn test_update_large_values(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with large values...");
     let result = db.execute("UPDATE accounts SET balance = 999999999 WHERE id = 1");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -87,7 +88,7 @@ fn test_update_negative_values(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with negative values...");
     let result = db.execute("UPDATE accounts SET balance = -100 WHERE id = 2");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 2");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -98,7 +99,7 @@ fn test_update_with_string_concat(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with string operations...");
     let result = db.execute("UPDATE customers SET name = CONCAT(name, ' Jr.') WHERE id = 1");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT name FROM customers WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -109,7 +110,7 @@ fn test_update_with_string_functions(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with string functions...");
     let result = db.execute("UPDATE customers SET name = UPPER(name) WHERE id = 2");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT name FROM customers WHERE id = 2");
     assert!(result.is_ok());
     let output = result.unwrap();

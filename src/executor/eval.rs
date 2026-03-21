@@ -19,23 +19,46 @@ impl Eval {
     ) -> Result<Value, ExecutorError> {
         match expr {
             Expr::Column(name) => {
-                // Handle table-prefixed column names (e.g., "o.total" -> "total")
-                let lookup_name = if let Some(dot_pos) = name.find('.') {
-                    &name[dot_pos + 1..]
+                // Handle table-prefixed column names (e.g., "c.id" -> look up "c.id" directly)
+                // For unprefixed names, try direct lookup first, then search for unique match
+                if name.contains('.') {
+                    // Prefixed column - look up directly
+                    tuple
+                        .get(name.as_str())
+                        .cloned()
+                        .ok_or_else(|| ExecutorError::ColumnNotFound(name.clone()))
                 } else {
-                    name.as_str()
-                };
-                tuple
-                    .get(lookup_name)
-                    .cloned()
-                    .ok_or_else(|| ExecutorError::ColumnNotFound(name.clone()))
+                    // Unprefixed column - try direct lookup first
+                    if let Some(value) = tuple.get(name.as_str()) {
+                        return Ok(value.clone());
+                    }
+                    // Search for unique match with any prefix
+                    let matches: Vec<_> = tuple
+                        .iter()
+                        .filter(|(k, _)| k.ends_with(&format!(".{}", name)) || *k == name)
+                        .collect();
+
+                    if matches.is_empty() {
+                        Err(ExecutorError::ColumnNotFound(name.clone()))
+                    } else if matches.len() > 1 {
+                        Err(ExecutorError::AmbiguousColumn(format!(
+                            "Column '{}' is ambiguous. Found: {:?}",
+                            name,
+                            matches.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>()
+                        )))
+                    } else {
+                        Ok(matches[0].1.clone())
+                    }
+                }
             }
-            Expr::QualifiedColumn { table: _, column } => {
-                // For qualified columns, just use the column name
+            Expr::QualifiedColumn { table, column } => {
+                // For qualified columns, look up "table.column" directly
+                let qualified_name = format!("{}.{}", table, column);
                 tuple
-                    .get(column)
+                    .get(&qualified_name)
                     .cloned()
-                    .ok_or_else(|| ExecutorError::ColumnNotFound(column.clone()))
+                    .or_else(|| tuple.get(column).cloned()) // Fallback to unqualified
+                    .ok_or(ExecutorError::ColumnNotFound(qualified_name))
             }
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::Float(f) => Ok(Value::Float(*f)),
