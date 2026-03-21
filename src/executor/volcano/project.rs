@@ -165,10 +165,10 @@ mod tests {
 
     #[test]
     fn test_project_executor_with_table_prefix() {
-        // Input tuple has unprefixed column names (as they come from the table)
+        // Input tuple has prefixed column names (as they come from JoinExecutor)
         let mut input_tuple = Tuple::new();
-        input_tuple.insert("id".to_string(), crate::catalog::Value::Int(1));
-        input_tuple.insert("total".to_string(), crate::catalog::Value::Int(100));
+        input_tuple.insert("o.id".to_string(), crate::catalog::Value::Int(1));
+        input_tuple.insert("o.total".to_string(), crate::catalog::Value::Int(100));
 
         let mock_executor = MockExecutor::new(vec![input_tuple]);
         let mut projector = ProjectExecutor::new(
@@ -177,7 +177,7 @@ mod tests {
         );
 
         let result = projector.next().unwrap().unwrap();
-        // Output should have stripped prefix
+        // Output should have stripped prefix (o.id -> id, o.total -> total)
         assert_eq!(result.len(), 2);
         assert_eq!(result.get("id"), Some(&crate::catalog::Value::Int(1)));
         assert_eq!(result.get("total"), Some(&crate::catalog::Value::Int(100)));
@@ -185,8 +185,9 @@ mod tests {
 
     #[test]
     fn test_project_executor_with_alias() {
+        // Input tuple has prefixed column names (as they come from JoinExecutor)
         let mut input_tuple = Tuple::new();
-        input_tuple.insert("id".to_string(), crate::catalog::Value::Int(1));
+        input_tuple.insert("o.id".to_string(), crate::catalog::Value::Int(1));
 
         let mock_executor = MockExecutor::new(vec![input_tuple]);
         let mut projector = ProjectExecutor::new(

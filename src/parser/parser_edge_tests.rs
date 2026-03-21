@@ -277,7 +277,8 @@ fn test_parse_large_number() {
 #[test]
 fn test_parse_negative_number() {
     let result = parse("SELECT * FROM users WHERE id = -1");
-    assert!(result.is_err()); // Negative numbers not supported in lexer
+    // Negative numbers are now supported via unary minus operator
+    assert!(result.is_ok());
 }
 
 // Operator Edge Cases
