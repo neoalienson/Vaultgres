@@ -19,7 +19,7 @@ echo -e "${YELLOW}Git Hash: ${GIT_HASH}${NC}"
 
 # Build image
 echo -e "${YELLOW}Building image...${NC}"
-docker build --build-arg GIT_HASH=${GIT_HASH} -f Dockerfile -t vaultgres:${VERSION} -t vaultgres:latest ..
+docker build --build-arg GIT_HASH="${GIT_HASH}" -f Dockerfile -t vaultgres:"${VERSION}" -t vaultgres:latest ..
 
 # Get image size
 SIZE=$(docker images vaultgres:latest --format "{{.Size}}")

@@ -27,7 +27,7 @@ case $MODE in
             cargo test --package e2e --test smoke -- --list | grep ': test$' | sed 's/: test$//'
         elif [ -n "$TEST_NAME" ]; then
             echo -e "${GREEN}Running smoke test: $TEST_NAME${NC}"
-            cargo test --package e2e --test smoke $TEST_NAME -- --test-threads=1 --nocapture
+            cargo test --package e2e --test smoke "$TEST_NAME" -- --test-threads=1 --nocapture
         else
             echo -e "${GREEN}Running quick tests (smoke tests)${NC}"
             cargo test --package e2e --test smoke -- --test-threads=1 --nocapture
@@ -40,7 +40,7 @@ case $MODE in
             cargo test --package e2e --test scenarios -- --list | grep ': test$' | sed 's/: test$//'
         elif [ -n "$TEST_NAME" ]; then
             echo -e "${GREEN}Running scenario: $TEST_NAME${NC}"
-            cargo test --package e2e --test scenarios pet_store::test_$TEST_NAME -- --test-threads=1 --nocapture
+            cargo test --package e2e --test scenarios "pet_store::test_$TEST_NAME" -- --test-threads=1 --nocapture
         else
             echo -e "${GREEN}Running all scenarios tests${NC}"
             cargo test --package e2e --test scenarios -- --test-threads=1 --nocapture

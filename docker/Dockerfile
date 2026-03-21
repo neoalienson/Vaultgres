@@ -2,7 +2,7 @@
 FROM rust:1.85 AS builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y musl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends musl-dev && rm -rf /var/lib/apt/lists/*
 
 # Add musl target for static linking
 RUN rustup target add x86_64-unknown-linux-musl
