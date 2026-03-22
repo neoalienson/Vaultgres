@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use vaultgres::parser::ast::Statement;
     use vaultgres::parser::Parser;
+    use vaultgres::parser::ast::Statement;
 
     #[test]
     fn test_parse_recursive_cte() {

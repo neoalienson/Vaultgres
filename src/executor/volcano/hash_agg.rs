@@ -4,8 +4,8 @@ use crate::catalog::{TableSchema, Value};
 use crate::executor::eval::Eval;
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
 use crate::parser::ast::{AggregateFunc, Expr};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 /// Aggregate state for tracking aggregation progress

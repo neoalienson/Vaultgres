@@ -97,11 +97,7 @@ mod tests {
         let outer = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Int(n) = row[0] {
-                if n == 1 {
-                    Ok(vec![vec![Value::Int(100)]])
-                } else {
-                    Ok(vec![])
-                }
+                if n == 1 { Ok(vec![vec![Value::Int(100)]]) } else { Ok(vec![]) }
             } else {
                 Ok(vec![])
             }
@@ -131,11 +127,7 @@ mod tests {
 
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Int(n) = row[0] {
-                if n == 1 {
-                    Ok(vec![vec![Value::Int(100)]])
-                } else {
-                    Ok(vec![])
-                }
+                if n == 1 { Ok(vec![vec![Value::Int(100)]]) } else { Ok(vec![]) }
             } else {
                 Ok(vec![])
             }
@@ -186,11 +178,7 @@ mod tests {
         let outer = vec![vec![Value::Int(1)]];
 
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
-            if let Value::Int(n) = row[0] {
-                Ok(vec![vec![Value::Int(n * 10)]])
-            } else {
-                Ok(vec![])
-            }
+            if let Value::Int(n) = row[0] { Ok(vec![vec![Value::Int(n * 10)]]) } else { Ok(vec![]) }
         };
 
         let result = CorrelatedExecutor::execute_scalar(&outer, &subquery_fn).unwrap();
@@ -317,11 +305,7 @@ mod edge_tests {
         let outer = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Int(n) = row[0] {
-                if n == 1 {
-                    Ok(vec![vec![Value::Int(100)]])
-                } else {
-                    Ok(vec![])
-                }
+                if n == 1 { Ok(vec![vec![Value::Int(100)]]) } else { Ok(vec![]) }
             } else {
                 Ok(vec![])
             }
@@ -338,11 +322,7 @@ mod edge_tests {
         let outer = vec![vec![Value::Text("a".to_string())], vec![Value::Text("b".to_string())]];
         let subquery_fn = |row: &[Value]| -> Result<Vec<Vec<Value>>, String> {
             if let Value::Text(s) = &row[0] {
-                if s == "a" {
-                    Ok(vec![vec![Value::Int(1)]])
-                } else {
-                    Ok(vec![])
-                }
+                if s == "a" { Ok(vec![vec![Value::Int(1)]]) } else { Ok(vec![]) }
             } else {
                 Ok(vec![])
             }

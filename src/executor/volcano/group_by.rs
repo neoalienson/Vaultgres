@@ -294,11 +294,7 @@ impl GroupByExecutor {
 
 impl Executor for GroupByExecutor {
     fn next(&mut self) -> Result<Option<Tuple>, ExecutorError> {
-        if self.require_sort {
-            self.streaming_next()
-        } else {
-            self.buffered_next()
-        }
+        if self.require_sort { self.streaming_next() } else { self.buffered_next() }
     }
 }
 

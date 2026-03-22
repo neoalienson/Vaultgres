@@ -1,7 +1,7 @@
-use crossbeam::channel::{bounded, Sender};
+use crossbeam::channel::{Sender, bounded};
 use crossbeam::deque::{Injector, Stealer, Worker};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 

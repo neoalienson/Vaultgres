@@ -78,20 +78,20 @@ mod tests {
     fn test_all_true() {
         let value = Value::Int(10);
         let results = vec![Value::Int(1), Value::Int(5), Value::Int(9)];
-        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
-            .unwrap());
+        assert!(
+            ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
+                .unwrap()
+        );
     }
 
     #[test]
     fn test_all_false() {
         let value = Value::Int(5);
         let results = vec![Value::Int(1), Value::Int(5), Value::Int(10)];
-        assert!(!ArraySubqueryExecutor::execute_all(
-            &value,
-            &BinaryOperator::GreaterThan,
-            &results
-        )
-        .unwrap());
+        assert!(
+            !ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
+                .unwrap()
+        );
     }
 
     #[test]
@@ -105,7 +105,9 @@ mod tests {
     fn test_all_empty() {
         let value = Value::Int(5);
         let results = vec![];
-        assert!(ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
-            .unwrap());
+        assert!(
+            ArraySubqueryExecutor::execute_all(&value, &BinaryOperator::GreaterThan, &results)
+                .unwrap()
+        );
     }
 }

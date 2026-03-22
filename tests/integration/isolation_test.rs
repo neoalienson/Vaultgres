@@ -2,8 +2,8 @@
 mod tests {
     use std::sync::Arc;
     use vaultgres::catalog::Catalog;
-    use vaultgres::parser::ast::*;
     use vaultgres::parser::Parser;
+    use vaultgres::parser::ast::*;
 
     #[test]
     fn test_parse_set_transaction_read_committed() {

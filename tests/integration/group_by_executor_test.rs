@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use vaultgres::catalog::{TableSchema, Value};
-use vaultgres::executor::operators::executor::Executor;
 use vaultgres::executor::GroupByExecutor;
+use vaultgres::executor::operators::executor::Executor;
 use vaultgres::parser::ast::{AggregateFunc, Expr};
 
 type Tuple = HashMap<String, Value>;

@@ -178,10 +178,9 @@ mod tests {
             TupleBuilder::new().with_int("id", 1).with_text("b", "y").build(),
         ]);
 
-        let probe = MockExecutor::with_tuples(vec![TupleBuilder::new()
-            .with_int("id", 1)
-            .with_text("p", "a")
-            .build()]);
+        let probe = MockExecutor::with_tuples(vec![
+            TupleBuilder::new().with_int("id", 1).with_text("p", "a").build(),
+        ]);
 
         let mut join =
             HashJoinExecutor::with_key(Box::new(build), Box::new(probe), "id".to_string());

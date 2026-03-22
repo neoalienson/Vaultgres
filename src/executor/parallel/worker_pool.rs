@@ -1,9 +1,9 @@
 use crate::executor::operators::executor::ExecutorError;
 use crate::executor::parallel::morsel::Morsel;
 use crate::executor::parallel::operator::ParallelOperator;
-use crossbeam::channel::{bounded, Receiver, Sender};
-use std::sync::atomic::{AtomicBool, Ordering};
+use crossbeam::channel::{Receiver, Sender, bounded};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
