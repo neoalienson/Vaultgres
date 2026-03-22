@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use vaultgres::catalog::*;
-use vaultgres::parser::ast::{BinaryOperator, ColumnDef, DataType, Expr, UnaryOperator};
+use vaultgres::parser::ast::{
+    AggregateFunc, BinaryOperator, ColumnDef, DataType, Expr, SelectStmt, UnaryOperator,
+};
 
 #[test]
 fn test_update() {
@@ -636,4 +638,336 @@ fn test_update_type_mismatch_arithmetic_to_text() {
     let result = catalog.update("data", assignments, None);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
+}
+
+#[test]
+fn test_update_with_scalar_subquery_max() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("balance".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("accounts".to_string(), columns.clone()).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(3), Expr::Number(150)]).unwrap();
+
+    let assignments = vec![(
+        "balance".to_string(),
+        Expr::Subquery(Box::new(SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Aggregate {
+                func: AggregateFunc::Max,
+                arg: Box::new(Expr::Column("balance".to_string())),
+            }],
+            from: "accounts".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+            offset: None,
+        })),
+    )];
+
+    let updated = catalog.update("accounts", assignments, None).unwrap();
+    assert_eq!(updated, 3);
+
+    let catalog_arc = Arc::new(catalog.clone());
+    let results = Catalog::select_with_catalog(
+        &catalog_arc,
+        "accounts",
+        false,
+        vec![Expr::Column("balance".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    for row in results {
+        assert_eq!(row[0], Value::Int(200));
+    }
+}
+
+#[test]
+fn test_update_with_scalar_subquery_min() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("balance".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("accounts".to_string(), columns.clone()).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+
+    let assignments = vec![(
+        "balance".to_string(),
+        Expr::Subquery(Box::new(SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Aggregate {
+                func: AggregateFunc::Min,
+                arg: Box::new(Expr::Column("balance".to_string())),
+            }],
+            from: "accounts".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+            offset: None,
+        })),
+    )];
+
+    let updated = catalog.update("accounts", assignments, None).unwrap();
+    assert_eq!(updated, 2);
+
+    let catalog_arc = Arc::new(catalog.clone());
+    let results = Catalog::select_with_catalog(
+        &catalog_arc,
+        "accounts",
+        false,
+        vec![Expr::Column("balance".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    for row in results {
+        assert_eq!(row[0], Value::Int(100));
+    }
+}
+
+#[test]
+fn test_update_with_scalar_subquery_sum() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("total".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("orders".to_string(), columns.clone()).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::Number(0)]).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(2), Expr::Number(0)]).unwrap();
+
+    let assignments = vec![(
+        "total".to_string(),
+        Expr::Subquery(Box::new(SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Aggregate {
+                func: AggregateFunc::Sum,
+                arg: Box::new(Expr::Column("id".to_string())),
+            }],
+            from: "orders".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+            offset: None,
+        })),
+    )];
+
+    let updated = catalog.update("orders", assignments, None).unwrap();
+    assert_eq!(updated, 2);
+
+    let catalog_arc = Arc::new(catalog.clone());
+    let results = Catalog::select_with_catalog(
+        &catalog_arc,
+        "orders",
+        false,
+        vec![Expr::Column("total".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    for row in results {
+        assert_eq!(row[0], Value::Int(3));
+    }
+}
+
+#[test]
+fn test_update_with_scalar_subquery_count() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("cnt".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("items".to_string(), columns.clone()).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(1), Expr::Number(0)]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(2), Expr::Number(0)]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(3), Expr::Number(0)]).unwrap();
+
+    let assignments = vec![(
+        "cnt".to_string(),
+        Expr::Subquery(Box::new(SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Aggregate {
+                func: AggregateFunc::Count,
+                arg: Box::new(Expr::Star),
+            }],
+            from: "items".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: None,
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+            offset: None,
+        })),
+    )];
+
+    let updated = catalog.update("items", assignments, None).unwrap();
+    assert_eq!(updated, 3);
+
+    let catalog_arc = Arc::new(catalog.clone());
+    let results = Catalog::select_with_catalog(
+        &catalog_arc,
+        "items",
+        false,
+        vec![Expr::Column("cnt".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    for row in results {
+        assert_eq!(row[0], Value::Int(3));
+    }
+}
+
+#[test]
+fn test_update_with_scalar_subquery_empty_result_returns_null() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("balance".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("accounts".to_string(), columns.clone()).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+
+    let assignments = vec![(
+        "balance".to_string(),
+        Expr::Subquery(Box::new(SelectStmt {
+            distinct: false,
+            columns: vec![Expr::Aggregate {
+                func: AggregateFunc::Max,
+                arg: Box::new(Expr::Column("balance".to_string())),
+            }],
+            from: "accounts".to_string(),
+            table_alias: None,
+            joins: vec![],
+            where_clause: Some(Expr::BinaryOp {
+                left: Box::new(Expr::Column("id".to_string())),
+                op: BinaryOperator::Equals,
+                right: Box::new(Expr::Number(999)),
+            }),
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+            offset: None,
+        })),
+    )];
+
+    let result = catalog.update("accounts", assignments, None);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_update_with_case_and_subquery() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("balance".to_string(), DataType::Int),
+    ];
+
+    catalog.create_table("accounts".to_string(), columns.clone()).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::Number(150)]).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(2), Expr::Number(50)]).unwrap();
+
+    let avg_subquery = Expr::Subquery(Box::new(SelectStmt {
+        distinct: false,
+        columns: vec![Expr::Aggregate {
+            func: AggregateFunc::Avg,
+            arg: Box::new(Expr::Column("balance".to_string())),
+        }],
+        from: "accounts".to_string(),
+        table_alias: None,
+        joins: vec![],
+        where_clause: None,
+        group_by: None,
+        having: None,
+        order_by: None,
+        limit: None,
+        offset: None,
+    }));
+
+    let assignments = vec![(
+        "balance".to_string(),
+        Expr::Case {
+            conditions: vec![(
+                Expr::BinaryOp {
+                    left: Box::new(Expr::Column("balance".to_string())),
+                    op: BinaryOperator::GreaterThan,
+                    right: Box::new(avg_subquery),
+                },
+                Expr::BinaryOp {
+                    left: Box::new(Expr::Column("balance".to_string())),
+                    op: BinaryOperator::Subtract,
+                    right: Box::new(Expr::Number(10)),
+                },
+            )],
+            else_expr: Some(Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Column("balance".to_string())),
+                op: BinaryOperator::Add,
+                right: Box::new(Expr::Number(10)),
+            })),
+        },
+    )];
+
+    let updated = catalog.update("accounts", assignments, None).unwrap();
+    assert_eq!(updated, 2);
+
+    let catalog_arc = Arc::new(catalog.clone());
+    let results = Catalog::select_with_catalog(
+        &catalog_arc,
+        "accounts",
+        false,
+        vec![Expr::Column("id".to_string()), Expr::Column("balance".to_string())],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    let mut balances: Vec<i64> =
+        results.iter().map(|r| if let Value::Int(n) = r[1] { n } else { 0 }).collect();
+    balances.sort();
+    assert_eq!(balances, vec![60, 140]);
 }

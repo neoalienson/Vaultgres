@@ -794,16 +794,26 @@ impl Catalog {
         let txn = self.txn_mgr.begin();
         let snapshot = txn.snapshot.clone();
 
+        // Get tuples with read lock first (before write lock)
+        // This allows us to evaluate subqueries safely
+        let table_tuples = {
+            let data = self.data.read().unwrap();
+            data.get(table).ok_or_else(|| format!("Table '{}' has no data", table))?.clone()
+        };
+
+        // Acquire write lock and get mutable reference
         let mut data = self.data.write().unwrap();
         let tuples = data.get_mut(table).ok_or_else(|| format!("Table '{}' has no data", table))?;
 
-        let updated = UpdateDeleteExecutor::update(
+        let updated = UpdateDeleteExecutor::update_with_tuples(
             tuples,
             &assignments,
             &where_clause,
             &schema,
             &snapshot,
             &self.txn_mgr,
+            self,
+            &table_tuples,
         )?;
 
         self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;

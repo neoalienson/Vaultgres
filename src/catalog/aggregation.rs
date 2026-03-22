@@ -1,6 +1,6 @@
 use super::{Catalog, TableSchema, Tuple, Value, predicate::PredicateEvaluator};
 use crate::parser::ast::Expr;
-use crate::transaction::TransactionManager;
+use crate::transaction::{Snapshot, TransactionManager};
 use std::sync::Arc;
 
 pub struct Aggregator;
@@ -13,10 +13,9 @@ impl Aggregator {
         where_clause: Option<Expr>,
         tuples: &[Tuple],
         schema: &TableSchema,
+        snapshot: &Snapshot,
         txn_mgr: &Arc<TransactionManager>,
     ) -> Result<Vec<Vec<Value>>, String> {
-        let snapshot = txn_mgr.get_snapshot();
-
         let (func, arg_expr) = if let Expr::Aggregate { func, arg } = agg_expr {
             (func, arg)
         } else {
@@ -28,7 +27,7 @@ impl Aggregator {
 
         let mut values = Vec::new();
         for tuple in tuples {
-            if tuple.header.is_visible(&snapshot, txn_mgr) {
+            if tuple.header.is_visible(snapshot, txn_mgr) {
                 if let Some(ref predicate) = where_clause {
                     let subquery_eval = |select: &crate::parser::ast::SelectStmt| {
                         super::select_executor::SelectExecutor::eval_scalar_subquery(
@@ -165,7 +164,7 @@ mod tests {
     use crate::transaction::TupleHeader;
     use std::collections::HashMap;
 
-    fn create_test_data() -> (TableSchema, Vec<Tuple>, Arc<TransactionManager>) {
+    fn create_test_data() -> (TableSchema, Vec<Tuple>, Snapshot, Arc<TransactionManager>) {
         let schema = TableSchema::new(
             "test".to_string(),
             vec![
@@ -177,6 +176,9 @@ mod tests {
         let txn_mgr = Arc::new(TransactionManager::new());
         let txn = txn_mgr.begin();
         let header = TupleHeader::new(txn.xid);
+        // Capture snapshot BEFORE committing - this is how PostgreSQL MVCC works
+        // Tuples created in a transaction are visible within that transaction
+        let snapshot = txn.snapshot.clone();
         txn_mgr.commit(txn.xid).unwrap();
 
         let tuples = vec![
@@ -197,21 +199,23 @@ mod tests {
             },
         ];
 
-        (schema, tuples, txn_mgr)
+        (schema, tuples, snapshot, txn_mgr)
     }
 
     #[test]
     fn test_count_aggregate() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
+        // Use the txn_mgr from create_test_data for visibility checks
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Count,
             arg: Box::new(Expr::Star),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0][0], Value::Int(3));
@@ -219,16 +223,17 @@ mod tests {
 
     #[test]
     fn test_sum_aggregate() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Sum,
             arg: Box::new(Expr::Column("value".to_string())),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0][0], Value::Int(60));
@@ -236,16 +241,17 @@ mod tests {
 
     #[test]
     fn test_avg_aggregate() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Avg,
             arg: Box::new(Expr::Column("value".to_string())),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0][0], Value::Int(20));
@@ -253,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_min_max_aggregate() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr_min = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Min,
@@ -264,14 +270,30 @@ mod tests {
             arg: Box::new(Expr::Column("value".to_string())),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr_min, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr_min,
+            None,
+            &tuples,
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(10));
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr_max, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr_max,
+            None,
+            &tuples,
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(30));
     }
 
@@ -306,74 +328,121 @@ mod tests {
 
     #[test]
     fn test_execute_invalid_aggregate_expression() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Number(10); // Not an aggregate expression
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr);
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Invalid aggregate expression");
     }
 
     #[test]
     fn test_execute_column_not_found() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Sum,
             arg: Box::new(Expr::Column("non_existent".to_string())),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr);
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Column 'non_existent' not found");
     }
 
     #[test]
     fn test_execute_empty_tuples() {
-        let (schema, _tuples, txn_mgr) = create_test_data();
+        let (schema, _tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Count,
             arg: Box::new(Expr::Star),
         };
 
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &[], &schema, &txn_mgr).unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr,
+            None,
+            &[],
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0));
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Sum,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &[], &schema, &txn_mgr).unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr,
+            None,
+            &[],
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0));
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Avg,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &[], &schema, &txn_mgr).unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr,
+            None,
+            &[],
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0));
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Min,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &[], &schema, &txn_mgr).unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr,
+            None,
+            &[],
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0));
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Max,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &[], &schema, &txn_mgr).unwrap();
+        let result = Aggregator::execute(
+            &catalog,
+            "test",
+            &agg_expr,
+            None,
+            &[],
+            &schema,
+            &snapshot,
+            &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0));
     }
 
@@ -391,6 +460,7 @@ mod tests {
         let txn = txn_mgr.begin();
         let header = TupleHeader::new(txn.xid);
         txn_mgr.commit(txn.xid).unwrap();
+        let snapshot = txn_mgr.get_snapshot();
 
         let tuples = vec![
             Tuple { header, data: vec![Value::Int(1), Value::Int(10)], column_map: HashMap::new() },
@@ -403,42 +473,46 @@ mod tests {
             func: crate::parser::ast::AggregateFunc::Sum,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(30)); // NULL values should be ignored
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Avg,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(15)); // (10 + 20) / 2
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Min,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(10));
 
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Max,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(20));
     }
 
     #[test]
     fn test_execute_count_with_where_clause() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Count,
@@ -457,6 +531,7 @@ mod tests {
             where_clause,
             &tuples,
             &schema,
+            &snapshot,
             &txn_mgr,
         )
         .unwrap();
@@ -466,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_execute_sum_with_where_clause() {
-        let (schema, tuples, txn_mgr) = create_test_data();
+        let (schema, tuples, snapshot, txn_mgr) = create_test_data();
         let catalog = Catalog::new();
         let agg_expr = Expr::Aggregate {
             func: crate::parser::ast::AggregateFunc::Sum,
@@ -485,6 +560,7 @@ mod tests {
             where_clause,
             &tuples,
             &schema,
+            &snapshot,
             &txn_mgr,
         )
         .unwrap();
@@ -506,6 +582,7 @@ mod tests {
         let txn = txn_mgr.begin();
         let header = TupleHeader::new(txn.xid);
         txn_mgr.commit(txn.xid).unwrap();
+        let snapshot = txn_mgr.get_snapshot();
 
         let tuples = vec![Tuple {
             header,
@@ -518,9 +595,10 @@ mod tests {
             func: crate::parser::ast::AggregateFunc::Avg,
             arg: Box::new(Expr::Column("value".to_string())),
         };
-        let result =
-            Aggregator::execute(&catalog, "test", &agg_expr, None, &tuples, &schema, &txn_mgr)
-                .unwrap();
+        let result = Aggregator::execute(
+            &catalog, "test", &agg_expr, None, &tuples, &schema, &snapshot, &txn_mgr,
+        )
+        .unwrap();
         assert_eq!(result[0][0], Value::Int(0)); // Should be 0 when no numeric values
     }
 }

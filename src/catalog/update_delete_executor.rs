@@ -1,5 +1,6 @@
-use super::{TableSchema, Tuple, Value};
+use super::{Catalog, TableSchema, Tuple, Value};
 use crate::catalog::predicate::PredicateEvaluator;
+use crate::catalog::select_executor::SelectExecutor;
 use crate::executor::expr_evaluator::{eval_binary_op, eval_unary_op};
 use crate::parser::ast::{DataType, Expr};
 use crate::transaction::{Snapshot, TransactionManager};
@@ -15,6 +16,7 @@ impl UpdateDeleteExecutor {
         schema: &TableSchema,
         snapshot: &Snapshot,
         txn_mgr: &Arc<TransactionManager>,
+        catalog: &Catalog,
     ) -> Result<usize, String> {
         let mut updated = 0;
         for tuple in tuples.iter_mut() {
@@ -28,7 +30,42 @@ impl UpdateDeleteExecutor {
                 }
             }
 
-            Self::apply_assignments(tuple, assignments, schema)?;
+            Self::apply_assignments(tuple, assignments, schema, catalog)?;
+            updated += 1;
+        }
+        Ok(updated)
+    }
+
+    pub fn update_with_tuples(
+        tuples: &mut [Tuple],
+        assignments: &[(String, Expr)],
+        where_clause: &Option<Expr>,
+        schema: &TableSchema,
+        snapshot: &Snapshot,
+        txn_mgr: &Arc<TransactionManager>,
+        catalog: &Catalog,
+        subquery_tuples: &[Tuple],
+    ) -> Result<usize, String> {
+        let mut updated = 0;
+        for tuple in tuples.iter_mut() {
+            if !tuple.header.is_visible(snapshot, txn_mgr) {
+                continue;
+            }
+
+            if let Some(predicate) = where_clause {
+                if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
+                    continue;
+                }
+            }
+
+            Self::apply_assignments_with_tuples(
+                tuple,
+                assignments,
+                schema,
+                catalog,
+                subquery_tuples,
+                snapshot,
+            )?;
             updated += 1;
         }
         Ok(updated)
@@ -38,6 +75,7 @@ impl UpdateDeleteExecutor {
         tuple: &mut Tuple,
         assignments: &[(String, Expr)],
         schema: &TableSchema,
+        catalog: &Catalog,
     ) -> Result<(), String> {
         for (col_name, expr) in assignments {
             let idx = schema
@@ -46,7 +84,37 @@ impl UpdateDeleteExecutor {
                 .position(|c| &c.name == col_name)
                 .ok_or_else(|| format!("Column '{}' not found", col_name))?;
 
-            let value = Self::evaluate_expr(expr, &tuple.data, schema)?;
+            let value = Self::evaluate_expr(expr, &tuple.data, schema, catalog)?;
+
+            Self::validate_type(&schema.columns[idx].data_type, &value, col_name)?;
+            tuple.data[idx] = value;
+        }
+        Ok(())
+    }
+
+    fn apply_assignments_with_tuples(
+        tuple: &mut Tuple,
+        assignments: &[(String, Expr)],
+        schema: &TableSchema,
+        catalog: &Catalog,
+        subquery_tuples: &[Tuple],
+        snapshot: &Snapshot,
+    ) -> Result<(), String> {
+        for (col_name, expr) in assignments {
+            let idx = schema
+                .columns
+                .iter()
+                .position(|c| &c.name == col_name)
+                .ok_or_else(|| format!("Column '{}' not found", col_name))?;
+
+            let value = Self::evaluate_expr_with_tuples(
+                expr,
+                &tuple.data,
+                schema,
+                catalog,
+                subquery_tuples,
+                snapshot,
+            )?;
 
             Self::validate_type(&schema.columns[idx].data_type, &value, col_name)?;
             tuple.data[idx] = value;
@@ -58,6 +126,7 @@ impl UpdateDeleteExecutor {
         expr: &Expr,
         tuple_data: &[Value],
         schema: &TableSchema,
+        catalog: &Catalog,
     ) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
@@ -83,33 +152,172 @@ impl UpdateDeleteExecutor {
                 Ok(tuple_data[idx].clone())
             }
             Expr::UnaryOp { op, expr } => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
                 eval_unary_op(op, &val)
             }
             Expr::BinaryOp { left, op, right } => {
-                let l = Self::evaluate_expr(left, tuple_data, schema)?;
-                let r = Self::evaluate_expr(right, tuple_data, schema)?;
+                let l = Self::evaluate_expr(left, tuple_data, schema, catalog)?;
+                let r = Self::evaluate_expr(right, tuple_data, schema, catalog)?;
                 eval_binary_op(&l, op, &r)
             }
             Expr::IsNull(expr) => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
                 Ok(Value::Bool(matches!(val, Value::Null)))
             }
             Expr::IsNotNull(expr) => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
                 Ok(Value::Bool(!matches!(val, Value::Null)))
             }
             Expr::Case { conditions, else_expr } => {
                 for (when_expr, then_expr) in conditions {
-                    let when_val = Self::evaluate_expr(when_expr, tuple_data, schema)?;
+                    let when_val = Self::evaluate_expr(when_expr, tuple_data, schema, catalog)?;
                     if when_val == Value::Bool(true) {
-                        return Self::evaluate_expr(then_expr, tuple_data, schema);
+                        return Self::evaluate_expr(then_expr, tuple_data, schema, catalog);
                     }
                 }
                 if let Some(else_e) = else_expr {
-                    Self::evaluate_expr(else_e, tuple_data, schema)
+                    Self::evaluate_expr(else_e, tuple_data, schema, catalog)
                 } else {
                     Ok(Value::Null)
+                }
+            }
+            Expr::Subquery(subquery) => {
+                match SelectExecutor::eval_scalar_subquery(catalog, subquery) {
+                    Ok(value) => Ok(value),
+                    Err(_) => Ok(Value::Null),
+                }
+            }
+            _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
+        }
+    }
+
+    fn evaluate_expr_with_tuples(
+        expr: &Expr,
+        tuple_data: &[Value],
+        schema: &TableSchema,
+        catalog: &Catalog,
+        subquery_tuples: &[Tuple],
+        snapshot: &Snapshot,
+    ) -> Result<Value, String> {
+        match expr {
+            Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::Float(f) => Ok(Value::Float(*f)),
+            Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
+            Expr::Column(name) => {
+                let lookup_name =
+                    if let Some(dot_pos) = name.find('.') { &name[dot_pos + 1..] } else { name };
+                let idx = schema
+                    .columns
+                    .iter()
+                    .position(|c| &c.name == lookup_name)
+                    .ok_or_else(|| format!("Column '{}' not found", name))?;
+                Ok(tuple_data[idx].clone())
+            }
+            Expr::QualifiedColumn { table: _, column } => {
+                let idx = schema
+                    .columns
+                    .iter()
+                    .position(|c| &c.name == column)
+                    .ok_or_else(|| format!("Column '{}' not found", column))?;
+                Ok(tuple_data[idx].clone())
+            }
+            Expr::UnaryOp { op, expr } => {
+                let val = Self::evaluate_expr_with_tuples(
+                    expr,
+                    tuple_data,
+                    schema,
+                    catalog,
+                    subquery_tuples,
+                    snapshot,
+                )?;
+                eval_unary_op(op, &val)
+            }
+            Expr::BinaryOp { left, op, right } => {
+                let l = Self::evaluate_expr_with_tuples(
+                    left,
+                    tuple_data,
+                    schema,
+                    catalog,
+                    subquery_tuples,
+                    snapshot,
+                )?;
+                let r = Self::evaluate_expr_with_tuples(
+                    right,
+                    tuple_data,
+                    schema,
+                    catalog,
+                    subquery_tuples,
+                    snapshot,
+                )?;
+                eval_binary_op(&l, op, &r)
+            }
+            Expr::IsNull(expr) => {
+                let val = Self::evaluate_expr_with_tuples(
+                    expr,
+                    tuple_data,
+                    schema,
+                    catalog,
+                    subquery_tuples,
+                    snapshot,
+                )?;
+                Ok(Value::Bool(matches!(val, Value::Null)))
+            }
+            Expr::IsNotNull(expr) => {
+                let val = Self::evaluate_expr_with_tuples(
+                    expr,
+                    tuple_data,
+                    schema,
+                    catalog,
+                    subquery_tuples,
+                    snapshot,
+                )?;
+                Ok(Value::Bool(!matches!(val, Value::Null)))
+            }
+            Expr::Case { conditions, else_expr } => {
+                for (when_expr, then_expr) in conditions {
+                    let when_val = Self::evaluate_expr_with_tuples(
+                        when_expr,
+                        tuple_data,
+                        schema,
+                        catalog,
+                        subquery_tuples,
+                        snapshot,
+                    )?;
+                    if when_val == Value::Bool(true) {
+                        return Self::evaluate_expr_with_tuples(
+                            then_expr,
+                            tuple_data,
+                            schema,
+                            catalog,
+                            subquery_tuples,
+                            snapshot,
+                        );
+                    }
+                }
+                if let Some(else_e) = else_expr {
+                    Self::evaluate_expr_with_tuples(
+                        else_e,
+                        tuple_data,
+                        schema,
+                        catalog,
+                        subquery_tuples,
+                        snapshot,
+                    )
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            Expr::Subquery(subquery) => {
+                // Use the provided tuples and outer query's snapshot to evaluate the subquery
+                match SelectExecutor::eval_scalar_subquery_with_tuples(
+                    catalog,
+                    subquery,
+                    subquery_tuples,
+                    snapshot,
+                ) {
+                    Ok(value) => Ok(value),
+                    Err(_) => Ok(Value::Null),
                 }
             }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
@@ -251,6 +459,7 @@ mod tests {
         schema: &TableSchema,
         snapshot: &Snapshot,
         txn_mgr: &Arc<TransactionManager>,
+        catalog: &Catalog,
     ) -> Result<usize, String> {
         let mut updated = 0;
         for tuple in tuples.iter_mut() {
@@ -264,7 +473,7 @@ mod tests {
                 }
             }
 
-            UpdateDeleteExecutor::apply_assignments(tuple, assignments, schema)?;
+            UpdateDeleteExecutor::apply_assignments(tuple, assignments, schema, catalog)?;
             updated += 1;
         }
         Ok(updated)
@@ -377,7 +586,15 @@ mod tests {
             ("age".to_string(), Expr::Number(31)),
         ];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("name"), Some(Value::Text("Bob".to_string())));
         assert_eq!(tuple.get_value("age"), Some(Value::Int(31)));
     }
@@ -388,7 +605,12 @@ mod tests {
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
         let assignments = vec![("non_existent".to_string(), Expr::Number(100))];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Column 'non_existent' not found");
     }
@@ -399,7 +621,12 @@ mod tests {
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
         let assignments = vec![("name".to_string(), Expr::Number(123))]; // name is TEXT
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Type mismatch for column 'name'");
     }
@@ -410,7 +637,12 @@ mod tests {
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
         let assignments = vec![("age".to_string(), Expr::Star)];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Unsupported expression"));
     }
@@ -422,7 +654,15 @@ mod tests {
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
         let assignments = vec![("age".to_string(), Expr::Column("id".to_string()))];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(1)));
     }
 
@@ -435,7 +675,15 @@ mod tests {
             Expr::QualifiedColumn { table: "users".to_string(), column: "id".to_string() },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(1)));
     }
 
@@ -445,7 +693,12 @@ mod tests {
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
         let assignments = vec![("age".to_string(), Expr::Column("missing".to_string()))];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Column 'missing' not found"));
     }
@@ -463,7 +716,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(31)));
     }
 
@@ -480,7 +741,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(25)));
     }
 
@@ -497,7 +766,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(60)));
     }
 
@@ -514,7 +791,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(10)));
     }
 
@@ -531,7 +816,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(2)));
     }
 
@@ -548,7 +841,12 @@ mod tests {
             },
         )];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Division by zero"));
     }
@@ -566,7 +864,12 @@ mod tests {
             },
         )];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Division by zero"));
     }
@@ -588,7 +891,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(61)));
     }
 
@@ -613,7 +924,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(23)));
     }
 
@@ -630,7 +949,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(30)));
     }
 
@@ -647,7 +974,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(10)));
     }
 
@@ -663,7 +998,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("age"), Some(Value::Int(-30)));
     }
 
@@ -684,7 +1027,15 @@ mod tests {
         let assignments =
             vec![("flag".to_string(), Expr::IsNull(Box::new(Expr::Column("val".to_string()))))];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("flag"), Some(Value::Bool(true)));
     }
 
@@ -705,7 +1056,15 @@ mod tests {
         let assignments =
             vec![("flag".to_string(), Expr::IsNotNull(Box::new(Expr::Column("val".to_string()))))];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("flag"), Some(Value::Bool(true)));
     }
 
@@ -732,7 +1091,12 @@ mod tests {
             },
         )];
 
-        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        let result = UpdateDeleteExecutor::apply_assignments(
+            &mut tuple,
+            &assignments,
+            &schema,
+            &Catalog::new(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Type mismatch"));
     }
@@ -760,7 +1124,15 @@ mod tests {
             ),
         ];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("id"), Some(Value::Int(11)));
         assert_eq!(tuple.get_value("age"), Some(Value::Int(60)));
     }
@@ -803,7 +1175,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("balance"), Some(Value::Int(140)));
     }
 
@@ -844,7 +1224,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("balance"), Some(Value::Int(60)));
     }
 
@@ -877,7 +1265,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("value"), Some(Value::Int(0)));
     }
 
@@ -930,7 +1326,15 @@ mod tests {
             },
         )];
 
-        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert!(
+            UpdateDeleteExecutor::apply_assignments(
+                &mut tuple,
+                &assignments,
+                &schema,
+                &Catalog::new()
+            )
+            .is_ok()
+        );
         assert_eq!(tuple.get_value("grade"), Some(Value::Text("B".to_string())));
     }
 
@@ -945,6 +1349,7 @@ mod tests {
         let assignments = vec![("age".to_string(), Expr::Number(31))];
         let snapshot = Snapshot::new(txn.xid, txn.xid + 1, vec![]); // Mock snapshot
 
+        let catalog = Catalog::new();
         let updated_count = update_with_mock_evaluator(
             &mut tuples,
             &assignments,
@@ -952,6 +1357,7 @@ mod tests {
             &schema,
             &snapshot,
             &txn_mgr,
+            &catalog,
         )
         .unwrap();
 
@@ -977,6 +1383,7 @@ mod tests {
             right: Box::new(Expr::String("Alice".to_string())),
         });
         let snapshot = Snapshot::new(xid_creator, xid_creator + 1, vec![]);
+        let catalog = Catalog::new();
 
         let updated_count = update_with_mock_evaluator(
             &mut tuples,
@@ -985,6 +1392,7 @@ mod tests {
             &schema,
             &snapshot,
             &txn_mgr,
+            &catalog,
         )
         .unwrap();
 
@@ -1008,6 +1416,7 @@ mod tests {
             right: Box::new(Expr::String("Bob".to_string())),
         });
         let snapshot = Snapshot::new(xid_creator, xid_creator + 1, vec![]);
+        let catalog = Catalog::new();
 
         let updated_count = update_with_mock_evaluator(
             &mut tuples,
@@ -1016,6 +1425,7 @@ mod tests {
             &schema,
             &snapshot,
             &txn_mgr,
+            &catalog,
         )
         .unwrap();
 
@@ -1031,6 +1441,7 @@ mod tests {
         let mut tuples = vec![create_test_tuple(txn.xid, 1, "Alice", 30)];
         let assignments = vec![("age".to_string(), Expr::Number(31))];
         let snapshot = Snapshot::new(0, txn.xid, vec![txn.xid]); // Snapshot before txn commits
+        let catalog = Catalog::new();
 
         let updated_count = update_with_mock_evaluator(
             &mut tuples,
@@ -1039,6 +1450,7 @@ mod tests {
             &schema,
             &snapshot,
             &txn_mgr,
+            &catalog,
         )
         .unwrap();
 
