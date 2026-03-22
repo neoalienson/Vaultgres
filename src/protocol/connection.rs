@@ -8,6 +8,22 @@ use crate::planner::planner::Planner;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+/// Check if an expression contains an aggregate function
+fn contains_aggregate(expr: &Expr) -> bool {
+    match expr {
+        Expr::Aggregate { .. } => true,
+        Expr::Alias { expr, .. } => contains_aggregate(expr),
+        Expr::FunctionCall { args, .. } => args.iter().any(contains_aggregate),
+        Expr::BinaryOp { left, right, .. } => contains_aggregate(left) || contains_aggregate(right),
+        Expr::UnaryOp { expr, .. } => contains_aggregate(expr),
+        Expr::Case { conditions, else_expr } => {
+            conditions.iter().any(|(w, t)| contains_aggregate(w) || contains_aggregate(t))
+                || else_expr.as_ref().map_or(false, |e| contains_aggregate(e))
+        }
+        _ => false,
+    }
+}
+
 pub enum ExecutionResult {
     CommandComplete(String),
     ResultSet(ResultSet),
@@ -255,7 +271,12 @@ impl<S: Read + Write> Connection<S> {
                     return Ok(ExecutionResult::ResultSet(result_set));
                 }
 
-                if !select_stmt.joins.is_empty() {
+                // Check if query has aggregates - if so, use planner even with JOINs
+                // because execute_join_query doesn't support GROUP BY/aggregation
+                let has_aggregates = select_stmt.columns.iter().any(|col| contains_aggregate(col))
+                    || select_stmt.group_by.as_ref().is_some_and(|gb| !gb.is_empty());
+
+                if !select_stmt.joins.is_empty() && !has_aggregates {
                     return self.execute_join_query(select_stmt);
                 }
 

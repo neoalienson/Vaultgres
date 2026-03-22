@@ -187,7 +187,57 @@ impl UpdateDeleteExecutor {
                     Err(_) => Ok(Value::Null),
                 }
             }
+            Expr::FunctionCall { name, args } => {
+                let evaluated_args: Result<Vec<Value>, String> = args
+                    .iter()
+                    .map(|arg| Self::evaluate_expr(arg, tuple_data, schema, catalog))
+                    .collect();
+                Self::eval_function(name, evaluated_args?)
+            }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
+        }
+    }
+
+    fn eval_function(name: &str, args: Vec<Value>) -> Result<Value, String> {
+        use crate::catalog::string_functions;
+        match name.to_uppercase().as_str() {
+            "UPPER" => {
+                if args.len() != 1 {
+                    return Err("UPPER takes one argument".to_string());
+                }
+                string_functions::StringFunctions::upper(args[0].clone())
+            }
+            "LOWER" => {
+                if args.len() != 1 {
+                    return Err("LOWER takes one argument".to_string());
+                }
+                string_functions::StringFunctions::lower(args[0].clone())
+            }
+            "LENGTH" => {
+                if args.len() != 1 {
+                    return Err("LENGTH takes one argument".to_string());
+                }
+                string_functions::StringFunctions::length(args[0].clone())
+            }
+            "CONCAT" => string_functions::StringFunctions::concat(args),
+            "SUBSTRING" => {
+                if args.len() == 2 {
+                    string_functions::StringFunctions::substring(
+                        args[0].clone(),
+                        args[1].clone(),
+                        None,
+                    )
+                } else if args.len() == 3 {
+                    string_functions::StringFunctions::substring(
+                        args[0].clone(),
+                        args[1].clone(),
+                        Some(args[2].clone()),
+                    )
+                } else {
+                    Err("SUBSTRING takes 2 or 3 arguments".to_string())
+                }
+            }
+            _ => Err(format!("Function '{}' not found", name)),
         }
     }
 
@@ -319,6 +369,22 @@ impl UpdateDeleteExecutor {
                     Ok(value) => Ok(value),
                     Err(_) => Ok(Value::Null),
                 }
+            }
+            Expr::FunctionCall { name, args } => {
+                let evaluated_args: Result<Vec<Value>, String> = args
+                    .iter()
+                    .map(|arg| {
+                        Self::evaluate_expr_with_tuples(
+                            arg,
+                            tuple_data,
+                            schema,
+                            catalog,
+                            subquery_tuples,
+                            snapshot,
+                        )
+                    })
+                    .collect();
+                Self::eval_function(name, evaluated_args?)
             }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
         }
