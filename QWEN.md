@@ -180,7 +180,7 @@ cargo check
 cargo build --release --features profiling
 
 # E2E scenario test for pet store
-cd /home/neo/projects/vaultgres/docker && docker compose down -v 2>/dev/null; docker compose build vaultgres 2>&1 
+cd docker && docker compose down -v 2>/dev/null; docker compose build vaultgres 2>&1 
 cd tests/e2e && cargo test --package e2e --test pet_store -- --test-threads=1  --nocapture
 ```
 

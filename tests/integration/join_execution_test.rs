@@ -33,10 +33,18 @@ fn test_inner_join_basic() {
         vec![("id", DataType::Int), ("customer_id", DataType::Int), ("total", DataType::Int)],
     );
 
-    catalog.insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("customers", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(2), Expr::Number(1), Expr::Number(200)]).unwrap();
+    catalog
+        .insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+        .unwrap();
+    catalog
+        .insert("customers", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+        .unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)])
+        .unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(2), Expr::Number(1), Expr::Number(200)])
+        .unwrap();
 
     let select = parse_select(
         "SELECT c.name, o.total FROM customers c INNER JOIN orders o ON c.id = o.customer_id",

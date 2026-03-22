@@ -33,7 +33,9 @@ fn test_default_value_text() {
         )
         .unwrap();
 
-    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::String("user".to_string())]).unwrap();
+    catalog
+        .insert("accounts", &[], vec![Expr::Number(1), Expr::String("user".to_string())])
+        .unwrap();
     assert_eq!(catalog.row_count("accounts"), 1);
 }
 
@@ -55,7 +57,11 @@ fn test_default_value_multiple_columns() {
         .unwrap();
 
     catalog
-        .insert("users", &[], vec![Expr::Number(1), Expr::Number(1), Expr::String("guest".to_string())])
+        .insert(
+            "users",
+            &[],
+            vec![Expr::Number(1), Expr::Number(1), Expr::String("guest".to_string())],
+        )
         .unwrap();
     assert_eq!(catalog.row_count("users"), 1);
 }

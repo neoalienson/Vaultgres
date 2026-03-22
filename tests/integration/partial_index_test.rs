@@ -12,9 +12,15 @@ fn test_partial_index_creation() {
     ];
 
     catalog.create_table("orders".to_string(), columns).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::String("active".to_string())]).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(2), Expr::String("inactive".to_string())]).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(3), Expr::String("active".to_string())]).unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(1), Expr::String("active".to_string())])
+        .unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(2), Expr::String("inactive".to_string())])
+        .unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(3), Expr::String("active".to_string())])
+        .unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,

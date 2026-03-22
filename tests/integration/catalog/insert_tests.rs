@@ -55,7 +55,9 @@ fn test_insert_multiple_rows() {
 
     catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
     catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())]).unwrap();
+    catalog
+        .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
+        .unwrap();
 
     assert_eq!(catalog.row_count("users"), 3);
 }

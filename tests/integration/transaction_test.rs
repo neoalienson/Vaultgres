@@ -17,7 +17,9 @@ mod tests {
     }
 
     fn insert_user(catalog: &Catalog, id: i64, name: &str) {
-        catalog.insert("users", &[], vec![Expr::Number(id), Expr::String(name.to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(id), Expr::String(name.to_string())])
+            .unwrap();
     }
 
     #[test]

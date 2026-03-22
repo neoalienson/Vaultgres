@@ -30,8 +30,12 @@ fn test_join_execution() {
         .unwrap();
 
     // Insert data
-    catalog.insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog
+        .insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+        .unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)])
+        .unwrap();
 
     // Parse JOIN query
     let sql = "SELECT c.name, o.total FROM customers c INNER JOIN orders o ON c.id = o.customer_id";

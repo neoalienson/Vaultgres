@@ -9,7 +9,7 @@ use crate::parser::ast::{
 };
 use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;

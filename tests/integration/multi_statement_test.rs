@@ -19,8 +19,12 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
         catalog
             .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
             .unwrap();
@@ -44,8 +48,12 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
         catalog.rollback_transaction().unwrap();
 
         assert_eq!(catalog.row_count("users"), 2);
@@ -65,10 +73,14 @@ mod tests {
             )
             .unwrap();
 
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
         catalog
             .update(
                 "users",
@@ -110,15 +122,23 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
         catalog.savepoint("sp1".to_string()).unwrap();
         catalog
             .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
             .unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(4), Expr::String("Dave".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(4), Expr::String("Dave".to_string())])
+            .unwrap();
         catalog.rollback_to_savepoint("sp1").unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(5), Expr::String("Eve".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(5), Expr::String("Eve".to_string())])
+            .unwrap();
         catalog.commit_transaction().unwrap();
 
         assert_eq!(catalog.row_count("users"), 3);
@@ -139,8 +159,12 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
 
         let result = Catalog::select_with_catalog(
             &catalog_arc,
@@ -175,7 +199,9 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
 
         let result = catalog.insert("nonexistent", &[], vec![Expr::Number(1)]);
         assert!(result.is_err());
@@ -199,15 +225,21 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .unwrap();
         catalog.commit_transaction().unwrap();
 
         catalog.begin_transaction().unwrap();
         catalog
             .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
             .unwrap();
-        catalog.insert("users", &[], vec![Expr::Number(4), Expr::String("Dave".to_string())]).unwrap();
+        catalog
+            .insert("users", &[], vec![Expr::Number(4), Expr::String("Dave".to_string())])
+            .unwrap();
         catalog.commit_transaction().unwrap();
 
         assert_eq!(catalog.row_count("users"), 4);

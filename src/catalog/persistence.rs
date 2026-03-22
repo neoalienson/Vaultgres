@@ -2,7 +2,7 @@ use super::{Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
-use std::fs::{create_dir_all, File};
+use std::fs::{File, create_dir_all};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;

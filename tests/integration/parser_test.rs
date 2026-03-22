@@ -1,5 +1,5 @@
 use vaultgres::parser::ast::BinaryOperator;
-use vaultgres::parser::{parse, Expr, Parser, Statement};
+use vaultgres::parser::{Expr, Parser, Statement, parse};
 
 fn parse_select(sql: &str) -> vaultgres::parser::ast::SelectStmt {
     match parse(sql).unwrap() {
