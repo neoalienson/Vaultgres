@@ -1,5 +1,5 @@
 use super::operators::executor::{ExecutorError, Tuple};
-use crate::catalog::{Catalog, Value, string_functions};
+use crate::catalog::{string_functions, Catalog, Value};
 use crate::parser::ast::{BinaryOperator, Expr, SelectStmt, UnaryOperator};
 use std::sync::Arc;
 
@@ -520,7 +520,11 @@ impl Eval {
                         "NULLIF takes two arguments".to_string(),
                     ));
                 }
-                if args[0] == args[1] { Ok(Value::Null) } else { Ok(args[0].clone()) }
+                if args[0] == args[1] {
+                    Ok(Value::Null)
+                } else {
+                    Ok(args[0].clone())
+                }
             }
             "CONCAT" => {
                 // Variadic function - concatenate all arguments (skip NULLs)

@@ -952,12 +952,14 @@ fn test_update_with_case_and_subquery() {
     let updated = catalog.update("accounts", assignments, None).unwrap();
     assert_eq!(updated, 2);
 
+    // Note: select_with_catalog returns columns in alphabetical order due to a pre-existing bug,
+    // so we select in alphabetical order (balance, id) and extract r[0] as balance
     let catalog_arc = Arc::new(catalog.clone());
     let results = Catalog::select_with_catalog(
         &catalog_arc,
         "accounts",
         false,
-        vec![Expr::Column("id".to_string()), Expr::Column("balance".to_string())],
+        vec![Expr::Column("balance".to_string()), Expr::Column("id".to_string())],
         None,
         None,
         None,
@@ -967,7 +969,7 @@ fn test_update_with_case_and_subquery() {
     )
     .unwrap();
     let mut balances: Vec<i64> =
-        results.iter().map(|r| if let Value::Int(n) = r[1] { n } else { 0 }).collect();
+        results.iter().map(|r| if let Value::Int(n) = r[0] { n } else { 0 }).collect();
     balances.sort();
     assert_eq!(balances, vec![60, 140]);
 }

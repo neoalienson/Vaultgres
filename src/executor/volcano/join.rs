@@ -294,13 +294,15 @@ mod tests {
     #[test]
     fn test_column_prefixing_with_duplicate_names() {
         // Test that columns with same name from different tables are preserved
-        let left = MockExecutor::with_tuples(vec![
-            TupleBuilder::new().with_int("id", 1).with_text("name", "Alice").build(),
-        ]);
+        let left = MockExecutor::with_tuples(vec![TupleBuilder::new()
+            .with_int("id", 1)
+            .with_text("name", "Alice")
+            .build()]);
 
-        let right = MockExecutor::with_tuples(vec![
-            TupleBuilder::new().with_int("id", 1).with_text("name", "Order1").build(),
-        ]);
+        let right = MockExecutor::with_tuples(vec![TupleBuilder::new()
+            .with_int("id", 1)
+            .with_text("name", "Order1")
+            .build()]);
 
         // Condition should work with unprefixed columns (they get looked up in the combined tuple)
         let condition = |l: &Tuple, r: &Tuple| l.get("id") == r.get("id");

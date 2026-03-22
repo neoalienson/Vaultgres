@@ -74,10 +74,10 @@ pub use parallel::{ParallelConfig, ParallelExecutor};
 
 pub use volcano::{
     AggregateExecutor, AggregateFunction, CaseExecutor, DistinctExecutor, ExceptExecutor,
-    FilterExecutor, HashAggExecutor, HashJoinExecutor, HavingExecutor, IntersectExecutor,
-    JoinExecutor, JoinType, LimitExecutor, MergeJoinExecutor, NestedLoopJoinExecutor,
-    ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryExecutor, SubqueryScanExecutor,
-    UnionExecutor, UnionType,
+    FilterExecutor, GroupByExecutor, HashAggExecutor, HashJoinExecutor, HavingExecutor,
+    IntersectExecutor, JoinExecutor, JoinType, LimitExecutor, MergeJoinExecutor,
+    NestedLoopJoinExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryExecutor,
+    SubqueryScanExecutor, UnionExecutor, UnionType,
 };
 
 // ============================================================================
@@ -90,7 +90,7 @@ pub use correlated::{CorrelatedExecutor, SubqueryKind};
 pub use cursor::CursorManager;
 pub use derived_table::DerivedTableExecutor;
 pub use eval::Eval;
-pub use expr_evaluator::{ExprEvaluator, eval_binary_op, eval_unary_op};
+pub use expr_evaluator::{eval_binary_op, eval_unary_op, ExprEvaluator};
 pub use function_cache::FunctionCache;
 pub use index_only_scan::IndexOnlyScan;
 pub use lateral::LateralSubqueryExecutor;
@@ -105,7 +105,7 @@ pub use unnest::UnnestExecutor;
 
 #[cfg(test)]
 pub use test_helpers::{
-    MockExecutor as TestMockExecutor, TupleBuilder, compare_executors, count_results,
-    create_multi_column_schema, create_simple_schema, run_executor, test_executor_lifecycle,
-    tuple_with_value,
+    compare_executors, count_results, create_multi_column_schema, create_simple_schema,
+    run_executor, test_executor_lifecycle, tuple_with_value, MockExecutor as TestMockExecutor,
+    TupleBuilder,
 };

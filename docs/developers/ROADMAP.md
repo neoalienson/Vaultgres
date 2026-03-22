@@ -112,7 +112,7 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ AggregateExecutor (volcano module)
 - ✅ SubqueryExecutor (volcano module)
 - ✅ CaseExecutor (volcano module)
-- ⏸️ GroupByExecutor (deferred - covered by HashAggExecutor)
+- ✅ GroupByExecutor (volcano module - sort-based grouping, alternative to HashAggExecutor)
 - ⏸️ CTEExecutor (deferred - requires planner integration)
 - ⏸️ WindowExecutor (deferred - requires partition handling)
 

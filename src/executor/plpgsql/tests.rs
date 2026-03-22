@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::catalog::Value;
-    use crate::executor::plpgsql::PlPgSqlInterpreter;
     use crate::executor::plpgsql::evaluator::PlPgSqlExprEvaluator;
+    use crate::executor::plpgsql::PlPgSqlInterpreter;
     use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
     use crate::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
     use std::collections::HashMap;

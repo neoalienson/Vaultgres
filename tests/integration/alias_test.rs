@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use vaultgres::parser::Parser;
     use vaultgres::parser::ast::{Expr, Statement};
+    use vaultgres::parser::Parser;
 
     fn parse_select(sql: &str) -> vaultgres::parser::ast::SelectStmt {
         let mut parser = Parser::new(sql).unwrap();
