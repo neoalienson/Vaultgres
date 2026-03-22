@@ -5,7 +5,7 @@ pub fn run_update_tests(db: &DbConnection) {
     eprintln!("\n[PetStore] === Testing UPDATE Statements ===");
 
     // Create accounts table for balance tests if not exists
-    let result = db.execute("CREATE TABLE accounts (id INT, name TEXT, balance INT)");
+    let result = db.execute("CREATE TABLE IF NOT EXISTS accounts (id INT, name TEXT, balance INT)");
     if result.is_err() {
         // Table might already exist, that's ok
     }
@@ -32,7 +32,7 @@ fn test_update_arithmetic(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with arithmetic (balance - 10)...");
     let result = db.execute("UPDATE accounts SET balance = balance - 10 WHERE id = 1");
     assert!(result.is_ok(), "UPDATE with arithmetic should succeed");
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -43,7 +43,7 @@ fn test_update_addition(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with addition (balance + 50)...");
     let result = db.execute("UPDATE accounts SET balance = balance + 50 WHERE id = 2");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 2");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -54,7 +54,7 @@ fn test_update_multiplication(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with multiplication (balance * 2)...");
     let result = db.execute("UPDATE accounts SET balance = balance * 2 WHERE id = 3");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE id = 3");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -63,9 +63,11 @@ fn test_update_multiplication(db: &DbConnection) {
 
 fn test_update_multiple_columns(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with multiple columns...");
-    let result = db.execute("UPDATE accounts SET name = 'Alice Updated', balance = balance + 100 WHERE id = 1");
+    let result = db.execute(
+        "UPDATE accounts SET name = 'Alice Updated', balance = balance + 100 WHERE id = 1",
+    );
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT name, balance FROM accounts WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -77,7 +79,7 @@ fn test_update_text_where(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE with text WHERE condition...");
     let result = db.execute("UPDATE accounts SET balance = 0 WHERE name = 'Bob'");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT balance FROM accounts WHERE name = 'Bob'");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -100,7 +102,7 @@ fn test_update_inventory(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE inventory (decrement stock)...");
     let result = db.execute("UPDATE inventory SET stock = stock - 5 WHERE item_id = 1");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT stock FROM inventory WHERE item_id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -109,9 +111,10 @@ fn test_update_inventory(db: &DbConnection) {
 
 fn test_update_loyalty_points(db: &DbConnection) {
     eprintln!("[PetStore] Testing UPDATE loyalty points...");
-    let result = db.execute("UPDATE customers SET loyalty_points = loyalty_points + 50 WHERE id = 1");
+    let result =
+        db.execute("UPDATE customers SET loyalty_points = loyalty_points + 50 WHERE id = 1");
     assert!(result.is_ok());
-    
+
     let result = db.execute("SELECT loyalty_points FROM customers WHERE id = 1");
     assert!(result.is_ok());
     let output = result.unwrap();
