@@ -99,6 +99,19 @@ impl UpdateDeleteExecutor {
                 let val = Self::evaluate_expr(expr, tuple_data, schema)?;
                 Ok(Value::Bool(!matches!(val, Value::Null)))
             }
+            Expr::Case { conditions, else_expr } => {
+                for (when_expr, then_expr) in conditions {
+                    let when_val = Self::evaluate_expr(when_expr, tuple_data, schema)?;
+                    if when_val == Value::Bool(true) {
+                        return Self::evaluate_expr(then_expr, tuple_data, schema);
+                    }
+                }
+                if let Some(else_e) = else_expr {
+                    Self::evaluate_expr(else_e, tuple_data, schema)
+                } else {
+                    Ok(Value::Null)
+                }
+            }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
         }
     }
@@ -750,6 +763,175 @@ mod tests {
         assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
         assert_eq!(tuple.get_value("id"), Some(Value::Int(11)));
         assert_eq!(tuple.get_value("age"), Some(Value::Int(60)));
+    }
+
+    // --- CASE expression tests ---
+    #[test]
+    fn test_apply_assignments_case_expression() {
+        let schema = TableSchema::new(
+            "accounts".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("balance".to_string(), DataType::Int),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("id".to_string(), Value::Int(1));
+        tuple.add_value("balance".to_string(), Value::Int(150));
+
+        let assignments = vec![(
+            "balance".to_string(),
+            Expr::Case {
+                conditions: vec![(
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("balance".to_string())),
+                        op: BinaryOperator::GreaterThan,
+                        right: Box::new(Expr::Number(100)),
+                    },
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("balance".to_string())),
+                        op: BinaryOperator::Subtract,
+                        right: Box::new(Expr::Number(10)),
+                    },
+                )],
+                else_expr: Some(Box::new(Expr::BinaryOp {
+                    left: Box::new(Expr::Column("balance".to_string())),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expr::Number(10)),
+                })),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("balance"), Some(Value::Int(140)));
+    }
+
+    #[test]
+    fn test_apply_assignments_case_expression_else_branch() {
+        let schema = TableSchema::new(
+            "accounts".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("balance".to_string(), DataType::Int),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("id".to_string(), Value::Int(1));
+        tuple.add_value("balance".to_string(), Value::Int(50));
+
+        let assignments = vec![(
+            "balance".to_string(),
+            Expr::Case {
+                conditions: vec![(
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("balance".to_string())),
+                        op: BinaryOperator::GreaterThan,
+                        right: Box::new(Expr::Number(100)),
+                    },
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("balance".to_string())),
+                        op: BinaryOperator::Subtract,
+                        right: Box::new(Expr::Number(10)),
+                    },
+                )],
+                else_expr: Some(Box::new(Expr::BinaryOp {
+                    left: Box::new(Expr::Column("balance".to_string())),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expr::Number(10)),
+                })),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("balance"), Some(Value::Int(60)));
+    }
+
+    #[test]
+    fn test_apply_assignments_case_expression_no_else() {
+        let schema = TableSchema::new(
+            "data".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("value".to_string(), DataType::Int),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("id".to_string(), Value::Int(1));
+        tuple.add_value("value".to_string(), Value::Int(50));
+
+        let assignments = vec![(
+            "value".to_string(),
+            Expr::Case {
+                conditions: vec![(
+                    Expr::BinaryOp {
+                        left: Box::new(Expr::Column("value".to_string())),
+                        op: BinaryOperator::GreaterThan,
+                        right: Box::new(Expr::Number(100)),
+                    },
+                    Expr::Number(999),
+                )],
+                else_expr: Some(Box::new(Expr::Number(0))),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("value"), Some(Value::Int(0)));
+    }
+
+    #[test]
+    fn test_apply_assignments_case_expression_multiple_conditions() {
+        let schema = TableSchema::new(
+            "grade".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("score".to_string(), DataType::Int),
+                ColumnDef::new("grade".to_string(), DataType::Text),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("id".to_string(), Value::Int(1));
+        tuple.add_value("score".to_string(), Value::Int(85));
+        tuple.add_value("grade".to_string(), Value::Text("B".to_string()));
+
+        let assignments = vec![(
+            "grade".to_string(),
+            Expr::Case {
+                conditions: vec![
+                    (
+                        Expr::BinaryOp {
+                            left: Box::new(Expr::Column("score".to_string())),
+                            op: BinaryOperator::GreaterThanOrEqual,
+                            right: Box::new(Expr::Number(90)),
+                        },
+                        Expr::String("A".to_string()),
+                    ),
+                    (
+                        Expr::BinaryOp {
+                            left: Box::new(Expr::Column("score".to_string())),
+                            op: BinaryOperator::GreaterThanOrEqual,
+                            right: Box::new(Expr::Number(80)),
+                        },
+                        Expr::String("B".to_string()),
+                    ),
+                    (
+                        Expr::BinaryOp {
+                            left: Box::new(Expr::Column("score".to_string())),
+                            op: BinaryOperator::GreaterThanOrEqual,
+                            right: Box::new(Expr::Number(70)),
+                        },
+                        Expr::String("C".to_string()),
+                    ),
+                ],
+                else_expr: Some(Box::new(Expr::String("F".to_string()))),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("grade"), Some(Value::Text("B".to_string())));
     }
 
     // --- update tests ---
