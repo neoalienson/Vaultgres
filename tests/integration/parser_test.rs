@@ -1,4 +1,5 @@
-use vaultgres::parser::{Expr, Parser, Statement, parse};
+use vaultgres::parser::ast::BinaryOperator;
+use vaultgres::parser::{parse, Expr, Parser, Statement};
 
 fn parse_select(sql: &str) -> vaultgres::parser::ast::SelectStmt {
     match parse(sql).unwrap() {
@@ -215,4 +216,67 @@ fn test_intersect_parsing() {
 fn test_except_parsing() {
     let mut parser = Parser::new("SELECT id FROM users EXCEPT SELECT id FROM orders").unwrap();
     assert!(matches!(parser.parse().unwrap(), Statement::Except(_)));
+}
+
+#[test]
+fn test_parse_update_arithmetic_add() {
+    let s = parse_update("UPDATE users SET age = age + 1");
+    assert_eq!(s.assignments.len(), 1);
+    assert_eq!(s.assignments[0].0, "age");
+    match &s.assignments[0].1 {
+        Expr::BinaryOp { left, op: BinaryOperator::Add, right } => {
+            assert_eq!(*left.as_ref(), Expr::Column("age".to_string()));
+            assert_eq!(*right.as_ref(), Expr::Number(1));
+        }
+        _ => panic!("Expected BinaryOp with Add"),
+    }
+}
+
+#[test]
+fn test_parse_update_arithmetic_multiply() {
+    let s = parse_update("UPDATE data SET result = id * 2");
+    assert_eq!(s.assignments.len(), 1);
+    match &s.assignments[0].1 {
+        Expr::BinaryOp { left, op: BinaryOperator::Multiply, right } => {
+            assert_eq!(*left.as_ref(), Expr::Column("id".to_string()));
+            assert_eq!(*right.as_ref(), Expr::Number(2));
+        }
+        _ => panic!("Expected BinaryOp with Multiply"),
+    }
+}
+
+#[test]
+fn test_parse_update_arithmetic_nested() {
+    let s = parse_update("UPDATE data SET value = (a + b) * c");
+    assert_eq!(s.assignments.len(), 1);
+    match &s.assignments[0].1 {
+        Expr::BinaryOp { left, op: BinaryOperator::Multiply, right } => {
+            match left.as_ref() {
+                Expr::BinaryOp { left: l2, op: BinaryOperator::Add, right: r2 } => {
+                    assert_eq!(*l2.as_ref(), Expr::Column("a".to_string()));
+                    assert_eq!(*r2.as_ref(), Expr::Column("b".to_string()));
+                }
+                _ => panic!("Expected inner BinaryOp with Add"),
+            }
+            assert_eq!(*right.as_ref(), Expr::Column("c".to_string()));
+        }
+        _ => panic!("Expected outer BinaryOp with Multiply"),
+    }
+}
+
+#[test]
+fn test_parse_update_column_reference() {
+    let s = parse_update("UPDATE users SET other_col = source_col");
+    assert_eq!(s.assignments.len(), 1);
+    assert_eq!(s.assignments[0].0, "other_col");
+    assert_eq!(s.assignments[0].1, Expr::Column("source_col".to_string()));
+}
+
+#[test]
+fn test_parse_update_multiple_arithmetic() {
+    let s = parse_update("UPDATE data SET a = x + 1, b = y * 2, c = z - 3");
+    assert_eq!(s.assignments.len(), 3);
+    assert_eq!(s.assignments[0].0, "a");
+    assert_eq!(s.assignments[1].0, "b");
+    assert_eq!(s.assignments[2].0, "c");
 }

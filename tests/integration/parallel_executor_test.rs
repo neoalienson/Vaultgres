@@ -16,7 +16,7 @@ fn test_parallel_seq_scan_integration() {
         .unwrap();
 
     for i in 0..1000 {
-        catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let coordinator = ParallelCoordinator::new(4);
@@ -45,8 +45,8 @@ fn test_parallel_hash_join_integration() {
         .unwrap();
 
     for i in 0..100 {
-        catalog.insert("left_table", vec![Expr::Number(i % 10)]).unwrap();
-        catalog.insert("right_table", vec![Expr::Number(i % 10)]).unwrap();
+        catalog.insert("left_table", &[], vec![Expr::Number(i % 10)]).unwrap();
+        catalog.insert("right_table", &[], vec![Expr::Number(i % 10)]).unwrap();
     }
 
     let left_scan = Arc::new(ParallelSeqScan::new("left_table".to_string(), Arc::clone(&catalog)));
@@ -91,7 +91,7 @@ fn test_parallel_aggregation_integration() {
         .unwrap();
 
     for i in 0..500 {
-        catalog.insert("agg_test", vec![Expr::Number(i % 10)]).unwrap();
+        catalog.insert("agg_test", &[], vec![Expr::Number(i % 10)]).unwrap();
     }
 
     let scan = Arc::new(ParallelSeqScan::new("agg_test".to_string(), catalog));
@@ -126,7 +126,7 @@ fn test_parallel_sort_integration() {
         .unwrap();
 
     for i in (0..200).rev() {
-        catalog.insert("sort_test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("sort_test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = Arc::new(ParallelSeqScan::new("sort_test".to_string(), catalog));
@@ -180,7 +180,7 @@ fn test_single_worker_execution() {
         .unwrap();
 
     for i in 0..50 {
-        catalog.insert("single", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("single", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let coordinator = ParallelCoordinator::new(1);

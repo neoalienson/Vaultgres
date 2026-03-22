@@ -15,9 +15,11 @@ fn test_serial_auto_increment() {
         )
         .unwrap();
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(3), Expr::String("Charlie".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog
+        .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
+        .unwrap();
 
     assert_eq!(catalog.row_count("users"), 3);
 }
@@ -37,10 +39,10 @@ fn test_auto_increment_flag() {
         .unwrap();
 
     catalog
-        .insert("products", vec![Expr::Number(1), Expr::String("Product A".to_string())])
+        .insert("products", &[], vec![Expr::Number(1), Expr::String("Product A".to_string())])
         .unwrap();
     catalog
-        .insert("products", vec![Expr::Number(2), Expr::String("Product B".to_string())])
+        .insert("products", &[], vec![Expr::Number(2), Expr::String("Product B".to_string())])
         .unwrap();
 
     assert_eq!(catalog.row_count("products"), 2);
@@ -60,8 +62,12 @@ fn test_serial_with_explicit_values() {
         )
         .unwrap();
 
-    catalog.insert("items", vec![Expr::Number(100), Expr::String("Item 1".to_string())]).unwrap();
-    catalog.insert("items", vec![Expr::Number(101), Expr::String("Item 2".to_string())]).unwrap();
+    catalog
+        .insert("items", &[], vec![Expr::Number(100), Expr::String("Item 1".to_string())])
+        .unwrap();
+    catalog
+        .insert("items", &[], vec![Expr::Number(101), Expr::String("Item 2".to_string())])
+        .unwrap();
 
     assert_eq!(catalog.row_count("items"), 2);
 }
@@ -90,10 +96,14 @@ fn test_serial_multiple_tables() {
         )
         .unwrap();
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("posts", vec![Expr::Number(1), Expr::String("Post 1".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("posts", vec![Expr::Number(2), Expr::String("Post 2".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog
+        .insert("posts", &[], vec![Expr::Number(1), Expr::String("Post 1".to_string())])
+        .unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog
+        .insert("posts", &[], vec![Expr::Number(2), Expr::String("Post 2".to_string())])
+        .unwrap();
 
     assert_eq!(catalog.row_count("users"), 2);
     assert_eq!(catalog.row_count("posts"), 2);
@@ -117,11 +127,16 @@ fn test_serial_with_other_columns() {
     catalog
         .insert(
             "orders",
+            &[],
             vec![Expr::Number(1), Expr::String("Alice".to_string()), Expr::Number(100)],
         )
         .unwrap();
     catalog
-        .insert("orders", vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(200)])
+        .insert(
+            "orders",
+            &[],
+            vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(200)],
+        )
         .unwrap();
 
     assert_eq!(catalog.row_count("orders"), 2);
@@ -142,7 +157,7 @@ fn test_serial_sequence_continuity() {
         .unwrap();
 
     for i in 1..=10 {
-        catalog.insert("counters", vec![Expr::Number(i), Expr::Number(i * 10)]).unwrap();
+        catalog.insert("counters", &[], vec![Expr::Number(i), Expr::Number(i * 10)]).unwrap();
     }
 
     assert_eq!(catalog.row_count("counters"), 10);

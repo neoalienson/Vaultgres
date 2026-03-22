@@ -374,6 +374,7 @@ pub struct UniqueConstraint {
 pub enum DataType {
     Int,
     Serial,
+    Float,
     Text,
     Varchar(u32),
     Boolean,
@@ -430,6 +431,7 @@ pub struct OrderByExpr {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStmt {
     pub table: String,
+    pub columns: Vec<String>,
     pub values: Vec<Expr>,
     pub batch_values: Vec<Vec<Expr>>,
 }
@@ -581,6 +583,7 @@ mod tests {
     fn test_insert_stmt_creation() {
         let stmt = InsertStmt {
             table: "users".to_string(),
+            columns: Vec::new(),
             values: vec![Expr::Number(1), Expr::String("Alice".to_string())],
             batch_values: vec![],
         };

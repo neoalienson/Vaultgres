@@ -23,7 +23,7 @@ mod tests {
             vec![Expr::Number(3), Expr::String("Charlie".to_string())],
         ];
 
-        let count = catalog.batch_insert("users", batch).unwrap();
+        let count = catalog.batch_insert("users", &[], batch).unwrap();
         assert_eq!(count, 3);
     }
 
@@ -35,7 +35,7 @@ mod tests {
             .create_table("test".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
 
-        let count = catalog.batch_insert("test", vec![]).unwrap();
+        let count = catalog.batch_insert("test", &[], vec![]).unwrap();
         assert_eq!(count, 0);
     }
 
@@ -49,7 +49,7 @@ mod tests {
 
         let batch = vec![vec![Expr::Number(1), Expr::Number(2)]];
 
-        let result = catalog.batch_insert("test", batch);
+        let result = catalog.batch_insert("test", &[], batch);
         assert!(result.is_err());
     }
 }

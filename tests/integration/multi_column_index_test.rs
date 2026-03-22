@@ -16,6 +16,7 @@ fn test_multi_column_index_two_columns() {
     catalog
         .insert(
             "users",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("John".to_string()),
@@ -26,6 +27,7 @@ fn test_multi_column_index_two_columns() {
     catalog
         .insert(
             "users",
+            &[],
             vec![
                 Expr::Number(2),
                 Expr::String("Jane".to_string()),
@@ -65,6 +67,7 @@ fn test_multi_column_index_three_columns() {
     catalog
         .insert(
             "locations",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("USA".to_string()),
@@ -104,18 +107,21 @@ fn test_multi_column_index_ordering() {
     catalog
         .insert(
             "products",
+            &[],
             vec![Expr::Number(1), Expr::String("electronics".to_string()), Expr::Number(100)],
         )
         .unwrap();
     catalog
         .insert(
             "products",
+            &[],
             vec![Expr::Number(2), Expr::String("electronics".to_string()), Expr::Number(200)],
         )
         .unwrap();
     catalog
         .insert(
             "products",
+            &[],
             vec![Expr::Number(3), Expr::String("books".to_string()), Expr::Number(50)],
         )
         .unwrap();
@@ -150,6 +156,7 @@ fn test_multi_column_unique_index() {
     catalog
         .insert(
             "accounts",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("user1@test.com".to_string()),

@@ -1,12 +1,13 @@
 use crate::catalog::Value;
-use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
+use crate::executor::expr_evaluator::{eval_binary_op, eval_unary_op};
+use crate::parser::ast::Expr;
 use std::collections::HashMap;
 
-pub struct ExprEvaluator<'a> {
+pub struct PlPgSqlExprEvaluator<'a> {
     variables: &'a HashMap<String, Value>,
 }
 
-impl<'a> ExprEvaluator<'a> {
+impl<'a> PlPgSqlExprEvaluator<'a> {
     pub fn new(variables: &'a HashMap<String, Value>) -> Self {
         Self { variables }
     }
@@ -16,6 +17,7 @@ impl<'a> ExprEvaluator<'a> {
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
             Expr::Column(name) => self
                 .variables
                 .get(name)
@@ -30,12 +32,20 @@ impl<'a> ExprEvaluator<'a> {
             }
             Expr::UnaryOp { op, expr } => {
                 let val = self.eval(expr)?;
-                self.eval_unary_op(op, &val)
+                eval_unary_op(op, &val)
             }
             Expr::BinaryOp { left, op, right } => {
                 let l = self.eval(left)?;
                 let r = self.eval(right)?;
-                self.eval_binary_op(&l, op, &r)
+                eval_binary_op(&l, op, &r)
+            }
+            Expr::IsNull(expr) => {
+                let val = self.eval(expr)?;
+                Ok(Value::Bool(matches!(val, Value::Null)))
+            }
+            Expr::IsNotNull(expr) => {
+                let val = self.eval(expr)?;
+                Ok(Value::Bool(!matches!(val, Value::Null)))
             }
             _ => Err("Unsupported expression".to_string()),
         }
@@ -71,96 +81,6 @@ impl<'a> ExprEvaluator<'a> {
             Value::Int(n) => *n != 0,
             Value::Bool(b) => *b,
             _ => false,
-        }
-    }
-
-    fn eval_unary_op(&self, op: &UnaryOperator, val: &Value) -> Result<Value, String> {
-        match op {
-            UnaryOperator::Not => match val {
-                Value::Int(n) => Ok(Value::Bool(*n == 0)),
-                Value::Bool(b) => Ok(Value::Bool(!b)),
-                _ => Err("NOT requires integer or boolean".to_string()),
-            },
-            _ => Err(format!("Unsupported unary operator: {:?}", op)),
-        }
-    }
-
-    fn eval_binary_op(
-        &self,
-        left: &Value,
-        op: &BinaryOperator,
-        right: &Value,
-    ) -> Result<Value, String> {
-        match (left, right) {
-            (Value::Int(l), Value::Int(r)) => match op {
-                BinaryOperator::Equals => Ok(Value::Bool(l == r)),
-                BinaryOperator::GreaterThan => Ok(Value::Bool(l > r)),
-                BinaryOperator::LessThan => Ok(Value::Bool(l < r)),
-                BinaryOperator::GreaterThanOrEqual => Ok(Value::Bool(l >= r)),
-                BinaryOperator::LessThanOrEqual => Ok(Value::Bool(l <= r)),
-                BinaryOperator::Add => Ok(Value::Int(l + r)),
-                BinaryOperator::Subtract => Ok(Value::Int(l - r)),
-                BinaryOperator::Multiply => Ok(Value::Int(l * r)),
-                BinaryOperator::Divide => {
-                    if *r == 0 {
-                        Err("Division by zero".to_string())
-                    } else {
-                        Ok(Value::Int(l / r))
-                    }
-                }
-                BinaryOperator::Modulo => {
-                    if *r == 0 {
-                        Err("Division by zero".to_string())
-                    } else {
-                        Ok(Value::Int(l % r))
-                    }
-                }
-                BinaryOperator::And => Ok(Value::Bool(*l != 0 && *r != 0)),
-                BinaryOperator::Or => Ok(Value::Bool(*l != 0 || *r != 0)),
-                _ => Err(format!("Operator {:?} not supported for INT", op)),
-            },
-            (Value::Float(l), Value::Float(r)) => match op {
-                BinaryOperator::Equals => Ok(Value::Bool((l - r).abs() < f64::EPSILON)),
-                BinaryOperator::GreaterThan => Ok(Value::Bool(l > r)),
-                BinaryOperator::LessThan => Ok(Value::Bool(l < r)),
-                BinaryOperator::GreaterThanOrEqual => Ok(Value::Bool(l >= r)),
-                BinaryOperator::LessThanOrEqual => Ok(Value::Bool(l <= r)),
-                BinaryOperator::Add => Ok(Value::Float(l + r)),
-                BinaryOperator::Subtract => Ok(Value::Float(l - r)),
-                BinaryOperator::Multiply => Ok(Value::Float(l * r)),
-                BinaryOperator::Divide => {
-                    if *r == 0.0 {
-                        Err("Division by zero".to_string())
-                    } else {
-                        Ok(Value::Float(l / r))
-                    }
-                }
-                _ => Err(format!("Operator {:?} not supported for FLOAT", op)),
-            },
-            (Value::Bool(l), Value::Bool(r)) => match op {
-                BinaryOperator::And => Ok(Value::Bool(*l && *r)),
-                BinaryOperator::Or => Ok(Value::Bool(*l || *r)),
-                BinaryOperator::Equals => Ok(Value::Bool(l == r)),
-                _ => Err(format!("Operator {:?} not supported for BOOL", op)),
-            },
-            (Value::Text(l), Value::Text(r)) => match op {
-                BinaryOperator::Equals => Ok(Value::Bool(l == r)),
-                BinaryOperator::StringConcat => Ok(Value::Text(format!("{}{}", l, r))),
-                BinaryOperator::Like => {
-                    let pattern = r.replace('%', ".*").replace('_', ".");
-                    let re = regex::Regex::new(&format!("^{}$", pattern))
-                        .map_err(|e| format!("Invalid pattern: {}", e))?;
-                    Ok(Value::Bool(re.is_match(l)))
-                }
-                BinaryOperator::ILike => {
-                    let pattern = r.replace('%', ".*").replace('_', ".");
-                    let re = regex::Regex::new(&format!("(?i)^{}$", pattern))
-                        .map_err(|e| format!("Invalid pattern: {}", e))?;
-                    Ok(Value::Bool(re.is_match(l)))
-                }
-                _ => Err(format!("Operator {:?} not supported for TEXT", op)),
-            },
-            _ => Err("Type mismatch in binary operation".to_string()),
         }
     }
 }

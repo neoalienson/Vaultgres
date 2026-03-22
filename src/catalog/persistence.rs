@@ -2,7 +2,7 @@ use super::{Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
-use std::fs::{File, create_dir_all};
+use std::fs::{create_dir_all, File};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -244,6 +244,7 @@ fn write_data_type<W: Write>(writer: &mut W, dt: &DataType) -> Result<(), String
     match dt {
         DataType::Int => writer.write_all(&[0]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Serial => writer.write_all(&[0]).map_err(|e| format!("Write error: {}", e))?,
+        DataType::Float => writer.write_all(&[9]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Text => writer.write_all(&[1]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Varchar(len) => {
             writer.write_all(&[2]).map_err(|e| format!("Write error: {}", e))?;
@@ -283,6 +284,7 @@ fn read_data_type<R: Read>(reader: &mut R) -> Result<DataType, String> {
             Ok(DataType::Decimal(buf[0], buf[1]))
         }
         8 => Ok(DataType::Bytea),
+        9 => Ok(DataType::Float),
         _ => Err(format!("Unknown data type: {}", buf[0])),
     }
 }

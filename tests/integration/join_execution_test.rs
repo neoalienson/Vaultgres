@@ -33,10 +33,10 @@ fn test_inner_join_basic() {
         vec![("id", DataType::Int), ("customer_id", DataType::Int), ("total", DataType::Int)],
     );
 
-    catalog.insert("customers", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("customers", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("orders", vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("orders", vec![Expr::Number(2), Expr::Number(1), Expr::Number(200)]).unwrap();
+    catalog.insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("customers", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(2), Expr::Number(1), Expr::Number(200)]).unwrap();
 
     let select = parse_select(
         "SELECT c.name, o.total FROM customers c INNER JOIN orders o ON c.id = o.customer_id",
@@ -51,8 +51,8 @@ fn test_join_no_matches() {
     create_table(&catalog, "a", vec![("id", DataType::Int)]);
     create_table(&catalog, "b", vec![("a_id", DataType::Int)]);
 
-    catalog.insert("a", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("b", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(2)]).unwrap();
 
     let select = parse_select("SELECT * FROM a JOIN b ON a.id = b.a_id");
     assert_eq!(select.joins.len(), 1);
@@ -65,9 +65,9 @@ fn test_multiple_joins() {
     create_table(&catalog, "b", vec![("id", DataType::Int), ("a_id", DataType::Int)]);
     create_table(&catalog, "c", vec![("b_id", DataType::Int)]);
 
-    catalog.insert("a", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("b", vec![Expr::Number(1), Expr::Number(1)]).unwrap();
-    catalog.insert("c", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(1), Expr::Number(1)]).unwrap();
+    catalog.insert("c", &[], vec![Expr::Number(1)]).unwrap();
 
     let select = parse_select("SELECT * FROM a JOIN b ON a.id = b.a_id JOIN c ON b.id = c.b_id");
     assert_eq!(select.joins.len(), 2);
@@ -79,10 +79,10 @@ fn test_join_with_where_clause() {
     create_table(&catalog, "users", vec![("id", DataType::Int), ("status", DataType::Int)]);
     create_table(&catalog, "orders", vec![("user_id", DataType::Int), ("amount", DataType::Int)]);
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::Number(1)]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::Number(0)]).unwrap();
-    catalog.insert("orders", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("orders", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::Number(1)]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::Number(0)]).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("orders", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
 
     let select =
         parse_select("SELECT * FROM users u JOIN orders o ON u.id = o.user_id WHERE u.status = 1");
@@ -106,8 +106,8 @@ fn test_join_with_qualified_columns_in_select() {
     create_table(&catalog, "t1", vec![("id", DataType::Int), ("name", DataType::Text)]);
     create_table(&catalog, "t2", vec![("t1_id", DataType::Int), ("value", DataType::Int)]);
 
-    catalog.insert("t1", vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
-    catalog.insert("t2", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("t1", &[], vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
+    catalog.insert("t2", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
 
     let select = parse_select("SELECT t1.name, t2.value FROM t1 JOIN t2 ON t1.id = t2.t1_id");
     assert_eq!(select.columns.len(), 2);
@@ -121,8 +121,8 @@ fn test_join_same_column_names() {
     create_table(&catalog, "t1", vec![("id", DataType::Int), ("name", DataType::Text)]);
     create_table(&catalog, "t2", vec![("id", DataType::Int), ("name", DataType::Text)]);
 
-    catalog.insert("t1", vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
-    catalog.insert("t2", vec![Expr::Number(1), Expr::String("B".to_string())]).unwrap();
+    catalog.insert("t1", &[], vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
+    catalog.insert("t2", &[], vec![Expr::Number(1), Expr::String("B".to_string())]).unwrap();
 
     let select = parse_select("SELECT t1.name, t2.name FROM t1 JOIN t2 ON t1.id = t2.id");
     assert_eq!(select.columns.len(), 2);
@@ -134,10 +134,10 @@ fn test_join_with_order_by() {
     create_table(&catalog, "a", vec![("id", DataType::Int), ("name", DataType::Text)]);
     create_table(&catalog, "b", vec![("a_id", DataType::Int)]);
 
-    catalog.insert("a", vec![Expr::Number(2), Expr::String("B".to_string())]).unwrap();
-    catalog.insert("a", vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
-    catalog.insert("b", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("b", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(2), Expr::String("B".to_string())]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(1), Expr::String("A".to_string())]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(2)]).unwrap();
 
     let select = parse_select("SELECT a.name FROM a JOIN b ON a.id = b.a_id ORDER BY a.name");
     assert!(select.order_by.is_some());
@@ -149,10 +149,10 @@ fn test_join_with_limit() {
     create_table(&catalog, "a", vec![("id", DataType::Int)]);
     create_table(&catalog, "b", vec![("a_id", DataType::Int)]);
 
-    catalog.insert("a", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("a", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("b", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("b", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("a", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("b", &[], vec![Expr::Number(2)]).unwrap();
 
     let select = parse_select("SELECT * FROM a JOIN b ON a.id = b.a_id LIMIT 1");
     assert_eq!(select.limit, Some(1));

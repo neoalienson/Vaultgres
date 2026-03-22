@@ -83,7 +83,7 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction_with_isolation(IsolationLevel::ReadCommitted.into()).unwrap();
-        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.commit_transaction().unwrap();
 
         catalog.begin_transaction_with_isolation(IsolationLevel::ReadCommitted.into()).unwrap();
@@ -119,7 +119,7 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction_with_isolation(IsolationLevel::RepeatableRead.into()).unwrap();
-        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.commit_transaction().unwrap();
 
         assert_eq!(catalog.row_count("users"), 1);
@@ -140,8 +140,8 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction_with_isolation(IsolationLevel::Serializable.into()).unwrap();
-        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-        catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
         catalog.commit_transaction().unwrap();
 
         assert_eq!(catalog.row_count("users"), 2);

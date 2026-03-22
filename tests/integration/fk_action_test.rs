@@ -21,10 +21,10 @@ mod tests {
         catalog.create_table("child".to_string(), vec![child_col]).unwrap();
 
         // Insert parent
-        catalog.insert("parent", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("parent", &[], vec![Expr::Number(1)]).unwrap();
 
         // Insert child referencing parent
-        catalog.insert("child", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("child", &[], vec![Expr::Number(1)]).unwrap();
 
         assert_eq!(catalog.row_count("parent"), 1);
         assert_eq!(catalog.row_count("child"), 1);

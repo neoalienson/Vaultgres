@@ -9,9 +9,9 @@ fn test_aggregate_count() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Count,
@@ -41,9 +41,9 @@ fn test_aggregate_sum() {
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(10)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(20)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(30)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(10)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(20)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(30)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Sum,
@@ -73,9 +73,9 @@ fn test_aggregate_avg() {
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(10)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(20)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(30)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(10)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(20)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(30)]).unwrap();
 
     let agg_expr = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Avg,
@@ -105,9 +105,9 @@ fn test_aggregate_min_max() {
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(10)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(50)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(30)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(10)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(50)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(30)]).unwrap();
 
     let agg_expr_min = Expr::Aggregate {
         func: vaultgres::parser::ast::AggregateFunc::Min,
@@ -158,10 +158,10 @@ fn test_group_by() {
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(10)]).unwrap();
-    catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(20)]).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
-    catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(40)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string()), Expr::Number(10)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("B".to_string()), Expr::Number(20)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("B".to_string()), Expr::Number(40)]).unwrap();
 
     let group_by = Some(vec![Expr::Column("category".to_string())]);
     let rows = Catalog::select_with_catalog(
@@ -191,10 +191,10 @@ fn test_having_clause() {
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(10)]).unwrap();
-    catalog.insert("data", vec![Expr::String("B".to_string()), Expr::Number(20)]).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
-    catalog.insert("data", vec![Expr::String("C".to_string()), Expr::Number(5)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string()), Expr::Number(10)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("B".to_string()), Expr::Number(20)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string()), Expr::Number(30)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("C".to_string()), Expr::Number(5)]).unwrap();
 
     let group_by = Some(vec![Expr::Column("category".to_string())]);
     let having = Some(Expr::BinaryOp {

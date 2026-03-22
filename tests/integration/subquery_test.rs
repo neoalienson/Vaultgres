@@ -21,9 +21,9 @@ fn test_subquery_with_avg_aggregate() {
         .unwrap();
 
     // Insert data
-    catalog.insert("items", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("items", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
-    catalog.insert("items", vec![Expr::Number(3), Expr::Number(300)]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(3), Expr::Number(300)]).unwrap();
 
     // Build WHERE clause: price > (SELECT AVG(price) FROM items)
     use vaultgres::parser::ast::{AggregateFunc, BinaryOperator, SelectStmt};

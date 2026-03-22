@@ -20,9 +20,13 @@ fn create_test_catalog_with_data() -> (Arc<Catalog>, TempDir) {
     catalog.create_table("test_table".to_string(), columns).unwrap();
 
     // Insert data
-    catalog.insert("test_table", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog
+        .insert("test_table", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+        .unwrap();
 
-    catalog.insert("test_table", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog
+        .insert("test_table", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+        .unwrap();
 
     // Force a save by waiting for background thread
     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -104,12 +108,13 @@ fn test_multiple_tables_persistence() {
 
     // Insert data into both tables
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::String("user@example.com".to_string())])
+        .insert("users", &[], vec![Expr::Number(1), Expr::String("user@example.com".to_string())])
         .unwrap();
 
     catalog
         .insert(
             "products",
+            &[],
             vec![Expr::Number(1), Expr::String("Widget".to_string()), Expr::Number(999)],
         )
         .unwrap();
@@ -151,7 +156,7 @@ fn test_large_dataset_persistence() {
     // Insert 100 rows
     for i in 0..100 {
         catalog
-            .insert("large_table", vec![Expr::Number(i), Expr::String(format!("value_{}", i))])
+            .insert("large_table", &[], vec![Expr::Number(i), Expr::String(format!("value_{}", i))])
             .unwrap();
     }
 
@@ -227,14 +232,22 @@ fn test_persistence_with_joins() {
         .unwrap();
 
     // Insert customers
-    catalog.insert("customers", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog
+        .insert("customers", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+        .unwrap();
 
-    catalog.insert("customers", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog
+        .insert("customers", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+        .unwrap();
 
     // Insert orders
-    catalog.insert("orders", vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(1), Expr::Number(1), Expr::Number(100)])
+        .unwrap();
 
-    catalog.insert("orders", vec![Expr::Number(2), Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog
+        .insert("orders", &[], vec![Expr::Number(2), Expr::Number(2), Expr::Number(200)])
+        .unwrap();
 
     // Force save
     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -277,11 +290,19 @@ fn test_persistence_with_views() {
 
     // Insert data
     catalog
-        .insert("items", vec![Expr::Number(1), Expr::String("Item 1".to_string()), Expr::Number(1)])
+        .insert(
+            "items",
+            &[],
+            vec![Expr::Number(1), Expr::String("Item 1".to_string()), Expr::Number(1)],
+        )
         .unwrap();
 
     catalog
-        .insert("items", vec![Expr::Number(2), Expr::String("Item 2".to_string()), Expr::Number(0)])
+        .insert(
+            "items",
+            &[],
+            vec![Expr::Number(2), Expr::String("Item 2".to_string()), Expr::Number(0)],
+        )
         .unwrap();
 
     // Create view using catalog API directly
@@ -337,11 +358,11 @@ fn test_persistence_with_materialized_views() {
         .unwrap();
 
     // Insert data
-    catalog.insert("sales", vec![Expr::String("cat1".to_string()), Expr::Number(10)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat1".to_string()), Expr::Number(10)]).unwrap();
 
-    catalog.insert("sales", vec![Expr::String("cat2".to_string()), Expr::Number(20)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat2".to_string()), Expr::Number(20)]).unwrap();
 
-    catalog.insert("sales", vec![Expr::String("cat1".to_string()), Expr::Number(15)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat1".to_string()), Expr::Number(15)]).unwrap();
 
     // Create materialized view using catalog API directly
     let select_stmt = SelectStmt {

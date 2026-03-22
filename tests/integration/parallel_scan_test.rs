@@ -12,7 +12,7 @@ fn test_parallel_scan_small_table() {
         .unwrap();
 
     for i in 0..10 {
-        catalog.insert("users", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("users".to_string(), catalog);
@@ -29,7 +29,7 @@ fn test_parallel_scan_large_table() {
         .unwrap();
 
     for i in 0..1000 {
-        catalog.insert("data", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("data", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("data".to_string(), catalog);
@@ -46,7 +46,7 @@ fn test_parallel_scan_with_different_worker_counts() {
         .unwrap();
 
     for i in 0..100 {
-        catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("test".to_string(), Arc::clone(&catalog));
@@ -76,7 +76,7 @@ fn test_parallel_scan_single_row() {
         .create_table("single".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
         .unwrap();
 
-    catalog.insert("single", vec![Expr::Number(42)]).unwrap();
+    catalog.insert("single", &[], vec![Expr::Number(42)]).unwrap();
 
     let scan = ParallelSeqScan::new("single".to_string(), catalog);
     let config = ParallelConfig::new(4);
@@ -92,7 +92,7 @@ fn test_parallel_scan_more_workers_than_rows() {
         .unwrap();
 
     for i in 0..3 {
-        catalog.insert("few", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("few", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("few".to_string(), catalog);
@@ -109,7 +109,7 @@ fn test_parallel_scan_with_config_from_default() {
         .unwrap();
 
     for i in 0..50 {
-        catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -130,10 +130,10 @@ fn test_parallel_scan_multiple_tables() {
         .unwrap();
 
     for i in 0..20 {
-        catalog.insert("table1", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("table1", &[], vec![Expr::Number(i)]).unwrap();
     }
     for i in 0..30 {
-        catalog.insert("table2", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("table2", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let config = ParallelConfig::new(4);
@@ -155,7 +155,7 @@ fn test_parallel_scan_consistency() {
         .unwrap();
 
     for i in 0..100 {
-        catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     let scan = ParallelSeqScan::new("test".to_string(), catalog);

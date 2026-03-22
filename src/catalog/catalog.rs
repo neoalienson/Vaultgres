@@ -9,7 +9,7 @@ use crate::parser::ast::{
 };
 use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -477,16 +477,14 @@ impl Catalog {
             .cloned()
     }
 
-    pub fn insert(&self, table: &str, values: Vec<Expr>) -> Result<(), String> {
+    pub fn insert(&self, table: &str, columns: &[String], values: Vec<Expr>) -> Result<(), String> {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
-        if values.len() > schema.columns.len() {
-            return Err(format!(
-                "Too many values: expected {}, got {}",
-                schema.columns.len(),
-                values.len()
-            ));
+        let num_cols = if columns.is_empty() { schema.columns.len() } else { columns.len() };
+
+        if values.len() > num_cols {
+            return Err(format!("Too many values: expected {}, got {}", num_cols, values.len()));
         }
 
         let txn = self.txn_mgr.begin();
@@ -496,7 +494,33 @@ impl Catalog {
             .columns
             .iter()
             .enumerate()
-            .map(|(i, col)| InsertValidator::resolve_value(col, i, &values, table, &self.sequences))
+            .map(|(i, col)| {
+                if columns.is_empty() {
+                    InsertValidator::resolve_value(col, i, &values, table, &self.sequences)
+                } else {
+                    if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
+                        if value_idx < values.len() {
+                            InsertValidator::resolve_value(
+                                col,
+                                value_idx,
+                                &values,
+                                table,
+                                &self.sequences,
+                            )
+                        } else {
+                            Err(format!("Column {} has no value", col.name))
+                        }
+                    } else {
+                        InsertValidator::resolve_value(
+                            col,
+                            schema.columns.len(),
+                            &values,
+                            table,
+                            &self.sequences,
+                        )
+                    }
+                }
+            })
             .collect();
         let tuple_data = tuple_data?;
 
@@ -537,7 +561,12 @@ impl Catalog {
         data.get(table).map(|rows| rows.len()).unwrap_or(0)
     }
 
-    pub fn batch_insert(&self, table: &str, batch: Vec<Vec<Expr>>) -> Result<usize, String> {
+    pub fn batch_insert(
+        &self,
+        table: &str,
+        columns: &[String],
+        batch: Vec<Vec<Expr>>,
+    ) -> Result<usize, String> {
         if batch.is_empty() {
             return Ok(0);
         }
@@ -545,16 +574,18 @@ impl Catalog {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
+        let num_cols = if columns.is_empty() { schema.columns.len() } else { columns.len() };
+
         let txn = self.txn_mgr.begin();
         let header = crate::transaction::TupleHeader::new(txn.xid);
 
         let tuples: Result<Vec<crate::catalog::tuple::Tuple>, String> = batch
             .into_iter()
             .map(|values| {
-                if values.len() > schema.columns.len() {
+                if values.len() > num_cols {
                     return Err(format!(
                         "Too many values: expected {}, got {}",
-                        schema.columns.len(),
+                        num_cols,
                         values.len()
                     ));
                 }
@@ -564,7 +595,31 @@ impl Catalog {
                     .iter()
                     .enumerate()
                     .map(|(i, col)| {
-                        InsertValidator::resolve_value(col, i, &values, table, &self.sequences)
+                        if columns.is_empty() {
+                            InsertValidator::resolve_value(col, i, &values, table, &self.sequences)
+                        } else {
+                            if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
+                                if value_idx < values.len() {
+                                    InsertValidator::resolve_value(
+                                        col,
+                                        value_idx,
+                                        &values,
+                                        table,
+                                        &self.sequences,
+                                    )
+                                } else {
+                                    Err(format!("Column {} has no value", col.name))
+                                }
+                            } else {
+                                InsertValidator::resolve_value(
+                                    col,
+                                    schema.columns.len(),
+                                    &values,
+                                    table,
+                                    &self.sequences,
+                                )
+                            }
+                        }
                     })
                     .collect();
 

@@ -28,6 +28,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(1), Expr::String("Alice".to_string()), Expr::Number(25)],
             )
             .unwrap();
@@ -35,6 +36,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(30)],
             )
             .unwrap();
@@ -42,6 +44,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(3), Expr::String("Charlie".to_string()), Expr::Number(35)],
             )
             .unwrap();
@@ -111,6 +114,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(1), Expr::String("Alice".to_string()), Expr::Number(25)],
             )
             .unwrap();
@@ -118,6 +122,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(30)],
             )
             .unwrap();
@@ -125,6 +130,7 @@ mod tests {
         catalog
             .insert(
                 "users",
+                &[],
                 vec![Expr::Number(3), Expr::String("Charlie".to_string()), Expr::Number(35)],
             )
             .unwrap();
@@ -188,9 +194,13 @@ mod tests {
         catalog.create_table("test".to_string(), columns).unwrap();
 
         // Insert data
-        catalog.insert("test", vec![Expr::Number(1), Expr::String("Test1".to_string())]).unwrap();
+        catalog
+            .insert("test", &[], vec![Expr::Number(1), Expr::String("Test1".to_string())])
+            .unwrap();
 
-        catalog.insert("test", vec![Expr::Number(2), Expr::String("Test2".to_string())]).unwrap();
+        catalog
+            .insert("test", &[], vec![Expr::Number(2), Expr::String("Test2".to_string())])
+            .unwrap();
 
         // Query the table
         let results = Catalog::select_with_catalog(

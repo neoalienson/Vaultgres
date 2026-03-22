@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::catalog::Value;
+    use crate::executor::plpgsql::evaluator::PlPgSqlExprEvaluator;
     use crate::executor::plpgsql::PlPgSqlInterpreter;
-    use crate::executor::plpgsql::evaluator::ExprEvaluator;
     use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
     use crate::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
     use std::collections::HashMap;
@@ -240,14 +240,14 @@ mod tests {
 
 mod evaluator_tests {
     use crate::catalog::Value;
-    use crate::executor::plpgsql::evaluator::ExprEvaluator;
+    use crate::executor::plpgsql::evaluator::PlPgSqlExprEvaluator;
     use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
     use std::collections::HashMap;
 
     #[test]
     fn test_eval_number() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval(&Expr::Number(123)).unwrap(), Value::Int(123));
         assert_eq!(evaluator.eval(&Expr::Number(0)).unwrap(), Value::Int(0));
         assert_eq!(evaluator.eval(&Expr::Number(-45)).unwrap(), Value::Int(-45));
@@ -256,7 +256,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_string() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(
             evaluator.eval(&Expr::String("hello".to_string())).unwrap(),
             Value::Text("hello".to_string())
@@ -267,14 +267,14 @@ mod evaluator_tests {
     fn test_eval_column() {
         let mut vars = HashMap::new();
         vars.insert("x".to_string(), Value::Int(10));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval(&Expr::Column("x".to_string())).unwrap(), Value::Int(10));
     }
 
     #[test]
     fn test_eval_column_not_found() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let err = evaluator.eval(&Expr::Column("y".to_string())).unwrap_err();
         assert_eq!(err, "Variable 'y' not found");
     }
@@ -282,7 +282,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_list() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let list_expr = Expr::List(vec![Expr::Number(1), Expr::String("a".to_string())]);
         assert_eq!(
             evaluator.eval(&list_expr).unwrap(),
@@ -293,7 +293,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_list_empty() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let list_expr = Expr::List(vec![]);
         assert_eq!(evaluator.eval(&list_expr).unwrap(), Value::Array(vec![]));
     }
@@ -301,7 +301,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_unary_op_not_int() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::UnaryOp { op: UnaryOperator::Not, expr: Box::new(Expr::Number(0)) };
         assert_eq!(evaluator.eval(&expr).unwrap(), Value::Bool(true));
 
@@ -312,7 +312,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_unary_op_not_int_as_bool() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::UnaryOp { op: UnaryOperator::Not, expr: Box::new(Expr::Number(0)) }; // 0 is false
         assert_eq!(evaluator.eval(&expr).unwrap(), Value::Bool(true));
 
@@ -323,7 +323,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_unary_op_not_unsupported_type() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::UnaryOp {
             op: UnaryOperator::Not,
             expr: Box::new(Expr::String("test".to_string())),
@@ -335,7 +335,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_int_arithmetic() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let add = Expr::BinaryOp {
             left: Box::new(Expr::Number(5)),
             op: BinaryOperator::Add,
@@ -375,7 +375,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_int_division_by_zero() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let div = Expr::BinaryOp {
             left: Box::new(Expr::Number(6)),
             op: BinaryOperator::Divide,
@@ -396,7 +396,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_int_comparison() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let eq = Expr::BinaryOp {
             left: Box::new(Expr::Number(5)),
             op: BinaryOperator::Equals,
@@ -436,7 +436,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_int_logical() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let and = Expr::BinaryOp {
             left: Box::new(Expr::Number(1)),
             op: BinaryOperator::And,
@@ -455,14 +455,14 @@ mod evaluator_tests {
     #[test]
     fn test_eval_float_literal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval(&Expr::Float(123.45)).unwrap(), Value::Float(123.45));
     }
 
     #[test]
     fn test_eval_binary_op_float_arithmetic() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let add = Expr::BinaryOp {
             left: Box::new(Expr::Float(5.0)),
             op: BinaryOperator::Add,
@@ -495,7 +495,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_float_division_by_zero() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let div = Expr::BinaryOp {
             left: Box::new(Expr::Float(6.0)),
             op: BinaryOperator::Divide,
@@ -508,7 +508,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_float_comparison() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let eq = Expr::BinaryOp {
             left: Box::new(Expr::Float(5.0)),
             op: BinaryOperator::Equals,
@@ -520,7 +520,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_bool_logical() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let and = Expr::BinaryOp {
             left: Box::new(Expr::Number(1)), // using number for bool
             op: BinaryOperator::And,
@@ -539,7 +539,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_string_concat() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let concat = Expr::BinaryOp {
             left: Box::new(Expr::String("hello".to_string())),
             op: BinaryOperator::StringConcat,
@@ -551,7 +551,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_string_like() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let like = Expr::BinaryOp {
             left: Box::new(Expr::String("hello world".to_string())),
             op: BinaryOperator::Like,
@@ -570,7 +570,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_string_ilike() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let ilike = Expr::BinaryOp {
             left: Box::new(Expr::String("Hello World".to_string())),
             op: BinaryOperator::ILike,
@@ -582,7 +582,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_binary_op_type_mismatch() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(1)),
             op: BinaryOperator::Add,
@@ -595,7 +595,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_unsupported_expr_type() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // Use an Expr variant that is not explicitly handled in ExprEvaluator::eval
         // For example, Expr::Star is not handled in the match statement
         let expr = Expr::Star;
@@ -607,7 +607,7 @@ mod evaluator_tests {
     #[test]
     fn test_eval_string_no_placeholders() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("hello").unwrap(), "hello");
     }
 
@@ -615,7 +615,7 @@ mod evaluator_tests {
     fn test_eval_string_single_placeholder() {
         let mut vars = HashMap::new();
         vars.insert("name".to_string(), Value::Text("world".to_string()));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("hello $name").unwrap(), "hello world");
     }
 
@@ -624,7 +624,7 @@ mod evaluator_tests {
         let mut vars = HashMap::new();
         vars.insert("name".to_string(), Value::Text("world".to_string()));
         vars.insert("num".to_string(), Value::Int(123));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(
             evaluator.eval_string("hello $name, number $num").unwrap(),
             "hello world, number 123"
@@ -635,7 +635,7 @@ mod evaluator_tests {
     fn test_eval_string_numeric_placeholder() {
         let mut vars = HashMap::new();
         vars.insert("num".to_string(), Value::Int(123));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("Value: $num").unwrap(), "Value: 123");
     }
 
@@ -643,7 +643,7 @@ mod evaluator_tests {
     fn test_eval_string_bool_placeholder() {
         let mut vars = HashMap::new();
         vars.insert("flag".to_string(), Value::Bool(true));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("Flag is $flag").unwrap(), "Flag is true");
     }
 
@@ -651,36 +651,28 @@ mod evaluator_tests {
     fn test_eval_string_null_placeholder() {
         let mut vars = HashMap::new();
         vars.insert("val".to_string(), Value::Null);
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("Value is $val").unwrap(), "Value is NULL");
     }
 
     #[test]
     fn test_eval_string_non_existent_placeholder() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval_string("hello $name").unwrap(), "hello $name");
     }
 
     // is_true tests
     #[test]
     fn test_is_true_int() {
-        assert!(ExprEvaluator::is_true(&Value::Int(1)));
-        assert!(!ExprEvaluator::is_true(&Value::Int(0)));
-        assert!(ExprEvaluator::is_true(&Value::Int(-1)));
-    }
-
-    #[test]
-    fn test_is_true_bool() {
-        assert!(ExprEvaluator::is_true(&Value::Bool(true)));
-        assert!(!ExprEvaluator::is_true(&Value::Bool(false)));
-    }
-
-    #[test]
-    fn test_is_true_other_types() {
-        assert!(!ExprEvaluator::is_true(&Value::Text("hello".to_string())));
-        assert!(!ExprEvaluator::is_true(&Value::Float(1.0)));
-        assert!(!ExprEvaluator::is_true(&Value::Array(vec![])));
-        assert!(!ExprEvaluator::is_true(&Value::Null));
+        assert!(PlPgSqlExprEvaluator::is_true(&Value::Int(1)));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Int(0)));
+        assert!(PlPgSqlExprEvaluator::is_true(&Value::Int(-1)));
+        assert!(PlPgSqlExprEvaluator::is_true(&Value::Bool(true)));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Bool(false)));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Text("hello".to_string())));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Float(1.0)));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Array(vec![])));
+        assert!(!PlPgSqlExprEvaluator::is_true(&Value::Null));
     }
 }

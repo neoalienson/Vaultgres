@@ -221,13 +221,14 @@ impl<S: Read + Write> Connection<S> {
                 // Handle multi-row INSERT using batch_insert if there are additional rows
                 if insert.batch_values.is_empty() {
                     // Single row INSERT
-                    self.catalog.insert(&insert.table, insert.values)?;
+                    self.catalog.insert(&insert.table, &insert.columns, insert.values)?;
                     Ok(ExecutionResult::CommandComplete("INSERT 0 1".to_string()))
                 } else {
                     // Multi-row INSERT: combine first row with batch_values
                     let mut all_rows = vec![insert.values];
                     all_rows.extend(insert.batch_values);
-                    let count = self.catalog.batch_insert(&insert.table, all_rows)?;
+                    let count =
+                        self.catalog.batch_insert(&insert.table, &insert.columns, all_rows)?;
                     Ok(ExecutionResult::CommandComplete(format!("INSERT 0 {}", count)))
                 }
             }
@@ -1320,7 +1321,7 @@ mod tests {
         let insert_sql = "INSERT INTO test_data VALUES (1);";
         let insert_stmt_enum = Parser::new(insert_sql).unwrap().parse().unwrap();
         if let Statement::Insert(insert_stmt) = insert_stmt_enum {
-            catalog.insert(&insert_stmt.table, insert_stmt.values).unwrap();
+            catalog.insert(&insert_stmt.table, &insert_stmt.columns, insert_stmt.values).unwrap();
         } else {
             panic!("Expected Insert statement");
         }
@@ -1370,7 +1371,7 @@ mod tests {
         let insert_sql = "INSERT INTO products VALUES (101, 'Laptop');";
         let insert_stmt_enum = Parser::new(insert_sql).unwrap().parse().unwrap();
         if let Statement::Insert(insert_stmt) = insert_stmt_enum {
-            catalog.insert(&insert_stmt.table, insert_stmt.values).unwrap();
+            catalog.insert(&insert_stmt.table, &insert_stmt.columns, insert_stmt.values).unwrap();
         } else {
             panic!("Expected Insert statement");
         }

@@ -152,9 +152,9 @@ fn test_materialized_view_with_group_by() {
     ];
     catalog.create_table("sales".to_string(), columns).unwrap();
 
-    catalog.insert("sales", vec![Expr::String("cat1".to_string()), Expr::Number(10)]).unwrap();
-    catalog.insert("sales", vec![Expr::String("cat2".to_string()), Expr::Number(20)]).unwrap();
-    catalog.insert("sales", vec![Expr::String("cat1".to_string()), Expr::Number(15)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat1".to_string()), Expr::Number(10)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat2".to_string()), Expr::Number(20)]).unwrap();
+    catalog.insert("sales", &[], vec![Expr::String("cat1".to_string()), Expr::Number(15)]).unwrap();
 
     let query = vaultgres::parser::Parser::new("CREATE MATERIALIZED VIEW sales_summary AS SELECT s.category, SUM(s.amount) FROM sales s GROUP BY s.category").unwrap().parse().unwrap();
     if let vaultgres::parser::Statement::CreateMaterializedView(create) = query {

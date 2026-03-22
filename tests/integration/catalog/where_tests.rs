@@ -11,7 +11,7 @@ fn setup_catalog_with_data(
         columns.iter().map(|(n, t)| ColumnDef::new(n.to_string(), t.clone())).collect();
     catalog.create_table("data".to_string(), cols).unwrap();
     for row in data {
-        catalog.insert("data", row).unwrap();
+        catalog.insert("data", &[], row).unwrap();
     }
     let catalog_arc = Arc::new(catalog.clone());
     (catalog, catalog_arc)

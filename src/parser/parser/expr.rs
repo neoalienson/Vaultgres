@@ -394,6 +394,22 @@ pub fn parse_expr_list(parser: &mut Parser) -> Result<Vec<Expr>> {
     Ok(exprs)
 }
 
+pub fn parse_ident_list(parser: &mut Parser) -> Result<Vec<String>> {
+    let mut idents = vec![];
+
+    loop {
+        let ident = parser.expect_identifier()?;
+        idents.push(ident);
+
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
+        parser.advance();
+    }
+
+    Ok(idents)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

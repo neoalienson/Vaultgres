@@ -9,6 +9,15 @@ pub fn parse_insert(parser: &mut Parser) -> Result<Statement> {
 
     let table = parser.expect_identifier()?;
 
+    let columns = if parser.current_token() == &Token::LeftParen {
+        parser.advance();
+        let cols = super::expr::parse_ident_list(parser)?;
+        parser.expect(Token::RightParen)?;
+        cols
+    } else {
+        Vec::new()
+    };
+
     parser.expect(Token::Values)?;
     parser.expect(Token::LeftParen)?;
 
@@ -24,7 +33,7 @@ pub fn parse_insert(parser: &mut Parser) -> Result<Statement> {
         parser.expect(Token::RightParen)?;
     }
 
-    Ok(Statement::Insert(InsertStmt { table, values, batch_values }))
+    Ok(Statement::Insert(InsertStmt { table, columns, values, batch_values }))
 }
 
 pub fn parse_update(parser: &mut Parser) -> Result<Statement> {

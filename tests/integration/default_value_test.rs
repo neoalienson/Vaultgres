@@ -15,7 +15,7 @@ fn test_default_value_integer() {
         )
         .unwrap();
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::Number(0)]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::Number(0)]).unwrap();
     assert_eq!(catalog.row_count("users"), 1);
 }
 
@@ -33,7 +33,7 @@ fn test_default_value_text() {
         )
         .unwrap();
 
-    catalog.insert("accounts", vec![Expr::Number(1), Expr::String("user".to_string())]).unwrap();
+    catalog.insert("accounts", &[], vec![Expr::Number(1), Expr::String("user".to_string())]).unwrap();
     assert_eq!(catalog.row_count("accounts"), 1);
 }
 
@@ -55,7 +55,7 @@ fn test_default_value_multiple_columns() {
         .unwrap();
 
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::Number(1), Expr::String("guest".to_string())])
+        .insert("users", &[], vec![Expr::Number(1), Expr::Number(1), Expr::String("guest".to_string())])
         .unwrap();
     assert_eq!(catalog.row_count("users"), 1);
 }
@@ -74,7 +74,7 @@ fn test_default_value_missing_no_default() {
         )
         .unwrap();
 
-    let result = catalog.insert("users", vec![Expr::Number(1)]);
+    let result = catalog.insert("users", &[], vec![Expr::Number(1)]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.contains("default") || err.contains("Expected"));
@@ -94,7 +94,7 @@ fn test_default_value_zero() {
         )
         .unwrap();
 
-    catalog.insert("counters", vec![Expr::Number(1), Expr::Number(0)]).unwrap();
+    catalog.insert("counters", &[], vec![Expr::Number(1), Expr::Number(0)]).unwrap();
     assert_eq!(catalog.row_count("counters"), 1);
 }
 
@@ -112,6 +112,6 @@ fn test_default_value_empty_string() {
         )
         .unwrap();
 
-    catalog.insert("items", vec![Expr::Number(1), Expr::String("".to_string())]).unwrap();
+    catalog.insert("items", &[], vec![Expr::Number(1), Expr::String("".to_string())]).unwrap();
     assert_eq!(catalog.row_count("items"), 1);
 }

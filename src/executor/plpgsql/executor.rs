@@ -1,5 +1,5 @@
 use super::control_flow::ControlFlow;
-use super::evaluator::ExprEvaluator;
+use super::evaluator::PlPgSqlExprEvaluator;
 use crate::catalog::Value;
 use crate::parser::ast::Expr;
 use crate::parser::plpgsql_ast::PlPgSqlStmt;
@@ -50,14 +50,14 @@ impl<'a> StmtExecutor<'a> {
     }
 
     fn exec_declare(&mut self, name: &str, default: &Option<Expr>) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let value = if let Some(expr) = default { evaluator.eval(expr)? } else { Value::Null };
         self.variables.insert(name.to_string(), value);
         Ok(ControlFlow::None)
     }
 
     fn exec_assign(&mut self, target: &str, value: &Expr) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let val = evaluator.eval(value)?;
         self.variables.insert(target.to_string(), val);
         Ok(ControlFlow::None)
@@ -69,9 +69,9 @@ impl<'a> StmtExecutor<'a> {
         then_stmts: &[PlPgSqlStmt],
         else_stmts: &[PlPgSqlStmt],
     ) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let cond = evaluator.eval(condition)?;
-        let stmts = if ExprEvaluator::is_true(&cond) { then_stmts } else { else_stmts };
+        let stmts = if PlPgSqlExprEvaluator::is_true(&cond) { then_stmts } else { else_stmts };
         self.exec_stmts(stmts)
     }
 
@@ -81,8 +81,8 @@ impl<'a> StmtExecutor<'a> {
         body: &[PlPgSqlStmt],
     ) -> Result<ControlFlow, String> {
         loop {
-            let evaluator = ExprEvaluator::new(self.variables);
-            if !ExprEvaluator::is_true(&evaluator.eval(condition)?) {
+            let evaluator = PlPgSqlExprEvaluator::new(self.variables);
+            if !PlPgSqlExprEvaluator::is_true(&evaluator.eval(condition)?) {
                 break;
             }
             match self.exec_loop_body(body)? {
@@ -100,7 +100,7 @@ impl<'a> StmtExecutor<'a> {
         end: &Expr,
         body: &[PlPgSqlStmt],
     ) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let (Value::Int(s), Value::Int(e)) = (evaluator.eval(start)?, evaluator.eval(end)?) else {
             return Err("FOR loop requires integer bounds".to_string());
         };
@@ -121,7 +121,7 @@ impl<'a> StmtExecutor<'a> {
         array: &Expr,
         body: &[PlPgSqlStmt],
     ) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let Value::Array(arr) = evaluator.eval(array)? else {
             return Err("FOREACH requires array".to_string());
         };
@@ -176,7 +176,7 @@ impl<'a> StmtExecutor<'a> {
         when_clauses: &[(Expr, Vec<PlPgSqlStmt>)],
         else_stmts: &[PlPgSqlStmt],
     ) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let val = evaluator.eval(expr)?;
 
         for (when_expr, stmts) in when_clauses {
@@ -188,7 +188,7 @@ impl<'a> StmtExecutor<'a> {
     }
 
     fn exec_return(&mut self, value: &Option<Expr>) -> Result<ControlFlow, String> {
-        let evaluator = ExprEvaluator::new(self.variables);
+        let evaluator = PlPgSqlExprEvaluator::new(self.variables);
         let val = if let Some(expr) = value { evaluator.eval(expr)? } else { Value::Null };
         Ok(ControlFlow::Return(val))
     }

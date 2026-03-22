@@ -13,10 +13,10 @@ fn test_expression_index_creation() {
 
     catalog.create_table("users".to_string(), columns).unwrap();
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::String("USER@EXAMPLE.COM".to_string())])
+        .insert("users", &[], vec![Expr::Number(1), Expr::String("USER@EXAMPLE.COM".to_string())])
         .unwrap();
     catalog
-        .insert("users", vec![Expr::Number(2), Expr::String("admin@test.com".to_string())])
+        .insert("users", &[], vec![Expr::Number(2), Expr::String("admin@test.com".to_string())])
         .unwrap();
 
     let rows = Catalog::select_with_catalog(
@@ -45,8 +45,12 @@ fn test_expression_index_with_function() {
     ];
 
     catalog.create_table("products".to_string(), columns).unwrap();
-    catalog.insert("products", vec![Expr::Number(1), Expr::String("Widget".to_string())]).unwrap();
-    catalog.insert("products", vec![Expr::Number(2), Expr::String("Gadget".to_string())]).unwrap();
+    catalog
+        .insert("products", &[], vec![Expr::Number(1), Expr::String("Widget".to_string())])
+        .unwrap();
+    catalog
+        .insert("products", &[], vec![Expr::Number(2), Expr::String("Gadget".to_string())])
+        .unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -78,6 +82,7 @@ fn test_expression_index_multiple_expressions() {
     catalog
         .insert(
             "people",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("John".to_string()),

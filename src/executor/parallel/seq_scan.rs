@@ -100,7 +100,7 @@ mod tests {
             .unwrap();
 
         for i in 0..10 {
-            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", &[], vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -130,7 +130,7 @@ mod tests {
             .unwrap();
 
         for i in 0..100 {
-            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", &[], vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -158,7 +158,7 @@ mod tests {
             .unwrap();
 
         for i in 0..50 {
-            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", &[], vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -175,7 +175,7 @@ mod tests {
             .unwrap();
 
         for i in 0..200 {
-            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", &[], vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);
@@ -192,7 +192,7 @@ mod tests {
             .unwrap();
 
         for i in 0..5 {
-            (&*catalog).insert("test", vec![Expr::Number(i)]).unwrap();
+            (&*catalog).insert("test", &[], vec![Expr::Number(i)]).unwrap();
         }
 
         let scan = ParallelSeqScan::new("test".to_string(), catalog);

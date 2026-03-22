@@ -22,22 +22,35 @@ fn main() {
     // Insert test data
     println!("2. Inserting test data...");
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string()), Expr::Number(25)])
-        .unwrap();
-
-    catalog
-        .insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(30)])
+        .insert(
+            "users",
+            &[],
+            vec![Expr::Number(1), Expr::String("Alice".to_string()), Expr::Number(25)],
+        )
         .unwrap();
 
     catalog
         .insert(
             "users",
+            &[],
+            vec![Expr::Number(2), Expr::String("Bob".to_string()), Expr::Number(30)],
+        )
+        .unwrap();
+
+    catalog
+        .insert(
+            "users",
+            &[],
             vec![Expr::Number(3), Expr::String("Charlie".to_string()), Expr::Number(35)],
         )
         .unwrap();
 
     catalog
-        .insert("users", vec![Expr::Number(4), Expr::String("David".to_string()), Expr::Number(28)])
+        .insert(
+            "users",
+            &[],
+            vec![Expr::Number(4), Expr::String("David".to_string()), Expr::Number(28)],
+        )
         .unwrap();
 
     println!("   Inserted 4 users: Alice(25), Bob(30), Charlie(35), David(28)");

@@ -19,7 +19,7 @@ mod tests {
 
         // Try to insert NULL into NOT NULL column
         let result =
-            catalog.insert("users", vec![Expr::Number(0), Expr::String("Alice".to_string())]);
+            catalog.insert("users", &[], vec![Expr::Number(0), Expr::String("Alice".to_string())]);
         assert!(result.is_ok());
     }
 
@@ -38,7 +38,7 @@ mod tests {
             )
             .unwrap();
 
-        let result = catalog.insert("users", vec![Expr::String("Alice".to_string())]);
+        let result = catalog.insert("users", &[], vec![Expr::String("Alice".to_string())]);
         assert!(result.is_err()); // Partial insert not allowed without auto-fillable
     }
 
@@ -59,7 +59,7 @@ mod tests {
         // Primary key columns are implicitly NOT NULL
         // This is already enforced in the existing code
         let result =
-            catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]);
+            catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]);
         assert!(result.is_ok());
     }
 
@@ -79,7 +79,7 @@ mod tests {
 
         // Both columns are nullable by default
         let result =
-            catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]);
+            catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]);
         assert!(result.is_ok());
     }
 
@@ -96,7 +96,7 @@ mod tests {
         catalog.create_table("users".to_string(), vec![col1, col2]).unwrap();
 
         let result =
-            catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]);
+            catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]);
         assert!(result.is_ok());
     }
 
@@ -116,7 +116,7 @@ mod tests {
 
         // Both columns provided
         let result =
-            catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]);
+            catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]);
         assert!(result.is_ok());
         assert_eq!(catalog.row_count("users"), 1);
     }

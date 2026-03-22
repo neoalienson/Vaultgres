@@ -1,5 +1,6 @@
 use super::{TableSchema, Tuple, Value};
 use crate::catalog::predicate::PredicateEvaluator;
+use crate::executor::expr_evaluator::{eval_binary_op, eval_unary_op};
 use crate::parser::ast::{DataType, Expr};
 use crate::transaction::{Snapshot, TransactionManager};
 use std::sync::Arc;
@@ -45,12 +46,7 @@ impl UpdateDeleteExecutor {
                 .position(|c| &c.name == col_name)
                 .ok_or_else(|| format!("Column '{}' not found", col_name))?;
 
-            let value = match expr {
-                Expr::Number(n) => Value::Int(*n),
-                Expr::String(s) => Value::Text(s.clone()),
-                Expr::Null => Value::Null,
-                _ => return Err("Invalid value expression".to_string()),
-            };
+            let value = Self::evaluate_expr(expr, &tuple.data, schema)?;
 
             Self::validate_type(&schema.columns[idx].data_type, &value, col_name)?;
             tuple.data[idx] = value;
@@ -58,11 +54,63 @@ impl UpdateDeleteExecutor {
         Ok(())
     }
 
+    fn evaluate_expr(
+        expr: &Expr,
+        tuple_data: &[Value],
+        schema: &TableSchema,
+    ) -> Result<Value, String> {
+        match expr {
+            Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::Float(f) => Ok(Value::Float(*f)),
+            Expr::String(s) => Ok(Value::Text(s.clone())),
+            Expr::Null => Ok(Value::Null),
+            Expr::Column(name) => {
+                let lookup_name =
+                    if let Some(dot_pos) = name.find('.') { &name[dot_pos + 1..] } else { name };
+                let idx = schema
+                    .columns
+                    .iter()
+                    .position(|c| &c.name == lookup_name)
+                    .ok_or_else(|| format!("Column '{}' not found", name))?;
+                Ok(tuple_data[idx].clone())
+            }
+            Expr::QualifiedColumn { table: _, column } => {
+                let idx = schema
+                    .columns
+                    .iter()
+                    .position(|c| &c.name == column)
+                    .ok_or_else(|| format!("Column '{}' not found", column))?;
+                Ok(tuple_data[idx].clone())
+            }
+            Expr::UnaryOp { op, expr } => {
+                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                eval_unary_op(op, &val)
+            }
+            Expr::BinaryOp { left, op, right } => {
+                let l = Self::evaluate_expr(left, tuple_data, schema)?;
+                let r = Self::evaluate_expr(right, tuple_data, schema)?;
+                eval_binary_op(&l, op, &r)
+            }
+            Expr::IsNull(expr) => {
+                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                Ok(Value::Bool(matches!(val, Value::Null)))
+            }
+            Expr::IsNotNull(expr) => {
+                let val = Self::evaluate_expr(expr, tuple_data, schema)?;
+                Ok(Value::Bool(!matches!(val, Value::Null)))
+            }
+            _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
+        }
+    }
+
     fn validate_type(data_type: &DataType, value: &Value, col_name: &str) -> Result<(), String> {
         match (data_type, value) {
             (DataType::Int, Value::Int(_))
+            | (DataType::Float, Value::Float(_))
+            | (DataType::Float, Value::Int(_))
             | (DataType::Text, Value::Text(_))
-            | (DataType::Varchar(_), Value::Text(_)) => Ok(()),
+            | (DataType::Varchar(_), Value::Text(_))
+            | (DataType::Boolean, Value::Bool(_)) => Ok(()),
             _ => Err(format!("Type mismatch for column '{}'", col_name)),
         }
     }
@@ -110,6 +158,41 @@ mod tests {
     struct MockPredicateEvaluator;
 
     impl MockPredicateEvaluator {
+        fn eval_expr(
+            expr: &Expr,
+            tuple_data: &[Value],
+            schema: &TableSchema,
+        ) -> Result<Value, String> {
+            match expr {
+                Expr::Column(name) => {
+                    let lookup_name = if let Some(dot_pos) = name.find('.') {
+                        &name[dot_pos + 1..]
+                    } else {
+                        name
+                    };
+                    let idx = schema
+                        .columns
+                        .iter()
+                        .position(|c| &c.name == lookup_name)
+                        .ok_or_else(|| format!("Column '{}' not found", name))?;
+                    Ok(tuple_data[idx].clone())
+                }
+                Expr::Number(n) => Ok(Value::Int(*n)),
+                Expr::String(s) => Ok(Value::Text(s.clone())),
+                Expr::Null => Ok(Value::Null),
+                Expr::BinaryOp { left, op, right } => {
+                    let l = Self::eval_expr(left, tuple_data, schema)?;
+                    let r = Self::eval_expr(right, tuple_data, schema)?;
+                    crate::executor::expr_evaluator::eval_binary_op(&l, op, &r)
+                }
+                Expr::UnaryOp { op, expr } => {
+                    let val = Self::eval_expr(expr, tuple_data, schema)?;
+                    crate::executor::expr_evaluator::eval_unary_op(op, &val)
+                }
+                _ => Err(format!("Unsupported expression in mock predicate: {:?}", expr)),
+            }
+        }
+
         fn evaluate(
             expr: &Expr,
             tuple_data: &[Value],
@@ -117,37 +200,30 @@ mod tests {
         ) -> Result<bool, String> {
             match expr {
                 Expr::BinaryOp { left, op, right } => {
-                    let left_val = match left.as_ref() {
-                        Expr::Column(col_name) => {
-                            let idx = schema
-                                .columns
-                                .iter()
-                                .position(|c| &c.name == col_name)
-                                .ok_or_else(|| format!("Column '{}' not found", col_name))?;
-                            tuple_data[idx].clone()
-                        }
-                        Expr::Number(n) => Value::Int(*n),
-                        Expr::String(s) => Value::Text(s.clone()),
-                        _ => return Err("Unsupported expression in mock predicate".to_string()),
-                    };
-                    let right_val = match right.as_ref() {
-                        Expr::Column(col_name) => {
-                            let idx = schema
-                                .columns
-                                .iter()
-                                .position(|c| &c.name == col_name)
-                                .ok_or_else(|| format!("Column '{}' not found", col_name))?;
-                            tuple_data[idx].clone()
-                        }
-                        Expr::Number(n) => Value::Int(*n),
-                        Expr::String(s) => Value::Text(s.clone()),
-                        _ => return Err("Unsupported expression in mock predicate".to_string()),
-                    };
-
+                    let left_val = Self::eval_expr(left, tuple_data, schema)?;
+                    let right_val = Self::eval_expr(right, tuple_data, schema)?;
                     match op {
                         BinaryOperator::Equals => Ok(left_val == right_val),
                         BinaryOperator::NotEquals => Ok(left_val != right_val),
-                        _ => Err("Unsupported operator in mock predicate".to_string()),
+                        BinaryOperator::GreaterThan => {
+                            let result = crate::executor::expr_evaluator::eval_binary_op(
+                                &left_val, op, &right_val,
+                            )?;
+                            match result {
+                                Value::Bool(b) => Ok(b),
+                                _ => Err("Comparison must return bool".to_string()),
+                            }
+                        }
+                        BinaryOperator::LessThan => {
+                            let result = crate::executor::expr_evaluator::eval_binary_op(
+                                &left_val, op, &right_val,
+                            )?;
+                            match result {
+                                Value::Bool(b) => Ok(b),
+                                _ => Err("Comparison must return bool".to_string()),
+                            }
+                        }
+                        _ => Err(format!("Unsupported operator in mock predicate: {:?}", op)),
                     }
                 }
                 _ => Err("Unsupported expression in mock predicate".to_string()),
@@ -232,37 +308,29 @@ mod tests {
     // --- validate_type tests ---
     #[test]
     fn test_validate_type_success() {
-        assert!(
-            UpdateDeleteExecutor::validate_type(&DataType::Int, &Value::Int(10), "col").is_ok()
-        );
-        assert!(
-            UpdateDeleteExecutor::validate_type(
-                &DataType::Text,
-                &Value::Text("hello".to_string()),
-                "col"
-            )
-            .is_ok()
-        );
-        assert!(
-            UpdateDeleteExecutor::validate_type(
-                &DataType::Varchar(10),
-                &Value::Text("short".to_string()),
-                "col"
-            )
-            .is_ok()
-        );
+        assert!(UpdateDeleteExecutor::validate_type(&DataType::Int, &Value::Int(10), "col").is_ok());
+        assert!(UpdateDeleteExecutor::validate_type(
+            &DataType::Text,
+            &Value::Text("hello".to_string()),
+            "col"
+        )
+        .is_ok());
+        assert!(UpdateDeleteExecutor::validate_type(
+            &DataType::Varchar(10),
+            &Value::Text("short".to_string()),
+            "col"
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_validate_type_mismatch() {
-        assert!(
-            UpdateDeleteExecutor::validate_type(
-                &DataType::Int,
-                &Value::Text("hello".to_string()),
-                "col"
-            )
-            .is_err()
-        );
+        assert!(UpdateDeleteExecutor::validate_type(
+            &DataType::Int,
+            &Value::Text("hello".to_string()),
+            "col"
+        )
+        .is_err());
         assert_eq!(
             UpdateDeleteExecutor::validate_type(
                 &DataType::Int,
@@ -319,11 +387,361 @@ mod tests {
     fn test_apply_assignments_invalid_expression() {
         let schema = create_test_schema();
         let mut tuple = create_test_tuple(1, 1, "Alice", 30);
-        let assignments = vec![("age".to_string(), Expr::Column("other_col".to_string()))]; // Unsupported Expr
+        let assignments = vec![("age".to_string(), Expr::Star)];
 
         let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid value expression");
+        assert!(result.unwrap_err().contains("Unsupported expression"));
+    }
+
+    // --- arithmetic expression tests ---
+    #[test]
+    fn test_apply_assignments_column_reference() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![("age".to_string(), Expr::Column("id".to_string()))];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(1)));
+    }
+
+    #[test]
+    fn test_apply_assignments_column_qualified() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::QualifiedColumn { table: "users".to_string(), column: "id".to_string() },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(1)));
+    }
+
+    #[test]
+    fn test_apply_assignments_expr_column_not_found() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![("age".to_string(), Expr::Column("missing".to_string()))];
+
+        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Column 'missing' not found"));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_add() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Add,
+                right: Box::new(Expr::Number(1)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(31)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_subtract() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Subtract,
+                right: Box::new(Expr::Number(5)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(25)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_multiply() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Multiply,
+                right: Box::new(Expr::Number(2)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(60)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_divide() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Divide,
+                right: Box::new(Expr::Number(3)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(10)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_modulo() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Modulo,
+                right: Box::new(Expr::Number(7)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(2)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_division_by_zero() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Divide,
+                right: Box::new(Expr::Number(0)),
+            },
+        )];
+
+        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Division by zero"));
+    }
+
+    #[test]
+    fn test_apply_assignments_modulo_by_zero() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("age".to_string())),
+                op: BinaryOperator::Modulo,
+                right: Box::new(Expr::Number(0)),
+            },
+        )];
+
+        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Division by zero"));
+    }
+
+    #[test]
+    fn test_apply_assignments_nested_arithmetic() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::BinaryOp {
+                    left: Box::new(Expr::Column("age".to_string())),
+                    op: BinaryOperator::Multiply,
+                    right: Box::new(Expr::Number(2)),
+                }),
+                op: BinaryOperator::Add,
+                right: Box::new(Expr::Column("id".to_string())),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(61)));
+    }
+
+    #[test]
+    fn test_apply_assignments_deeply_nested_arithmetic() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 10);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::BinaryOp {
+                    left: Box::new(Expr::Column("age".to_string())),
+                    op: BinaryOperator::Multiply,
+                    right: Box::new(Expr::BinaryOp {
+                        left: Box::new(Expr::Column("id".to_string())),
+                        op: BinaryOperator::Add,
+                        right: Box::new(Expr::Number(1)),
+                    }),
+                }),
+                op: BinaryOperator::Add,
+                right: Box::new(Expr::Number(3)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(23)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_with_literals() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 0);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Number(10)),
+                op: BinaryOperator::Multiply,
+                right: Box::new(Expr::Number(3)),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(30)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_between_two_columns() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 10);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Column("id".to_string())),
+                op: BinaryOperator::Multiply,
+                right: Box::new(Expr::Column("age".to_string())),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(10)));
+    }
+
+    #[test]
+    fn test_apply_assignments_unary_minus() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![(
+            "age".to_string(),
+            Expr::UnaryOp {
+                op: crate::parser::ast::UnaryOperator::Minus,
+                expr: Box::new(Expr::Column("age".to_string())),
+            },
+        )];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(-30)));
+    }
+
+    #[test]
+    fn test_apply_assignments_is_null() {
+        let schema = TableSchema::new(
+            "data".to_string(),
+            vec![
+                ColumnDef::new("flag".to_string(), DataType::Boolean),
+                ColumnDef::new("val".to_string(), DataType::Int),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("flag".to_string(), Value::Bool(false));
+        tuple.add_value("val".to_string(), Value::Null);
+
+        let assignments =
+            vec![("flag".to_string(), Expr::IsNull(Box::new(Expr::Column("val".to_string()))))];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("flag"), Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_apply_assignments_is_not_null() {
+        let schema = TableSchema::new(
+            "data".to_string(),
+            vec![
+                ColumnDef::new("flag".to_string(), DataType::Boolean),
+                ColumnDef::new("val".to_string(), DataType::Int),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("flag".to_string(), Value::Bool(false));
+        tuple.add_value("val".to_string(), Value::Int(42));
+
+        let assignments =
+            vec![("flag".to_string(), Expr::IsNotNull(Box::new(Expr::Column("val".to_string()))))];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("flag"), Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_apply_assignments_arithmetic_result_type_mismatch() {
+        let schema = TableSchema::new(
+            "data".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("name".to_string(), DataType::Text),
+            ],
+        );
+        let mut tuple =
+            Tuple { header: TupleHeader::new(1), data: vec![], column_map: HashMap::new() };
+        tuple.add_value("id".to_string(), Value::Int(1));
+        tuple.add_value("name".to_string(), Value::Text("hello".to_string()));
+
+        let assignments = vec![(
+            "name".to_string(),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Number(1)),
+                op: BinaryOperator::Add,
+                right: Box::new(Expr::Number(2)),
+            },
+        )];
+
+        let result = UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Type mismatch"));
+    }
+
+    #[test]
+    fn test_apply_assignments_multiple_arithmetic_assignments() {
+        let schema = create_test_schema();
+        let mut tuple = create_test_tuple(1, 1, "Alice", 30);
+        let assignments = vec![
+            (
+                "id".to_string(),
+                Expr::BinaryOp {
+                    left: Box::new(Expr::Column("id".to_string())),
+                    op: BinaryOperator::Add,
+                    right: Box::new(Expr::Number(10)),
+                },
+            ),
+            (
+                "age".to_string(),
+                Expr::BinaryOp {
+                    left: Box::new(Expr::Column("age".to_string())),
+                    op: BinaryOperator::Multiply,
+                    right: Box::new(Expr::Number(2)),
+                },
+            ),
+        ];
+
+        assert!(UpdateDeleteExecutor::apply_assignments(&mut tuple, &assignments, &schema).is_ok());
+        assert_eq!(tuple.get_value("id"), Some(Value::Int(11)));
+        assert_eq!(tuple.get_value("age"), Some(Value::Int(60)));
     }
 
     // --- update tests ---

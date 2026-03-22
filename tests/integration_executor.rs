@@ -14,9 +14,9 @@ fn test_filter_through_catalog() {
         ColumnDef::new("value".to_string(), DataType::Int),
     ];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1), Expr::Number(10)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2), Expr::Number(20)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(3), Expr::Number(30)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1), Expr::Number(10)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2), Expr::Number(20)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(3), Expr::Number(30)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -48,9 +48,9 @@ fn test_limit_through_catalog() {
     let catalog = Catalog::new();
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(3)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(3)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -79,7 +79,7 @@ fn test_project_through_catalog() {
         ColumnDef::new("name".to_string(), DataType::Text),
     ];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -106,9 +106,9 @@ fn test_distinct_through_catalog() {
     let catalog = Catalog::new();
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -134,9 +134,9 @@ fn test_sort_through_catalog() {
     let catalog = Catalog::new();
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(3)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(3)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -167,9 +167,9 @@ fn test_aggregate_through_catalog() {
     let catalog = Catalog::new();
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(10)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(20)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(30)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(10)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(20)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(30)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -201,8 +201,8 @@ fn test_seq_scan_through_catalog() {
     let catalog = Catalog::new();
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 
@@ -231,10 +231,10 @@ fn test_combined_operators() {
         ColumnDef::new("value".to_string(), DataType::Int),
     ];
     catalog.create_table("test".to_string(), columns).unwrap();
-    catalog.insert("test", vec![Expr::Number(1), Expr::Number(10)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(2), Expr::Number(20)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(3), Expr::Number(30)]).unwrap();
-    catalog.insert("test", vec![Expr::Number(4), Expr::Number(40)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(1), Expr::Number(10)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(2), Expr::Number(20)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(3), Expr::Number(30)]).unwrap();
+    catalog.insert("test", &[], vec![Expr::Number(4), Expr::Number(40)]).unwrap();
 
     let catalog_arc = std::sync::Arc::new(catalog.clone());
 

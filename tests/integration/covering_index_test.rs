@@ -17,6 +17,7 @@ fn test_covering_index_two_columns() {
     catalog
         .insert(
             "users",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("user1@test.com".to_string()),
@@ -57,6 +58,7 @@ fn test_covering_index_all_query_columns() {
     catalog
         .insert(
             "products",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("electronics".to_string()),
@@ -95,11 +97,16 @@ fn test_covering_index_with_where_clause() {
 
     catalog.create_table("tasks".to_string(), columns).unwrap();
     catalog
-        .insert("tasks", vec![Expr::Number(1), Expr::String("active".to_string()), Expr::Number(1)])
+        .insert(
+            "tasks",
+            &[],
+            vec![Expr::Number(1), Expr::String("active".to_string()), Expr::Number(1)],
+        )
         .unwrap();
     catalog
         .insert(
             "tasks",
+            &[],
             vec![Expr::Number(2), Expr::String("completed".to_string()), Expr::Number(2)],
         )
         .unwrap();
@@ -144,6 +151,7 @@ fn test_covering_index_includes_all_needed() {
     catalog
         .insert(
             "people",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("John".to_string()),
@@ -184,12 +192,14 @@ fn test_covering_index_order_by() {
     catalog
         .insert(
             "items",
+            &[],
             vec![Expr::Number(1), Expr::String("Item A".to_string()), Expr::Number(100)],
         )
         .unwrap();
     catalog
         .insert(
             "items",
+            &[],
             vec![Expr::Number(2), Expr::String("Item B".to_string()), Expr::Number(200)],
         )
         .unwrap();

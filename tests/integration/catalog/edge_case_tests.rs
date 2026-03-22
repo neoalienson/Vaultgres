@@ -16,7 +16,7 @@ fn test_insert_null_value() {
     // Note: Current implementation doesn't support NULL in INSERT
     // This test documents the limitation
     let values = vec![Expr::Number(1), Expr::String("Alice".to_string())];
-    assert!(catalog.insert("users", values).is_ok());
+    assert!(catalog.insert("users", &[], values).is_ok());
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn test_select_from_empty_result() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("id".to_string())),
@@ -60,7 +60,7 @@ fn test_update_no_matching_rows() {
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("id".to_string())),
@@ -81,7 +81,7 @@ fn test_delete_no_matching_rows() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("id".to_string())),
@@ -100,7 +100,7 @@ fn test_select_with_invalid_column() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let result = Catalog::select_with_catalog(
         &catalog_arc,
@@ -124,7 +124,7 @@ fn test_where_with_invalid_column() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("nonexistent".to_string())),
@@ -154,7 +154,7 @@ fn test_update_invalid_column() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let result = catalog.update("data", vec![("nonexistent".to_string(), Expr::Number(999))], None);
     assert!(result.is_err());
@@ -167,8 +167,8 @@ fn test_limit_larger_than_result_set() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -193,7 +193,7 @@ fn test_offset_larger_than_result_set() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -245,7 +245,7 @@ fn test_in_operator_empty_list() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("id".to_string())),
@@ -276,7 +276,7 @@ fn test_between_with_reversed_bounds() {
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(15)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(15)]).unwrap();
 
     // BETWEEN 30 AND 10 (reversed) - should return no rows
     // Converted to: value >= 30 AND value <= 10 (impossible condition)
@@ -317,7 +317,7 @@ fn test_like_with_empty_pattern() {
     let columns = vec![ColumnDef::new("name".to_string(), DataType::Text)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::String("test".to_string())]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("test".to_string())]).unwrap();
 
     let where_clause = Some(Expr::BinaryOp {
         left: Box::new(Expr::Column("name".to_string())),
@@ -372,9 +372,9 @@ fn test_distinct_all_duplicates() {
     let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -399,7 +399,7 @@ fn test_order_by_with_invalid_column() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let order_by = Some(vec![vaultgres::parser::ast::OrderByExpr {
         column: "nonexistent".to_string(),
@@ -428,7 +428,7 @@ fn test_group_by_with_invalid_column() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
 
     let group_by = Some(vec![Expr::Column("nonexistent".to_string())]);
     let result = Catalog::select_with_catalog(
@@ -453,8 +453,8 @@ fn test_zero_limit() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -476,7 +476,7 @@ fn test_zero_limit() {
 fn test_insert_to_nonexistent_table() {
     let catalog = Catalog::new();
     let catalog_arc = Arc::new(catalog.clone());
-    let result = catalog.insert("nonexistent", vec![Expr::Number(1)]);
+    let result = catalog.insert("nonexistent", &[], vec![Expr::Number(1)]);
     assert!(result.is_err());
 }
 

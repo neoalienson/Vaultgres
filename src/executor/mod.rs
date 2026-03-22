@@ -6,6 +6,7 @@ mod correlated;
 mod cursor;
 mod derived_table;
 mod eval;
+pub mod expr_evaluator;
 mod function_cache;
 mod index_only_scan;
 mod lateral;
@@ -89,6 +90,7 @@ pub use correlated::{CorrelatedExecutor, SubqueryKind};
 pub use cursor::CursorManager;
 pub use derived_table::DerivedTableExecutor;
 pub use eval::Eval;
+pub use expr_evaluator::{eval_binary_op, eval_unary_op, ExprEvaluator};
 pub use function_cache::FunctionCache;
 pub use index_only_scan::IndexOnlyScan;
 pub use lateral::LateralSubqueryExecutor;
@@ -103,7 +105,7 @@ pub use unnest::UnnestExecutor;
 
 #[cfg(test)]
 pub use test_helpers::{
-    MockExecutor as TestMockExecutor, TupleBuilder, compare_executors, count_results,
-    create_multi_column_schema, create_simple_schema, run_executor, test_executor_lifecycle,
-    tuple_with_value,
+    compare_executors, count_results, create_multi_column_schema, create_simple_schema,
+    run_executor, test_executor_lifecycle, tuple_with_value, MockExecutor as TestMockExecutor,
+    TupleBuilder,
 };

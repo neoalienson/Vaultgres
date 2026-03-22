@@ -17,7 +17,7 @@
 #[cfg(test)]
 mod tests {
     use crate::catalog::Value;
-    use crate::executor::plpgsql::evaluator::ExprEvaluator;
+    use crate::executor::plpgsql::evaluator::PlPgSqlExprEvaluator;
     use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
     use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn test_eval_float_positive() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(
             evaluator.eval(&Expr::Float(std::f64::consts::PI)).unwrap(),
             Value::Float(std::f64::consts::PI)
@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn test_eval_float_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(
             evaluator.eval(&Expr::Float(-std::f64::consts::E)).unwrap(),
             Value::Float(-std::f64::consts::E)
@@ -48,14 +48,14 @@ mod tests {
     #[test]
     fn test_eval_float_zero() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         assert_eq!(evaluator.eval(&Expr::Float(0.0)).unwrap(), Value::Float(0.0));
     }
 
     #[test]
     fn test_eval_float_very_small() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let result = evaluator.eval(&Expr::Float(0.0000001)).unwrap();
         assert!((result.as_float().unwrap() - 0.0000001).abs() < f64::EPSILON);
     }
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn test_eval_float_very_large() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let result = evaluator.eval(&Expr::Float(1e100)).unwrap();
         assert!((result.as_float().unwrap() - 1e100).abs() < f64::EPSILON);
     }
@@ -72,7 +72,7 @@ mod tests {
     fn test_eval_float_from_column() {
         let mut vars = HashMap::new();
         vars.insert("price".to_string(), Value::Float(19.99));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let result = evaluator.eval(&Expr::Column("price".to_string())).unwrap();
         assert!((result.as_float().unwrap() - 19.99).abs() < f64::EPSILON);
     }
@@ -84,7 +84,7 @@ mod tests {
     #[test]
     fn test_int_addition_positive() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Add,
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_int_addition_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-50)),
             op: BinaryOperator::Add,
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn test_int_addition_both_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-100)),
             op: BinaryOperator::Add,
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn test_int_subtraction_positive() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Subtract,
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn test_int_subtraction_negative_result() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(30)),
             op: BinaryOperator::Subtract,
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn test_int_subtraction_negative_operands() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-50)),
             op: BinaryOperator::Subtract,
@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn test_int_multiplication_positive() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(12)),
             op: BinaryOperator::Multiply,
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn test_int_multiplication_by_zero() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(1000)),
             op: BinaryOperator::Multiply,
@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn test_int_multiplication_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-7)),
             op: BinaryOperator::Multiply,
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn test_int_multiplication_both_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-6)),
             op: BinaryOperator::Multiply,
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_int_division_exact() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Divide,
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_int_division_truncates() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(7)),
             op: BinaryOperator::Divide,
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_int_division_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-20)),
             op: BinaryOperator::Divide,
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_int_division_by_one() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(42)),
             op: BinaryOperator::Divide,
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_int_modulo_exact() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(10)),
             op: BinaryOperator::Modulo,
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_int_modulo_remainder() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(17)),
             op: BinaryOperator::Modulo,
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn test_int_modulo_negative() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(-17)),
             op: BinaryOperator::Modulo,
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_float_addition() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(1.5)),
             op: BinaryOperator::Add,
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn test_float_subtraction() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(10.0)),
             op: BinaryOperator::Subtract,
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn test_float_multiplication() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(2.5)),
             op: BinaryOperator::Multiply,
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn test_float_division() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(10.0)),
             op: BinaryOperator::Divide,
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn test_float_division_by_one() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(42.5)),
             op: BinaryOperator::Divide,
@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn test_float_comparison_equal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(std::f64::consts::PI)),
             op: BinaryOperator::Equals,
@@ -370,7 +370,7 @@ mod tests {
     #[test]
     fn test_float_comparison_almost_equal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // Test floating point epsilon comparison
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(1.0 / 3.0 * 3.0)),
@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn test_float_comparison_greater_than() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(5.01)),
             op: BinaryOperator::GreaterThan,
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_float_comparison_less_than() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(4.99)),
             op: BinaryOperator::LessThan,
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn test_int_division_by_zero_literal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Divide,
@@ -425,7 +425,7 @@ mod tests {
     fn test_int_division_by_zero_variable() {
         let mut vars = HashMap::new();
         vars.insert("zero".to_string(), Value::Int(0));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Divide,
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn test_int_modulo_by_zero_literal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Modulo,
@@ -452,7 +452,7 @@ mod tests {
     fn test_int_modulo_by_zero_variable() {
         let mut vars = HashMap::new();
         vars.insert("zero".to_string(), Value::Int(0));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(100)),
             op: BinaryOperator::Modulo,
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn test_float_division_by_zero_literal() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(100.5)),
             op: BinaryOperator::Divide,
@@ -479,7 +479,7 @@ mod tests {
     fn test_float_division_by_zero_variable() {
         let mut vars = HashMap::new();
         vars.insert("zero_float".to_string(), Value::Float(0.0));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(100.5)),
             op: BinaryOperator::Divide,
@@ -496,7 +496,7 @@ mod tests {
     #[test]
     fn test_type_mismatch_int_string_add() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(10)),
             op: BinaryOperator::Add,
@@ -509,20 +509,20 @@ mod tests {
     #[test]
     fn test_type_mismatch_float_int_add() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(10.5)),
             op: BinaryOperator::Add,
             right: Box::new(Expr::Number(5)),
         };
-        let err = evaluator.eval(&expr).unwrap_err();
-        assert_eq!(err, "Type mismatch in binary operation");
+        let result = evaluator.eval(&expr).unwrap();
+        assert_eq!(result, Value::Float(15.5));
     }
 
     #[test]
     fn test_type_mismatch_bool_int_and() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // Note: In the current implementation, Bool AND Int would be a type mismatch
         // because the match arm is (Value::Bool, Value::Bool)
         let expr = Expr::BinaryOp {
@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn test_type_mismatch_string_int_comparison() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::String("10".to_string())),
             op: BinaryOperator::Equals,
@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn test_unsupported_operator_for_int() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // StringConcat is not supported for Int
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(10)),
@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn test_unsupported_operator_for_float() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // Modulo is not supported for Float in the current implementation
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Float(10.5)),
@@ -582,7 +582,7 @@ mod tests {
     #[test]
     fn test_unsupported_operator_for_bool() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // StringConcat is not supported for Int (which is used for bool representation)
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(1)), // Using Int as bool representation
@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn test_nested_arithmetic() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // (5 + 3) * 2
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::BinaryOp {
@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn test_complex_mixed_operations() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // ((10 - 5) * 2) + (8 / 4)
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::BinaryOp {
@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn test_chained_comparisons() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // 5 > 3 AND 3 < 10
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::BinaryOp {
@@ -669,7 +669,7 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert("x".to_string(), Value::Int(10));
         vars.insert("y".to_string(), Value::Int(5));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Column("x".to_string())),
@@ -684,7 +684,7 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert("price".to_string(), Value::Float(19.99));
         vars.insert("quantity".to_string(), Value::Float(3.0));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Column("price".to_string())),
@@ -700,16 +700,15 @@ mod tests {
         let mut vars = HashMap::new();
         vars.insert("count".to_string(), Value::Int(5));
         vars.insert("rate".to_string(), Value::Float(2.5));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
-        // This should fail due to type mismatch
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Column("count".to_string())),
             op: BinaryOperator::Multiply,
             right: Box::new(Expr::Column("rate".to_string())),
         };
-        let err = evaluator.eval(&expr).unwrap_err();
-        assert_eq!(err, "Type mismatch in binary operation");
+        let result = evaluator.eval(&expr).unwrap();
+        assert_eq!(result, Value::Float(12.5));
     }
 
     // ========================================================================
@@ -719,7 +718,7 @@ mod tests {
     #[test]
     fn test_integer_overflow_behavior() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
         // Test large number multiplication (may overflow in debug, wrap in release)
         let expr = Expr::BinaryOp {
             left: Box::new(Expr::Number(i64::MAX / 2)),
@@ -734,7 +733,7 @@ mod tests {
     #[test]
     fn test_zero_operations() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         // 0 + 0
         let add = Expr::BinaryOp {
@@ -764,7 +763,7 @@ mod tests {
     #[test]
     fn test_identity_operations() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         // x + 0 = x
         let add_zero = Expr::BinaryOp {
@@ -794,7 +793,7 @@ mod tests {
     #[test]
     fn test_float_precision_edge_case() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         // Test that very close floats are considered equal
         let expr = Expr::BinaryOp {
@@ -812,7 +811,7 @@ mod tests {
     fn test_unary_not_on_bool_variable() {
         let mut vars = HashMap::new();
         vars.insert("flag".to_string(), Value::Bool(false));
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         let expr = Expr::UnaryOp {
             op: UnaryOperator::Not,
@@ -824,7 +823,7 @@ mod tests {
     #[test]
     fn test_double_negation() {
         let vars = HashMap::new();
-        let evaluator = ExprEvaluator::new(&vars);
+        let evaluator = PlPgSqlExprEvaluator::new(&vars);
 
         // NOT(NOT(5 > 3))
         let expr = Expr::UnaryOp {

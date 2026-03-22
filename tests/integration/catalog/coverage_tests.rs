@@ -26,7 +26,7 @@ mod tests {
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
         assert_eq!(catalog.row_count("t"), 0);
-        catalog.insert("t", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("t", &[], vec![Expr::Number(1)]).unwrap();
         assert_eq!(catalog.row_count("t"), 1);
     }
 
@@ -44,7 +44,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        let result = catalog.insert("t", vec![Expr::String("text".to_string())]);
+        let result = catalog.insert("t", &[], vec![Expr::String("text".to_string())]);
         assert!(result.is_err());
     }
 
@@ -55,7 +55,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        let result = catalog.insert("t", vec![Expr::Number(1), Expr::Number(2)]);
+        let result = catalog.insert("t", &[], vec![Expr::Number(1), Expr::Number(2)]);
         assert!(result.is_err());
     }
 
@@ -66,7 +66,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        catalog.insert("t", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("t", &[], vec![Expr::Number(1)]).unwrap();
         let result = Catalog::select_with_catalog(
             &catalog_arc,
             "t",
@@ -89,7 +89,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        catalog.insert("t", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("t", &[], vec![Expr::Number(1)]).unwrap();
         let result = catalog.update("t", vec![("nonexistent".to_string(), Expr::Number(1))], None);
         assert!(result.is_err());
     }
@@ -101,7 +101,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        catalog.insert("t", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("t", &[], vec![Expr::Number(1)]).unwrap();
         let result =
             catalog.update("t", vec![("id".to_string(), Expr::String("text".to_string()))], None);
         assert!(result.is_err());
@@ -123,7 +123,7 @@ mod tests {
                 vec![ColumnDef::new("name".to_string(), DataType::Varchar(50))],
             )
             .unwrap();
-        catalog.insert("t", vec![Expr::String("test".to_string())]).unwrap();
+        catalog.insert("t", &[], vec![Expr::String("test".to_string())]).unwrap();
         let result = Catalog::select_with_catalog(
             &catalog_arc,
             "t",
@@ -149,7 +149,7 @@ mod tests {
                 vec![ColumnDef::new("name".to_string(), DataType::Varchar(50))],
             )
             .unwrap();
-        catalog.insert("t", vec![Expr::String("old".to_string())]).unwrap();
+        catalog.insert("t", &[], vec![Expr::String("old".to_string())]).unwrap();
         let result =
             catalog.update("t", vec![("name".to_string(), Expr::String("new".to_string()))], None);
         assert!(result.is_ok());
@@ -162,7 +162,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
-        let result = catalog.insert("t", vec![Expr::String("description".to_string())]);
+        let result = catalog.insert("t", &[], vec![Expr::String("description".to_string())]);
         assert!(result.is_ok());
     }
 
@@ -173,7 +173,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("desc".to_string(), DataType::Text)])
             .unwrap();
-        catalog.insert("t", vec![Expr::String("old".to_string())]).unwrap();
+        catalog.insert("t", &[], vec![Expr::String("old".to_string())]).unwrap();
         let result =
             catalog.update("t", vec![("desc".to_string(), Expr::String("new".to_string()))], None);
         assert!(result.is_ok());
@@ -186,7 +186,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        let result = catalog.insert("t", vec![Expr::Column("col".to_string())]);
+        let result = catalog.insert("t", &[], vec![Expr::Column("col".to_string())]);
         assert!(result.is_err());
     }
 
@@ -197,7 +197,7 @@ mod tests {
         catalog
             .create_table("t".to_string(), vec![ColumnDef::new("id".to_string(), DataType::Int)])
             .unwrap();
-        catalog.insert("t", vec![Expr::Number(1)]).unwrap();
+        catalog.insert("t", &[], vec![Expr::Number(1)]).unwrap();
         let result =
             catalog.update("t", vec![("id".to_string(), Expr::Column("col".to_string()))], None);
         assert!(result.is_err());

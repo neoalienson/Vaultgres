@@ -69,9 +69,9 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.savepoint("sp1".to_string()).unwrap();
-        catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
         catalog.rollback_to_savepoint("sp1").unwrap();
         catalog.commit_transaction().unwrap();
 
@@ -119,12 +119,12 @@ mod tests {
             .unwrap();
 
         catalog.begin_transaction().unwrap();
-        catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
         catalog.savepoint("sp1".to_string()).unwrap();
-        catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+        catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
         catalog.savepoint("sp2".to_string()).unwrap();
         catalog
-            .insert("users", vec![Expr::Number(3), Expr::String("Charlie".to_string())])
+            .insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())])
             .unwrap();
         catalog.rollback_to_savepoint("sp1").unwrap();
         catalog.commit_transaction().unwrap();

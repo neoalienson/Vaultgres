@@ -14,7 +14,7 @@ fn test_insert() {
     catalog.create_table("users".to_string(), columns).unwrap();
 
     let values = vec![Expr::Number(1), Expr::String("Alice".to_string())];
-    assert!(catalog.insert("users", values).is_ok());
+    assert!(catalog.insert("users", &[], values).is_ok());
     assert_eq!(catalog.row_count("users"), 1);
 }
 
@@ -27,7 +27,7 @@ fn test_insert_wrong_column_count() {
     catalog.create_table("users".to_string(), columns).unwrap();
 
     let values = vec![Expr::Number(1), Expr::String("Alice".to_string())];
-    assert!(catalog.insert("users", values).is_err());
+    assert!(catalog.insert("users", &[], values).is_err());
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_insert_type_mismatch() {
     catalog.create_table("users".to_string(), columns).unwrap();
 
     let values = vec![Expr::String("not a number".to_string())];
-    assert!(catalog.insert("users", values).is_err());
+    assert!(catalog.insert("users", &[], values).is_err());
 }
 
 #[test]
@@ -53,9 +53,9 @@ fn test_insert_multiple_rows() {
 
     catalog.create_table("users".to_string(), columns).unwrap();
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(3), Expr::String("Charlie".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(3), Expr::String("Charlie".to_string())]).unwrap();
 
     assert_eq!(catalog.row_count("users"), 3);
 }

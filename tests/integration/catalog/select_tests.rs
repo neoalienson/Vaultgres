@@ -12,8 +12,8 @@ fn test_select_all() {
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -42,7 +42,7 @@ fn test_select_specific_columns() {
     ];
 
     catalog.create_table("users".to_string(), columns).unwrap();
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -113,9 +113,9 @@ fn test_select_with_order_by_asc() {
     ];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(3), Expr::Number(300)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3), Expr::Number(300)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
 
     let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: true }]);
     let rows = Catalog::select_with_catalog(
@@ -145,9 +145,9 @@ fn test_select_with_order_by_desc() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
 
     let order_by = Some(vec![OrderByExpr { column: "id".to_string(), ascending: false }]);
     let rows = Catalog::select_with_catalog(
@@ -177,10 +177,10 @@ fn test_select_with_limit() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(4)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(4)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -205,10 +205,10 @@ fn test_select_with_offset() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(4)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(4)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -234,11 +234,11 @@ fn test_select_with_limit_and_offset() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::Number(1)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(4)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(5)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(4)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(5)]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,
@@ -265,10 +265,10 @@ fn test_distinct() {
     let columns = vec![ColumnDef::new("category".to_string(), DataType::Text)];
 
     catalog.create_table("data".to_string(), columns).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string())]).unwrap();
-    catalog.insert("data", vec![Expr::String("B".to_string())]).unwrap();
-    catalog.insert("data", vec![Expr::String("A".to_string())]).unwrap();
-    catalog.insert("data", vec![Expr::String("B".to_string())]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string())]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("B".to_string())]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("A".to_string())]).unwrap();
+    catalog.insert("data", &[], vec![Expr::String("B".to_string())]).unwrap();
 
     let rows = Catalog::select_with_catalog(
         &catalog_arc,

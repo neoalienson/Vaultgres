@@ -27,6 +27,7 @@ fn create_products_catalog() -> Arc<Catalog> {
     catalog_arc
         .insert(
             "products",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("Laptop".to_string()),
@@ -38,6 +39,7 @@ fn create_products_catalog() -> Arc<Catalog> {
     catalog_arc
         .insert(
             "products",
+            &[],
             vec![
                 Expr::Number(2),
                 Expr::String("Mouse".to_string()),
@@ -49,6 +51,7 @@ fn create_products_catalog() -> Arc<Catalog> {
     catalog_arc
         .insert(
             "products",
+            &[],
             vec![
                 Expr::Number(3),
                 Expr::String("Keyboard".to_string()),

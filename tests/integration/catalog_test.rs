@@ -28,9 +28,9 @@ fn test_catalog_insert_and_count() {
 
     catalog.create_table("data".to_string(), columns).unwrap();
 
-    catalog.insert("data", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
-    catalog.insert("data", vec![Expr::Number(3), Expr::Number(300)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("data", &[], vec![Expr::Number(3), Expr::Number(300)]).unwrap();
 
     assert_eq!(catalog.row_count("data"), 3);
 }
@@ -60,7 +60,7 @@ fn test_catalog_drop_and_recreate() {
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
 
     catalog.create_table("temp".to_string(), columns.clone()).unwrap();
-    catalog.insert("temp", vec![Expr::Number(1)]).unwrap();
+    catalog.insert("temp", &[], vec![Expr::Number(1)]).unwrap();
     assert_eq!(catalog.row_count("temp"), 1);
 
     catalog.drop_table("temp", false).unwrap();
@@ -77,7 +77,7 @@ fn test_catalog_varchar_type() {
     let columns = vec![ColumnDef::new("email".to_string(), DataType::Varchar(100))];
 
     catalog.create_table("contacts".to_string(), columns).unwrap();
-    catalog.insert("contacts", vec![Expr::String("test@example.com".to_string())]).unwrap();
+    catalog.insert("contacts", &[], vec![Expr::String("test@example.com".to_string())]).unwrap();
 
     assert_eq!(catalog.row_count("contacts"), 1);
 }
@@ -93,7 +93,7 @@ fn test_catalog_insert_validation() {
 
     catalog.create_table("users".to_string(), columns).unwrap();
 
-    let result = catalog.insert("users", vec![Expr::Number(1)]);
+    let result = catalog.insert("users", &[], vec![Expr::Number(1)]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.contains("default") || err.contains("Expected") || err.contains("Too many"));
@@ -107,7 +107,7 @@ fn test_catalog_type_validation() {
 
     catalog.create_table("numbers".to_string(), columns).unwrap();
 
-    let result = catalog.insert("numbers", vec![Expr::String("not a number".to_string())]);
+    let result = catalog.insert("numbers", &[], vec![Expr::String("not a number".to_string())]);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Type mismatch"));
 }
@@ -121,7 +121,7 @@ fn test_catalog_concurrent_operations() {
         .unwrap();
 
     for i in 0..10 {
-        catalog.insert("test", vec![Expr::Number(i)]).unwrap();
+        catalog.insert("test", &[], vec![Expr::Number(i)]).unwrap();
     }
 
     assert_eq!(catalog.row_count("test"), 10);

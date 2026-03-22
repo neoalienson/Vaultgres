@@ -16,11 +16,14 @@ fn test_unique_column_level() {
         .unwrap();
 
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::String("alice@example.com".to_string())])
+        .insert("users", &[], vec![Expr::Number(1), Expr::String("alice@example.com".to_string())])
         .unwrap();
 
-    let result = catalog
-        .insert("users", vec![Expr::Number(2), Expr::String("alice@example.com".to_string())]);
+    let result = catalog.insert(
+        "users",
+        &[],
+        vec![Expr::Number(2), Expr::String("alice@example.com".to_string())],
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("UNIQUE"));
 }
@@ -67,9 +70,11 @@ fn test_unique_allows_different_values() {
         )
         .unwrap();
 
-    catalog.insert("users", vec![Expr::Number(1), Expr::String("alice".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(2), Expr::String("bob".to_string())]).unwrap();
-    catalog.insert("users", vec![Expr::Number(3), Expr::String("charlie".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(1), Expr::String("alice".to_string())]).unwrap();
+    catalog.insert("users", &[], vec![Expr::Number(2), Expr::String("bob".to_string())]).unwrap();
+    catalog
+        .insert("users", &[], vec![Expr::Number(3), Expr::String("charlie".to_string())])
+        .unwrap();
 
     assert_eq!(catalog.row_count("users"), 3);
 }
@@ -89,11 +94,14 @@ fn test_unique_error_message() {
         .unwrap();
 
     catalog
-        .insert("users", vec![Expr::Number(1), Expr::String("test@example.com".to_string())])
+        .insert("users", &[], vec![Expr::Number(1), Expr::String("test@example.com".to_string())])
         .unwrap();
 
-    let result = catalog
-        .insert("users", vec![Expr::Number(2), Expr::String("test@example.com".to_string())]);
+    let result = catalog.insert(
+        "users",
+        &[],
+        vec![Expr::Number(2), Expr::String("test@example.com".to_string())],
+    );
 
     assert!(result.is_err());
     let error = result.unwrap_err();
@@ -115,10 +123,10 @@ fn test_unique_with_integers() {
         )
         .unwrap();
 
-    catalog.insert("products", vec![Expr::Number(1), Expr::Number(100)]).unwrap();
-    catalog.insert("products", vec![Expr::Number(2), Expr::Number(200)]).unwrap();
+    catalog.insert("products", &[], vec![Expr::Number(1), Expr::Number(100)]).unwrap();
+    catalog.insert("products", &[], vec![Expr::Number(2), Expr::Number(200)]).unwrap();
 
-    let result = catalog.insert("products", vec![Expr::Number(3), Expr::Number(100)]);
+    let result = catalog.insert("products", &[], vec![Expr::Number(3), Expr::Number(100)]);
     assert!(result.is_err());
 }
 
@@ -142,6 +150,7 @@ fn test_unique_multiple_columns() {
     catalog
         .insert(
             "users",
+            &[],
             vec![
                 Expr::Number(1),
                 Expr::String("alice@example.com".to_string()),
@@ -153,6 +162,7 @@ fn test_unique_multiple_columns() {
     // Duplicate email should fail
     let result = catalog.insert(
         "users",
+        &[],
         vec![
             Expr::Number(2),
             Expr::String("alice@example.com".to_string()),
@@ -164,6 +174,7 @@ fn test_unique_multiple_columns() {
     // Duplicate username should fail
     let result = catalog.insert(
         "users",
+        &[],
         vec![
             Expr::Number(3),
             Expr::String("bob@example.com".to_string()),

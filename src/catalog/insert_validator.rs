@@ -28,6 +28,7 @@ impl InsertValidator {
     fn parse_value(expr: &Expr) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
+            Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
             Expr::Null => Ok(Value::Null),
             _ => Err("Invalid value expression".to_string()),
@@ -43,6 +44,8 @@ impl InsertValidator {
         match (&col.data_type, &val) {
             (DataType::Int, Value::Int(_))
             | (DataType::Serial, Value::Int(_))
+            | (DataType::Float, Value::Float(_))
+            | (DataType::Float, Value::Int(_))
             | (DataType::Text, Value::Text(_))
             | (DataType::Varchar(_), Value::Text(_)) => Ok(val),
             _ => Err(format!("Type mismatch for column '{}'", col.name)),
