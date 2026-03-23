@@ -321,6 +321,47 @@ impl<S: Read + Write> Connection<S> {
                 let result_set = self.build_result_set(&column_names, rows)?;
                 Ok(ExecutionResult::ResultSet(result_set))
             }
+            Statement::With(with_stmt) => {
+                log::debug!(
+                    "Executing WITH: recursive={}, ctes={}, query_from={}",
+                    with_stmt.recursive,
+                    with_stmt.ctes.len(),
+                    with_stmt.query.from
+                );
+
+                let planner = Planner::new_with_catalog(self.catalog.clone());
+                let mut plan = planner.plan_with_cte(&with_stmt).map_err(|e| format!("{:?}", e))?;
+
+                let mut rows: Vec<Vec<Value>> = Vec::new();
+                let mut output_column_names: Option<Vec<String>> = None;
+
+                loop {
+                    match plan.next() {
+                        Ok(Some(tuple_hashmap)) => {
+                            let mut row = Vec::new();
+
+                            if output_column_names.is_none() {
+                                output_column_names = Some(tuple_hashmap.keys().cloned().collect());
+                            }
+
+                            if let Some(ref col_names) = output_column_names {
+                                for col_name in col_names {
+                                    row.push(
+                                        tuple_hashmap.get(col_name).cloned().unwrap_or(Value::Null),
+                                    );
+                                }
+                            }
+                            rows.push(row);
+                        }
+                        Ok(None) => break,
+                        Err(e) => return Err(format!("{:?}", e)),
+                    }
+                }
+
+                let column_names = output_column_names.unwrap_or_default();
+                let result_set = self.build_result_set(&column_names, rows)?;
+                Ok(ExecutionResult::ResultSet(result_set))
+            }
             Statement::Update(update) => {
                 let count =
                     self.catalog.update(&update.table, update.assignments, update.where_clause)?;

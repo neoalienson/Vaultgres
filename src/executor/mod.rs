@@ -74,11 +74,12 @@ pub use parallel::{ParallelConfig, ParallelExecutor};
 // ============================================================================
 
 pub use volcano::{
-    AggregateExecutor, AggregateFunction, CaseExecutor, DistinctExecutor, ExceptExecutor,
-    FilterExecutor, GroupByExecutor, HashAggExecutor, HashJoinExecutor, HavingExecutor,
-    IntersectExecutor, JoinExecutor, JoinType, LimitExecutor, MergeJoinExecutor,
-    NestedLoopJoinExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryExecutor,
-    SubqueryScanExecutor, UnionExecutor, UnionType,
+    AggregateExecutor, AggregateFunction, CTEColumns, CTEExecutor, CTEPlanner, CaseExecutor,
+    DistinctExecutor, ExceptExecutor, FilterExecutor, GroupByExecutor, HashAggExecutor,
+    HashJoinExecutor, HavingExecutor, IntersectExecutor, JoinExecutor, JoinType, LimitExecutor,
+    MergeJoinExecutor, NestedLoopJoinExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor,
+    SubqueryExecutor, SubqueryScanExecutor, UnionExecutor, UnionType, VolcanoRecursiveCTEExecutor,
+    VolcanoRecursiveCTEState,
 };
 
 // ============================================================================
@@ -97,7 +98,7 @@ pub use index_only_scan::IndexOnlyScan;
 pub use lateral::LateralSubqueryExecutor;
 pub use multiple_cte::MultipleCTEExecutor;
 pub use plpgsql::PlPgSqlInterpreter;
-pub use recursive_cte::RecursiveCTEExecutor;
+pub use recursive_cte::RecursiveCTEExecutor as LegacyRecursiveCTEExecutor;
 pub use table_function::TableFunctionExecutor;
 pub use unnest::UnnestExecutor;
 

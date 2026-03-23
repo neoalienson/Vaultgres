@@ -11,6 +11,7 @@ mod catalog_test;
 mod check_constraint_test;
 mod concat_function_test;
 mod covering_index_test;
+mod cte_executor_test;
 mod datatype_test;
 mod deadlock_test;
 mod default_value_test;

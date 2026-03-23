@@ -19,6 +19,10 @@ name = "array"
 path = "scenarios/array_tests.rs"
 
 [[test]]
+name = "cte"
+path = "scenarios/cte_tests.rs"
+
+[[test]]
 name = "scenarios"
 path = "scenarios/oltp_workload.rs"
 

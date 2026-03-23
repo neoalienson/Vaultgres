@@ -2,11 +2,13 @@ use crate::catalog::Value;
 use crate::catalog::{Catalog, TableSchema};
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
 use crate::executor::volcano::{
-    DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType, LimitExecutor,
-    ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
+    CTEExecutor, DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType,
+    LimitExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
+    VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState,
 };
-use crate::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr, SelectStmt};
+use crate::parser::ast::{AggregateFunc, CTE, ColumnDef, DataType, Expr, SelectStmt, WithStmt};
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct Planner {
@@ -100,6 +102,28 @@ impl Planner {
         };
 
         return self.build_plan_from_scan(plan, current_schema, stmt, catalog);
+    }
+
+    pub fn plan_with_cte(&self, with_stmt: &WithStmt) -> Result<Box<dyn Executor>, ExecutorError> {
+        let mut cte_results: HashMap<String, Vec<Tuple>> = HashMap::new();
+
+        for cte in &with_stmt.ctes {
+            let cte_plan = self.plan(&cte.query)?;
+
+            let mut results = Vec::new();
+            let mut executor = cte_plan;
+            while let Some(tuple) = executor.next()? {
+                results.push(tuple);
+            }
+
+            cte_results.insert(cte.name.clone(), results);
+        }
+
+        let main_plan = self.plan(&with_stmt.query)?;
+
+        let cte_executor = CTEExecutor::new(main_plan, cte_results);
+
+        Ok(Box::new(cte_executor))
     }
 
     /// Build the rest of the query plan after the initial table scan

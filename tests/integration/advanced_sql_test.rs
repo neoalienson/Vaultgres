@@ -1,6 +1,7 @@
 use vaultgres::catalog::{Function, FunctionLanguage, FunctionRegistry, Parameter, Value};
 use vaultgres::executor::{
-    BuiltinFunctions, CorrelatedExecutor, PlPgSqlInterpreter, RecursiveCTEExecutor, UnnestExecutor,
+    BuiltinFunctions, CorrelatedExecutor, LegacyRecursiveCTEExecutor, PlPgSqlInterpreter,
+    UnnestExecutor,
 };
 use vaultgres::parser::ast::{BinaryOperator, Expr};
 use vaultgres::parser::plpgsql_ast::{PlPgSqlFunction, PlPgSqlStmt};
@@ -73,7 +74,7 @@ fn test_recursive_cte_tree_traversal() {
         Ok(results)
     };
 
-    let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+    let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
     assert_eq!(result.len(), 5);
 }
 
@@ -175,7 +176,7 @@ fn test_recursive_cte_graph_cycle() {
         Ok(results)
     };
 
-    let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+    let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
     assert_eq!(result.len(), 5);
 }
 

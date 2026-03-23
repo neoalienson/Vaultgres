@@ -54,7 +54,7 @@ mod tests {
     #[test]
     fn test_recursive_cte_executor_simple() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -69,14 +69,14 @@ mod tests {
             Ok(results)
         };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 5);
     }
 
     #[test]
     fn test_recursive_cte_executor_with_cycle() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -89,39 +89,39 @@ mod tests {
             Ok(results)
         };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 3);
     }
 
     #[test]
     fn test_recursive_cte_executor_empty_base() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base: Vec<Vec<Value>> = vec![];
         let recursive_fn =
             |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![vec![Value::Int(1)]]) };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 0);
     }
 
     #[test]
     fn test_recursive_cte_executor_no_recursion() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1)], vec![Value::Int(2)]];
         let recursive_fn = |_: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> { Ok(vec![]) };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 2);
     }
 
     #[test]
     fn test_recursive_cte_executor_tree_traversal() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(1), Value::Int(0)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -137,14 +137,14 @@ mod tests {
             Ok(results)
         };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert_eq!(result.len(), 15);
     }
 
     #[test]
     fn test_recursive_cte_executor_fibonacci() {
         use vaultgres::catalog::Value;
-        use vaultgres::executor::RecursiveCTEExecutor;
+        use vaultgres::executor::LegacyRecursiveCTEExecutor;
 
         let base = vec![vec![Value::Int(0), Value::Int(1)]];
         let recursive_fn = |working: &[Vec<Value>]| -> Result<Vec<Vec<Value>>, String> {
@@ -159,7 +159,7 @@ mod tests {
             Ok(results)
         };
 
-        let result = RecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
+        let result = LegacyRecursiveCTEExecutor::execute(base, &recursive_fn).unwrap();
         assert!(result.len() > 5);
     }
 }

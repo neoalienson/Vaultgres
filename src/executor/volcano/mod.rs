@@ -6,6 +6,7 @@
 
 mod aggregate;
 mod case;
+mod cte;
 mod distinct;
 mod except;
 mod filter;
@@ -27,6 +28,9 @@ mod union;
 
 pub use aggregate::{AggregateExecutor, AggregateFunction};
 pub use case::CaseExecutor;
+pub use cte::{
+    CTEColumns, CTEExecutor, CTEPlanner, VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState,
+};
 pub use distinct::DistinctExecutor;
 pub use except::ExceptExecutor;
 pub use filter::FilterExecutor;
