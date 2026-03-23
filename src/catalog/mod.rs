@@ -24,10 +24,12 @@ mod catalog_tests;
 #[cfg(test)]
 mod datatype_tests;
 #[cfg(test)]
+mod enum_tests;
+#[cfg(test)]
 mod json_tests;
 
 // Re-export public types
-pub use crate::parser::ast::{ColumnDef as Column, DataType};
+pub use crate::parser::ast::{ColumnDef as Column, DataType, EnumTypeDef};
 pub use catalog::Catalog;
 pub use check::CheckValidator;
 pub use datetime_functions::DateTimeFunctions;

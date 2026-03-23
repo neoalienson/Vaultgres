@@ -399,7 +399,8 @@ impl UpdateDeleteExecutor {
             | (DataType::Varchar(_), Value::Text(_))
             | (DataType::Boolean, Value::Bool(_))
             | (DataType::Json, Value::Json(_))
-            | (DataType::Jsonb, Value::Json(_)) => Ok(()),
+            | (DataType::Jsonb, Value::Json(_))
+            | (DataType::Enum(_), Value::Enum(_)) => Ok(()),
             _ => Err(format!("Type mismatch for column '{}'", col_name)),
         }
     }

@@ -1,12 +1,13 @@
 use super::Parser;
 use super::select;
 use crate::parser::ast::{
-    CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt,
-    CreateTableStmt, CreateTriggerStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
-    DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
-    DropViewStmt, Expr, FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef,
-    ForeignKeyRef, FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode,
-    Statement, TriggerEvent, TriggerFor, TriggerTiming,
+    AlterTypeStmt, CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt,
+    CreateMaterializedViewStmt, CreateTableStmt, CreateTriggerStmt, CreateTypeStmt, CreateViewStmt,
+    DataType, DeclareCursorStmt, DescribeStmt, DropFunctionStmt, DropIndexStmt,
+    DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt, DropTypeStmt, DropViewStmt, Expr,
+    FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
+    FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, Statement,
+    TriggerEvent, TriggerFor, TriggerTiming,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -38,6 +39,7 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
         Token::Materialized => parse_create_materialized_view(parser),
         Token::Trigger => parse_create_trigger(parser),
         Token::Index => parse_create_index(parser, unique),
+        Token::Type => parse_create_type(parser),
         Token::Function | Token::Procedure => parse_create_function(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
@@ -278,6 +280,7 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
         Token::Materialized => parse_drop_materialized_view(parser),
         Token::Trigger => parse_drop_trigger(parser),
         Token::Index => parse_drop_index(parser),
+        Token::Type => parse_drop_type(parser),
         Token::Function | Token::Procedure => parse_drop_function(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
@@ -712,4 +715,96 @@ pub fn parse_close_cursor(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Close)?;
     let name = parser.expect_identifier()?;
     Ok(Statement::CloseCursor(CloseCursorStmt { name }))
+}
+
+pub fn parse_alter(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Alter)?;
+
+    match parser.current_token() {
+        Token::Type => parse_alter_type(parser),
+        _ => Err(ParseError::UnexpectedToken(format!(
+            "ALTER not supported for {:?}",
+            parser.current_token()
+        ))),
+    }
+}
+
+fn parse_alter_type(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Type)?;
+    let type_name = parser.expect_identifier()?;
+    parser.expect(Token::Add)?;
+    let new_label = match parser.current_token() {
+        Token::String(s) => {
+            let label = s.clone();
+            parser.advance();
+            label
+        }
+        _ => {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected enum label value, got {:?}",
+                parser.current_token()
+            )));
+        }
+    };
+
+    let after_label = if parser.current_token() == &Token::After {
+        parser.advance();
+        Some(parser.expect_identifier()?)
+    } else if parser.current_token() == &Token::Before {
+        parser.advance();
+        Some(parser.expect_identifier()?)
+    } else {
+        None
+    };
+
+    Ok(Statement::AlterType(AlterTypeStmt { type_name, new_label, after_label }))
+}
+
+fn parse_create_type(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Type)?;
+    let type_name = parser.expect_identifier()?;
+    parser.expect(Token::As)?;
+    parser.expect(Token::Enum)?;
+    parser.expect(Token::LeftParen)?;
+
+    let mut labels = Vec::new();
+    loop {
+        match parser.current_token() {
+            Token::String(s) => {
+                labels.push(s.clone());
+                parser.advance();
+            }
+            _ => {
+                return Err(ParseError::UnexpectedToken(format!(
+                    "Expected enum label, got {:?}",
+                    parser.current_token()
+                )));
+            }
+        }
+        if parser.current_token() == &Token::Comma {
+            parser.advance();
+            continue;
+        }
+        break;
+    }
+
+    parser.expect(Token::RightParen)?;
+
+    Ok(Statement::CreateType(CreateTypeStmt { type_name, labels }))
+}
+
+fn parse_drop_type(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Type)?;
+    let if_exists = parse_if_exists(parser)?;
+    let type_name = parser.expect_identifier()?;
+    let cascade = if parser.current_token() == &Token::Cascade {
+        parser.advance();
+        true
+    } else if parser.current_token() == &Token::Restrict {
+        parser.advance();
+        false
+    } else {
+        false
+    };
+    Ok(Statement::DropType(DropTypeStmt { type_name, if_exists, cascade }))
 }

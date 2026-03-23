@@ -263,7 +263,14 @@ VaultGres development roadmap with planned features and milestones.
 - Array types and operations
 - Range types (int4range, tsrange, etc.)
 - Composite types (user-defined types)
-- Enum types (partially implemented: Value::Enum storage exists, but CREATE TYPE AS ENUM not supported)
+- ✅ Enum types
+  - ✅ DataType::Enum(String) in AST
+  - ✅ CREATE TYPE ... AS ENUM parsing
+  - ✅ ALTER TYPE ... ADD VALUE parsing
+  - ✅ DROP TYPE ... [CASCADE | RESTRICT]
+  - ✅ Enum type registry in Catalog
+  - ✅ Enum value validation on INSERT
+  - ✅ Unit tests (27 tests) and integration tests (18 tests)
 
 ## Version 0.7.0 (RC)
 

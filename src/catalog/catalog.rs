@@ -4,8 +4,8 @@ use super::persistence::Persistence;
 use super::update_delete_executor::UpdateDeleteExecutor;
 use super::{Function, TableSchema, Value};
 use crate::parser::ast::{
-    ColumnDef, CreateIndexStmt, CreateTriggerStmt, Expr, ForeignKeyAction, ForeignKeyDef,
-    OrderByExpr, SelectStmt,
+    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, EnumTypeDef, Expr, ForeignKeyAction,
+    ForeignKeyDef, OrderByExpr, SelectStmt,
 };
 use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
@@ -23,6 +23,7 @@ pub struct Catalog {
     pub(crate) triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
     pub(crate) indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     pub(crate) functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
+    pub(crate) enum_types: Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     pub(crate) data: Arc<RwLock<HashMap<String, Vec<crate::catalog::tuple::Tuple>>>>,
     pub(crate) sequences: Arc<RwLock<HashMap<String, i64>>>,
     pub(crate) active_txn: Arc<RwLock<Option<Transaction>>>,
@@ -41,6 +42,7 @@ impl Catalog {
             triggers: Arc::new(RwLock::new(HashMap::new())),
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
+            enum_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             sequences: Arc::new(RwLock::new(HashMap::new())),
             active_txn: Arc::new(RwLock::new(None)),
@@ -61,6 +63,7 @@ impl Catalog {
             triggers: Arc::new(RwLock::new(HashMap::new())),
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
+            enum_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             sequences: Arc::new(RwLock::new(HashMap::new())),
             active_txn: Arc::new(RwLock::new(None)),
@@ -265,6 +268,121 @@ impl Catalog {
         log::debug!("create_table: created table '{}', triggering synchronous save", name);
         self.force_save()?;
         Ok(())
+    }
+
+    pub fn create_type(&self, type_name: String, labels: Vec<String>) -> Result<(), String> {
+        if labels.is_empty() {
+            return Err(format!("Enum type '{}' must have at least one label", type_name));
+        }
+
+        let mut enum_types = self.enum_types.write().unwrap();
+
+        if enum_types.contains_key(&type_name) {
+            return Err(format!("Type '{}' already exists", type_name));
+        }
+
+        let def = EnumTypeDef { type_name: type_name.clone(), labels };
+        enum_types.insert(type_name, def);
+
+        drop(enum_types);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn drop_type(&self, type_name: &str, if_exists: bool, cascade: bool) -> Result<(), String> {
+        {
+            let enum_types = self.enum_types.read().unwrap();
+            if !enum_types.contains_key(type_name) {
+                if if_exists {
+                    return Ok(());
+                }
+                return Err(format!("Type '{}' does not exist", type_name));
+            }
+        }
+
+        let dependent_tables: Vec<String> = {
+            let tables = self.tables.read().unwrap();
+            let mut deps = Vec::new();
+            for (table_name, schema) in tables.iter() {
+                for col in &schema.columns {
+                    if let DataType::Enum(ref t) = col.data_type {
+                        if t == type_name {
+                            deps.push(table_name.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+            deps
+        };
+
+        if !dependent_tables.is_empty() && !cascade {
+            return Err(format!(
+                "cannot drop type '{}' because it is used by table column",
+                type_name
+            ));
+        }
+
+        if cascade {
+            for table_name in dependent_tables {
+                self.drop_table(&table_name, false)?;
+            }
+        }
+
+        let mut enum_types = self.enum_types.write().unwrap();
+        enum_types.remove(type_name);
+        drop(enum_types);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn alter_type_add_value(
+        &self,
+        type_name: &str,
+        new_label: String,
+        after_label: Option<String>,
+    ) -> Result<(), String> {
+        let mut enum_types = self.enum_types.write().unwrap();
+
+        let def = enum_types
+            .get_mut(type_name)
+            .ok_or_else(|| format!("Type '{}' does not exist", type_name))?;
+
+        if def.labels.contains(&new_label) {
+            return Err(format!(
+                "Enum label '{}' already exists in type '{}'",
+                new_label, type_name
+            ));
+        }
+
+        match after_label {
+            Some(after) => {
+                let pos = def.labels.iter().position(|l| l == &after).ok_or_else(|| {
+                    format!("Label '{}' does not exist in enum '{}'", after, type_name)
+                })?;
+                def.labels.insert(pos + 1, new_label);
+            }
+            None => {
+                def.labels.push(new_label);
+            }
+        }
+
+        drop(enum_types);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn get_enum_type(&self, type_name: &str) -> Option<EnumTypeDef> {
+        self.enum_types.read().unwrap().get(type_name).cloned()
+    }
+
+    pub fn get_enum_label_index(&self, type_name: &str, label: &str) -> Option<i32> {
+        self.enum_types
+            .read()
+            .unwrap()
+            .get(type_name)
+            .and_then(|def| def.labels.iter().position(|l| l == label))
+            .map(|pos| pos as i32)
     }
 
     pub fn drop_table(&self, name: &str, if_exists: bool) -> Result<(), String> {
@@ -496,7 +614,14 @@ impl Catalog {
             .enumerate()
             .map(|(i, col)| {
                 if columns.is_empty() {
-                    InsertValidator::resolve_value(col, i, &values, table, &self.sequences)
+                    InsertValidator::resolve_value(
+                        col,
+                        i,
+                        &values,
+                        table,
+                        &self.sequences,
+                        &self.enum_types,
+                    )
                 } else {
                     if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
                         if value_idx < values.len() {
@@ -506,6 +631,7 @@ impl Catalog {
                                 &values,
                                 table,
                                 &self.sequences,
+                                &self.enum_types,
                             )
                         } else {
                             Err(format!("Column {} has no value", col.name))
@@ -517,6 +643,7 @@ impl Catalog {
                             &values,
                             table,
                             &self.sequences,
+                            &self.enum_types,
                         )
                     }
                 }
@@ -596,7 +723,14 @@ impl Catalog {
                     .enumerate()
                     .map(|(i, col)| {
                         if columns.is_empty() {
-                            InsertValidator::resolve_value(col, i, &values, table, &self.sequences)
+                            InsertValidator::resolve_value(
+                                col,
+                                i,
+                                &values,
+                                table,
+                                &self.sequences,
+                                &self.enum_types,
+                            )
                         } else {
                             if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
                                 if value_idx < values.len() {
@@ -606,6 +740,7 @@ impl Catalog {
                                         &values,
                                         table,
                                         &self.sequences,
+                                        &self.enum_types,
                                     )
                                 } else {
                                     Err(format!("Column {} has no value", col.name))
@@ -617,6 +752,7 @@ impl Catalog {
                                     &values,
                                     table,
                                     &self.sequences,
+                                    &self.enum_types,
                                 )
                             }
                         }

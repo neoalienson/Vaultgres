@@ -23,6 +23,9 @@ pub enum Statement {
     With(WithStmt),
     CreateFunction(CreateFunctionStmt),
     DropFunction(DropFunctionStmt),
+    CreateType(CreateTypeStmt),
+    DropType(DropTypeStmt),
+    AlterType(AlterTypeStmt),
     DeclareCursor(DeclareCursorStmt),
     FetchCursor(FetchCursorStmt),
     CloseCursor(CloseCursorStmt),
@@ -257,6 +260,36 @@ pub struct DropFunctionStmt {
     pub if_exists: bool,
 }
 
+/// Enum type definition
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct EnumTypeDef {
+    pub type_name: String,
+    pub labels: Vec<String>,
+}
+
+/// CREATE TYPE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CreateTypeStmt {
+    pub type_name: String,
+    pub labels: Vec<String>,
+}
+
+/// DROP TYPE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DropTypeStmt {
+    pub type_name: String,
+    pub if_exists: bool,
+    pub cascade: bool,
+}
+
+/// ALTER TYPE statement (for adding values to enum)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AlterTypeStmt {
+    pub type_name: String,
+    pub new_label: String,
+    pub after_label: Option<String>,
+}
+
 /// DECLARE CURSOR statement
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeclareCursorStmt {
@@ -385,6 +418,7 @@ pub enum DataType {
     Bytea,
     Json,
     Jsonb,
+    Enum(String),
 }
 
 /// SELECT statement

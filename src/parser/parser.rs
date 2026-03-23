@@ -60,6 +60,7 @@ impl Parser {
             Token::Delete => dml::parse_delete(self),
             Token::Create => ddl::parse_create(self),
             Token::Drop => ddl::parse_drop(self),
+            Token::Alter => ddl::parse_alter(self),
             Token::Describe => ddl::parse_describe(self),
             _ => Err(ParseError::UnexpectedToken(format!("{:?}", self.current_token()))),
         }?;

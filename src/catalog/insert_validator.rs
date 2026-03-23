@@ -1,5 +1,5 @@
 use super::{TableSchema, Tuple, UniqueValidator, Value};
-use crate::parser::ast::{ColumnDef, DataType, Expr};
+use crate::parser::ast::{ColumnDef, DataType, EnumTypeDef, Expr};
 use crate::transaction::TransactionManager;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -13,19 +13,23 @@ impl InsertValidator {
         values: &[Expr],
         table: &str,
         sequences: &Arc<RwLock<HashMap<String, i64>>>,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<Value, String> {
         if i < values.len() {
-            Self::parse_and_validate_value(&values[i], col)
+            Self::parse_and_validate_value(&values[i], col, enum_types)
         } else if col.is_auto_increment || col.data_type == DataType::Serial {
             Self::generate_sequence(table, &col.name, sequences)
         } else if let Some(ref default_expr) = col.default_value {
-            Self::parse_value(default_expr)
+            Self::parse_value(default_expr, enum_types)
         } else {
             Err(format!("Column '{}' has no default value", col.name))
         }
     }
 
-    fn parse_value(expr: &Expr) -> Result<Value, String> {
+    fn parse_value(
+        expr: &Expr,
+        _enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
             Expr::Float(f) => Ok(Value::Float(*f)),
@@ -35,9 +39,12 @@ impl InsertValidator {
         }
     }
 
-    fn parse_and_validate_value(expr: &Expr, col: &ColumnDef) -> Result<Value, String> {
-        let val = Self::parse_value(expr)?;
-        // NULL values are allowed for nullable columns
+    fn parse_and_validate_value(
+        expr: &Expr,
+        col: &ColumnDef,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<Value, String> {
+        let val = Self::parse_value(expr, enum_types)?;
         if matches!(val, Value::Null) {
             return Ok(val);
         }
@@ -50,6 +57,21 @@ impl InsertValidator {
             | (DataType::Varchar(_), Value::Text(_)) => Ok(val),
             (DataType::Json, Value::Text(s)) => Ok(Value::Json(s.clone())),
             (DataType::Jsonb, Value::Text(s)) => Ok(Value::Json(s.clone())),
+            (DataType::Enum(type_name), Value::Text(label)) => {
+                let enum_types = enum_types.read().unwrap();
+                if let Some(def) = enum_types.get(type_name) {
+                    if let Some(index) = def.labels.iter().position(|l| l == label) {
+                        Ok(Value::Enum(super::EnumValue {
+                            type_name: type_name.clone(),
+                            index: index as i32,
+                        }))
+                    } else {
+                        Err(format!("invalid enum label '{}' for type '{}'", label, type_name))
+                    }
+                } else {
+                    Err(format!("type '{}' does not exist", type_name))
+                }
+            }
             _ => Err(format!("Type mismatch for column '{}'", col.name)),
         }
     }
@@ -229,8 +251,10 @@ mod tests {
         let col = create_col_def("id", DataType::Int, false, false, false, None);
         let values = vec![Expr::Number(10)];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
+        let enum_types = Arc::new(RwLock::new(HashMap::new()));
         let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences).unwrap();
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
+                .unwrap();
         assert_eq!(resolved, Value::Int(10));
     }
 
@@ -239,7 +263,9 @@ mod tests {
         let col = create_col_def("id", DataType::Int, false, false, false, None);
         let values = vec![Expr::String("hello".to_string())];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
-        let resolved = InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences);
+        let enum_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved =
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types);
         assert!(resolved.is_err());
         assert_eq!(resolved.unwrap_err(), "Type mismatch for column 'id'");
     }
@@ -249,12 +275,15 @@ mod tests {
         let col = create_col_def("id", DataType::Serial, false, false, true, None);
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
+        let enum_types = Arc::new(RwLock::new(HashMap::new()));
         let resolved1 =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences).unwrap();
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
+                .unwrap();
         assert_eq!(resolved1, Value::Int(1));
 
         let resolved2 =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences).unwrap();
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
+                .unwrap();
         assert_eq!(resolved2, Value::Int(2));
     }
 
@@ -270,8 +299,10 @@ mod tests {
         );
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
+        let enum_types = Arc::new(RwLock::new(HashMap::new()));
         let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences).unwrap();
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
+                .unwrap();
         assert_eq!(resolved, Value::Text("default_name".to_string()));
     }
 
@@ -280,7 +311,9 @@ mod tests {
         let col = create_col_def("age", DataType::Int, false, false, false, None);
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
-        let resolved = InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences);
+        let enum_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved =
+            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types);
         assert!(resolved.is_err());
         assert_eq!(resolved.unwrap_err(), "Column 'age' has no default value");
     }

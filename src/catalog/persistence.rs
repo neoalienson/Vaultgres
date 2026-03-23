@@ -261,6 +261,10 @@ fn write_data_type<W: Write>(writer: &mut W, dt: &DataType) -> Result<(), String
         DataType::Bytea => writer.write_all(&[8]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Json => writer.write_all(&[10]).map_err(|e| format!("Write error: {}", e))?,
         DataType::Jsonb => writer.write_all(&[11]).map_err(|e| format!("Write error: {}", e))?,
+        DataType::Enum(type_name) => {
+            writer.write_all(&[12]).map_err(|e| format!("Write error: {}", e))?;
+            write_string(writer, type_name)?;
+        }
     }
     Ok(())
 }
@@ -289,6 +293,10 @@ fn read_data_type<R: Read>(reader: &mut R) -> Result<DataType, String> {
         9 => Ok(DataType::Float),
         10 => Ok(DataType::Json),
         11 => Ok(DataType::Jsonb),
+        12 => {
+            let type_name = read_string(reader)?;
+            Ok(DataType::Enum(type_name))
+        }
         _ => Err(format!("Unknown data type: {}", buf[0])),
     }
 }
