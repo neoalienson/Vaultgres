@@ -410,6 +410,8 @@ fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
         Token::Time => DataType::Time,
         Token::Timestamp => DataType::Timestamp,
         Token::Bytea | Token::Blob => DataType::Bytea,
+        Token::Json => DataType::Json,
+        Token::Jsonb => DataType::Jsonb,
         Token::Varchar => return parse_varchar(parser),
         Token::Decimal | Token::Numeric => return parse_decimal(parser),
         _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),

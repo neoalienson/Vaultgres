@@ -383,6 +383,8 @@ pub enum DataType {
     Timestamp,
     Decimal(u8, u8),
     Bytea,
+    Json,
+    Jsonb,
 }
 
 /// SELECT statement
@@ -546,6 +548,13 @@ pub enum BinaryOperator {
     Divide,
     Modulo,
     StringConcat,
+    JsonExtract,
+    JsonExtractText,
+    JsonPath,
+    JsonPathText,
+    JsonExists,
+    JsonExistsAny,
+    JsonExistsAll,
 }
 
 /// Unary operator

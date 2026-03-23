@@ -23,6 +23,8 @@ mod batch_insert_tests;
 mod catalog_tests;
 #[cfg(test)]
 mod datatype_tests;
+#[cfg(test)]
+mod json_tests;
 
 // Re-export public types
 pub use crate::parser::ast::{ColumnDef as Column, DataType};

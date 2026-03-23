@@ -48,6 +48,8 @@ impl InsertValidator {
             | (DataType::Float, Value::Int(_))
             | (DataType::Text, Value::Text(_))
             | (DataType::Varchar(_), Value::Text(_)) => Ok(val),
+            (DataType::Json, Value::Text(s)) => Ok(Value::Json(s.clone())),
+            (DataType::Jsonb, Value::Text(s)) => Ok(Value::Json(s.clone())),
             _ => Err(format!("Type mismatch for column '{}'", col.name)),
         }
     }

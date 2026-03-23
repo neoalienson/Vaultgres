@@ -254,11 +254,16 @@ VaultGres development roadmap with planned features and milestones.
 
 **Advanced SQL**
 - Full-text search with tsvector/tsquery
-- JSON/JSONB types with operators
+- ✅ JSON/JSONB types with operators
+  - ✅ DataType::Json and DataType::Jsonb
+  - ✅ JSON operators: ->, ->>, #>, #>>, ? (exists), ?| (exists any), ?& (exists all)
+  - ✅ INSERT validation and type checking
+  - ✅ Integration with catalog and persistence layers
+  - ✅ Unit tests (16 tests) and integration tests (22 tests)
 - Array types and operations
 - Range types (int4range, tsrange, etc.)
 - Composite types (user-defined types)
-- Enum types
+- Enum types (partially implemented: Value::Enum storage exists, but CREATE TYPE AS ENUM not supported)
 
 ## Version 0.7.0 (RC)
 

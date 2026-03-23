@@ -30,6 +30,7 @@ mod isolation_test;
 mod join_execution_test;
 mod join_order_test;
 mod join_test;
+mod json_test;
 mod lateral_test;
 mod lock_timeout_test;
 mod materialized_view_test;

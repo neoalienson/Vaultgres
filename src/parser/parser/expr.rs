@@ -48,8 +48,33 @@ fn parse_not(parser: &mut Parser) -> Result<Expr> {
     parse_comparison(parser)
 }
 
-fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
+/// Parse JSON operators: ->, ->>, #>, #>>, ?, ?|, ?&
+/// Lower precedence than additive, higher than comparison
+fn parse_json_operators(parser: &mut Parser) -> Result<Expr> {
     let left = parse_additive(parser)?;
+
+    loop {
+        let op = match parser.current_token() {
+            Token::Arrow => BinaryOperator::JsonExtract,
+            Token::DoubleArrow => BinaryOperator::JsonExtractText,
+            Token::HashArrow => BinaryOperator::JsonPath,
+            Token::HashDoubleArrow => BinaryOperator::JsonPathText,
+            Token::Question => BinaryOperator::JsonExists,
+            Token::QuestionBar => BinaryOperator::JsonExistsAny,
+            Token::QuestionAmpersand => BinaryOperator::JsonExistsAll,
+            _ => break,
+        };
+
+        parser.advance();
+        let right = parse_additive(parser)?;
+        return Ok(Expr::BinaryOp { left: Box::new(left), op, right: Box::new(right) });
+    }
+
+    Ok(left)
+}
+
+fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
+    let left = parse_json_operators(parser)?;
 
     // Handle IS NULL and IS NOT NULL
     if parser.current_token() == &Token::Is {

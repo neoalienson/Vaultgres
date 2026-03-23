@@ -26,6 +26,8 @@ pub enum Token {
     Numeric,
     Bytea,
     Blob,
+    Json,
+    Jsonb,
     Describe,
     Drop,
     If,
@@ -164,6 +166,13 @@ pub enum Token {
     GreaterThan,
     GreaterThanOrEqual,
     Dot,
+    Arrow,
+    DoubleArrow,
+    HashArrow,
+    HashDoubleArrow,
+    Question,
+    QuestionBar,
+    QuestionAmpersand,
 
     // End of input
     EOF,
@@ -210,7 +219,17 @@ impl Lexer {
             }
             '-' => {
                 self.advance();
-                Ok(Token::Minus)
+                if !self.is_eof() && self.current_char() == '>' {
+                    self.advance();
+                    if !self.is_eof() && self.current_char() == '>' {
+                        self.advance();
+                        Ok(Token::DoubleArrow)
+                    } else {
+                        Ok(Token::Arrow)
+                    }
+                } else {
+                    Ok(Token::Minus)
+                }
             }
             '*' => {
                 self.advance();
@@ -271,6 +290,32 @@ impl Lexer {
                     Ok(Token::GreaterThan)
                 }
             }
+            '#' => {
+                self.advance();
+                if !self.is_eof() && self.current_char() == '>' {
+                    self.advance();
+                    if !self.is_eof() && self.current_char() == '>' {
+                        self.advance();
+                        Ok(Token::HashDoubleArrow)
+                    } else {
+                        Ok(Token::HashArrow)
+                    }
+                } else {
+                    Err(ParseError::UnexpectedToken("#".to_string()))
+                }
+            }
+            '?' => {
+                self.advance();
+                if !self.is_eof() && self.current_char() == '|' {
+                    self.advance();
+                    Ok(Token::QuestionBar)
+                } else if !self.is_eof() && self.current_char() == '&' {
+                    self.advance();
+                    Ok(Token::QuestionAmpersand)
+                } else {
+                    Ok(Token::Question)
+                }
+            }
             '.' => {
                 self.advance();
                 Ok(Token::Dot)
@@ -317,6 +362,8 @@ impl Lexer {
             "NUMERIC" => Token::Numeric,
             "BYTEA" => Token::Bytea,
             "BLOB" => Token::Blob,
+            "JSON" => Token::Json,
+            "JSONB" => Token::Jsonb,
             "DESCRIBE" => Token::Describe,
             "DROP" => Token::Drop,
             "IF" => Token::If,

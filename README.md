@@ -18,57 +18,14 @@ VaultGres is a fully-featured RDBMS built from the ground up in Rust, providing:
 - **Advanced Query Engine**: Cost-based optimizer with parallel execution
 - **Memory Safety**: Zero-cost abstractions with Rust's ownership model
 - **Security by Design**: Enterprise-grade security features built into the core
-- **High Performance**: Lock-free data structures and async I/O throughout
 
-**Key Benefits:**
-- 🚀 **Performance**: 2-3x faster than PostgreSQL on OLTP workloads
+**Key Benefits (Target State):**
 - 🔒 **Memory Safe**: No buffer overflows, use-after-free, or data races
 - 🛡️ **Security First**: TDE, column-level encryption, audit logging, data masking
 - 🔄 **Full ACID**: Serializable isolation with optimistic concurrency control
 - 🔌 **Compatible**: Works with existing PostgreSQL tools and drivers
 - 📊 **Modern Architecture**: Async runtime, vectorized execution, columnar storage
 - 🛠️ **Easy to Deploy**: Single binary, no external dependencies
-
-## Features
-
-### Core Database Engine
-- **Storage Engine**: Pluggable storage with B+Tree and LSM-Tree implementations
-- **Transaction Manager**: MVCC with snapshot isolation and serializable support
-- **Query Optimizer**: Cost-based optimization with statistics and histograms
-- **Execution Engine**: Vectorized execution with SIMD acceleration
-- **Index Support**: B-Tree, Hash, GiST, GIN, BRIN indexes
-- **WAL (Write-Ahead Logging)**: Crash recovery and point-in-time recovery
-
-### SQL Support
-- **SQL Standard**: SQL:2016 compliance with window functions, CTEs, JSON
-- **Data Types**: All PostgreSQL types including arrays, JSON, UUID, geometric
-- **Advanced Features**: Triggers, stored procedures, views, materialized views
-- **Full-Text Search**: Built-in text search with ranking and highlighting
-- **Foreign Data Wrappers**: Query external data sources
-
-### Concurrency & Performance
-- **MVCC**: Non-blocking reads, optimistic writes
-- **Parallel Query**: Automatic parallelization of scans, joins, aggregates
-- **Connection Pooling**: Built-in connection pooler
-- **Async I/O**: Tokio-based async runtime for maximum throughput
-- **Lock-Free Structures**: Concurrent B+Trees and hash tables
-
-### Operations & Monitoring
-- **Replication**: Streaming replication with automatic failover
-- **Backup & Recovery**: Online backups, PITR, incremental backups
-- **Monitoring**: Prometheus metrics, query statistics, slow query log
-- **Administration**: SQL-based configuration, online schema changes
-
-### Enterprise Security (Security by Design)
-- **Transparent Data Encryption (TDE)**: Toggle-able encryption at rest for all data files
-- **Column-Level Encryption**: Encrypt sensitive columns with per-column keys
-- **Audit Logging**: Comprehensive audit trail for compliance (SOC2, HIPAA, GDPR)
-- **Data Masking**: Dynamic data masking for sensitive information
-- **Row-Level Security**: Fine-grained access control at row level
-- **Authentication**: TLS/SSL, SCRAM-SHA-256, certificate-based auth, LDAP/Kerberos
-- **Key Management**: Integration with HSM and cloud KMS (AWS KMS, Azure Key Vault)
-- **Encryption in Transit**: Mandatory TLS 1.3 with perfect forward secrecy
-- **Zero-Knowledge Backups**: Encrypted backups with client-side keys
 
 ## Quick Start
 
@@ -174,13 +131,6 @@ COMMIT;
 - **[Query Optimizer](docs/developers/OPTIMIZER.md)** - Cost model, statistics, plan generation
 - **[Testing Guide](docs/developers/testing/TESTING.md)** - Test organization and running instructions
 - **[Roadmap](docs/developers/ROADMAP.md)** - Future features and milestones
-
-## Requirements
-
-- **Rust**: 1.75+ (2021 edition)
-- **OS**: Linux, macOS, Windows
-- **Memory**: 512MB minimum, 4GB+ recommended
-- **Disk**: SSD recommended for production
 
 ## Building from Source
 
