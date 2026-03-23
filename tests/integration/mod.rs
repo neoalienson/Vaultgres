@@ -41,6 +41,7 @@ mod multi_statement_test;
 mod not_null_test;
 mod optimizer_test;
 mod parallel_executor_test;
+mod table_function_test;
 // mod parallel_ops_test; // Disabled
 mod parallel_scan_test;
 mod parallel_test;

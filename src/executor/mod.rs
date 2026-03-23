@@ -14,6 +14,7 @@ mod multiple_cte;
 pub mod operators;
 mod plpgsql;
 mod recursive_cte;
+pub mod table_function;
 mod unnest;
 pub mod volcano;
 
@@ -97,6 +98,7 @@ pub use lateral::LateralSubqueryExecutor;
 pub use multiple_cte::MultipleCTEExecutor;
 pub use plpgsql::PlPgSqlInterpreter;
 pub use recursive_cte::RecursiveCTEExecutor;
+pub use table_function::TableFunctionExecutor;
 pub use unnest::UnnestExecutor;
 
 // ============================================================================

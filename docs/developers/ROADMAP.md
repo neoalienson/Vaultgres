@@ -88,7 +88,7 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ SeqScanExecutor (volcano module)
 - ✅ FilterExecutor (operators module)
 - ✅ ProjectExecutor (operators module)
-- ⏸️ TableFunctionExecutor (stub implementation deferred)
+- ✅ TableFunctionExecutor with generate_series() and unnest() (volcano module)
 
 **Phase 2: Transform Executors** ✅ COMPLETED
 - ✅ SortExecutor (volcano module)
