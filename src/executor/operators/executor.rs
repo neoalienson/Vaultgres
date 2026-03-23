@@ -18,6 +18,7 @@ pub enum ExecutorError {
     InternalError(String),
     InvalidInput(String),
     DivisionByZero,
+    InvalidArrayIndex(String),
 }
 
 impl fmt::Display for ExecutorError {
@@ -37,6 +38,7 @@ impl fmt::Display for ExecutorError {
             ExecutorError::InternalError(msg) => write!(f, "Internal error: {}", msg),
             ExecutorError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             ExecutorError::DivisionByZero => write!(f, "Division by zero"),
+            ExecutorError::InvalidArrayIndex(msg) => write!(f, "Invalid array index: {}", msg),
         }
     }
 }

@@ -454,6 +454,47 @@ impl BuiltinFunctions {
                 volatility: crate::catalog::FunctionVolatility::Immutable,
             })
             .unwrap();
+        registry
+            .register(Function {
+                name: "unnest".to_string(),
+                parameters: vec![Parameter {
+                    name: "arr".to_string(),
+                    data_type: "ARRAY".to_string(),
+                    default: None,
+                }],
+                return_type: "ANY".to_string(),
+                language: FunctionLanguage::Sql,
+                body: "BUILTIN:unnest".to_string(),
+                is_variadic: false,
+                cost: 100.0,
+                rows: 0,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
+            })
+            .unwrap();
+        registry
+            .register(Function {
+                name: "array_position".to_string(),
+                parameters: vec![
+                    Parameter {
+                        name: "arr".to_string(),
+                        data_type: "ARRAY".to_string(),
+                        default: None,
+                    },
+                    Parameter {
+                        name: "elem".to_string(),
+                        data_type: "ANY".to_string(),
+                        default: None,
+                    },
+                ],
+                return_type: "INT".to_string(),
+                language: FunctionLanguage::Sql,
+                body: "BUILTIN:array_position".to_string(),
+                is_variadic: false,
+                cost: 100.0,
+                rows: 1,
+                volatility: crate::catalog::FunctionVolatility::Immutable,
+            })
+            .unwrap();
     }
 
     fn register_json_functions(registry: &mut FunctionRegistry) {
@@ -742,6 +783,26 @@ impl BuiltinFunctions {
                     Ok(Value::Int(truncated as i64))
                 } else {
                     Err("Expected TEXT, INT".to_string())
+                }
+            }
+            "unnest" => {
+                if let Value::Array(arr) = &args[0] {
+                    if arr.is_empty() { Ok(Value::Null) } else { Ok(arr[0].clone()) }
+                } else {
+                    Err("Expected ARRAY".to_string())
+                }
+            }
+            "array_position" => {
+                if let Value::Array(arr) = &args[0] {
+                    let target = &args[1];
+                    for (i, elem) in arr.iter().enumerate() {
+                        if elem == target {
+                            return Ok(Value::Int((i + 1) as i64));
+                        }
+                    }
+                    Ok(Value::Null)
+                } else {
+                    Err("Expected ARRAY".to_string())
                 }
             }
             _ => Err(format!("Unknown builtin function: {}", name)),

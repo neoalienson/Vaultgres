@@ -30,6 +30,7 @@ pub enum Token {
     Json,
     Jsonb,
     Enum,
+    Array,
     Describe,
     Drop,
     Alter,
@@ -179,6 +180,13 @@ pub enum Token {
     Question,
     QuestionBar,
     QuestionAmpersand,
+    LeftBracket,
+    RightBracket,
+    AtSign,
+    AndAnd,
+    PipePipe,
+    AtGreater,
+    LessAt,
 
     // End of input
     EOF,
@@ -283,6 +291,9 @@ impl Lexer {
                 if !self.is_eof() && self.current_char() == '=' {
                     self.advance();
                     Ok(Token::LessThanOrEqual)
+                } else if !self.is_eof() && self.current_char() == '@' {
+                    self.advance();
+                    Ok(Token::LessAt)
                 } else {
                     Ok(Token::LessThan)
                 }
@@ -320,6 +331,41 @@ impl Lexer {
                     Ok(Token::QuestionAmpersand)
                 } else {
                     Ok(Token::Question)
+                }
+            }
+            '[' => {
+                self.advance();
+                Ok(Token::LeftBracket)
+            }
+            ']' => {
+                self.advance();
+                Ok(Token::RightBracket)
+            }
+            '@' => {
+                self.advance();
+                if !self.is_eof() && self.current_char() == '>' {
+                    self.advance();
+                    Ok(Token::AtGreater)
+                } else {
+                    Err(ParseError::UnexpectedToken("@".to_string()))
+                }
+            }
+            '&' => {
+                self.advance();
+                if !self.is_eof() && self.current_char() == '&' {
+                    self.advance();
+                    Ok(Token::AndAnd)
+                } else {
+                    Err(ParseError::UnexpectedToken("&".to_string()))
+                }
+            }
+            '|' => {
+                self.advance();
+                if !self.is_eof() && self.current_char() == '|' {
+                    self.advance();
+                    Ok(Token::PipePipe)
+                } else {
+                    Err(ParseError::UnexpectedToken("|".to_string()))
                 }
             }
             '.' => {
@@ -372,6 +418,7 @@ impl Lexer {
             "JSON" => Token::Json,
             "JSONB" => Token::Jsonb,
             "ENUM" => Token::Enum,
+            "ARRAY" => Token::Array,
             "DESCRIBE" => Token::Describe,
             "DROP" => Token::Drop,
             "ALTER" => Token::Alter,

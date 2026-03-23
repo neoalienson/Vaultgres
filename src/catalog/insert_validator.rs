@@ -35,6 +35,13 @@ impl InsertValidator {
             Expr::Float(f) => Ok(Value::Float(*f)),
             Expr::String(s) => Ok(Value::Text(s.clone())),
             Expr::Null => Ok(Value::Null),
+            Expr::Array(arr) => {
+                let mut values = Vec::new();
+                for elem in arr {
+                    values.push(Self::parse_value(elem, _enum_types)?);
+                }
+                Ok(Value::Array(values))
+            }
             _ => Err("Invalid value expression".to_string()),
         }
     }
@@ -54,7 +61,8 @@ impl InsertValidator {
             | (DataType::Float, Value::Float(_))
             | (DataType::Float, Value::Int(_))
             | (DataType::Text, Value::Text(_))
-            | (DataType::Varchar(_), Value::Text(_)) => Ok(val),
+            | (DataType::Varchar(_), Value::Text(_))
+            | (DataType::Array(_), Value::Array(_)) => Ok(val),
             (DataType::Json, Value::Text(s)) => Ok(Value::Json(s.clone())),
             (DataType::Jsonb, Value::Text(s)) => Ok(Value::Json(s.clone())),
             (DataType::Enum(type_name), Value::Text(label)) => {

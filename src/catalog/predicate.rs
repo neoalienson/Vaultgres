@@ -162,6 +162,16 @@ impl PredicateEvaluator {
                 )?;
                 Ok(left_result || right_result)
             }
+            BinaryOperator::ArrayContains
+            | BinaryOperator::ArrayContainedBy
+            | BinaryOperator::ArrayOverlaps
+            | BinaryOperator::ArrayConcat => {
+                let left_val =
+                    Self::evaluate_expr_with_subquery(left, tuple, schema, subquery_eval)?;
+                let right_val =
+                    Self::evaluate_expr_with_subquery(right, tuple, schema, subquery_eval)?;
+                Self::eval_array_op(&left_val, op, &right_val)
+            }
             _ => {
                 let left_val =
                     Self::evaluate_expr_with_subquery(left, tuple, schema, subquery_eval)?;
@@ -231,6 +241,57 @@ impl PredicateEvaluator {
         }
     }
 
+    fn eval_array_op(left: &Value, op: &BinaryOperator, right: &Value) -> Result<bool, String> {
+        match op {
+            BinaryOperator::ArrayContains => match (left, right) {
+                (Value::Array(arr), elem) => {
+                    for item in arr {
+                        if item == elem {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                }
+                _ => Err("Array contains (@>) requires array on left side".to_string()),
+            },
+            BinaryOperator::ArrayContainedBy => match (left, right) {
+                (Value::Array(left_arr), Value::Array(right_arr)) => {
+                    for elem in left_arr {
+                        let mut found = false;
+                        for item in right_arr {
+                            if item == elem {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            return Ok(false);
+                        }
+                    }
+                    Ok(true)
+                }
+                _ => Err("Array contained by (<@) requires arrays on both sides".to_string()),
+            },
+            BinaryOperator::ArrayOverlaps => match (left, right) {
+                (Value::Array(l), Value::Array(r)) => {
+                    for left_item in l {
+                        for right_item in r {
+                            if left_item == right_item {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+                _ => Err("Array overlaps (&&) requires arrays on both sides".to_string()),
+            },
+            BinaryOperator::ArrayConcat => {
+                Err("Array concat (||) not supported in WHERE clause".to_string())
+            }
+            _ => Err("Not an array operator".to_string()),
+        }
+    }
+
     pub fn evaluate_expr_with_subquery<F>(
         expr: &Expr,
         tuple: &[Value],
@@ -272,6 +333,18 @@ impl PredicateEvaluator {
                 subquery_eval(select)
             }
             Expr::List(_) => Err("List not evaluable as value".to_string()),
+            Expr::Array(arr) => {
+                let mut values = Vec::new();
+                for elem in arr {
+                    values.push(Self::evaluate_expr_with_subquery(
+                        elem,
+                        tuple,
+                        schema,
+                        subquery_eval,
+                    )?);
+                }
+                Ok(Value::Array(values))
+            }
             _ => {
                 log::warn!("Unsupported expression type in predicate evaluation");
                 Err("Unsupported expression".to_string())

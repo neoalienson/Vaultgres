@@ -192,6 +192,9 @@ impl Eval {
             Expr::List(_) => Err(ExecutorError::UnsupportedExpression(
                 "List not supported in this context".to_string(),
             )),
+            Expr::Array(_) => Err(ExecutorError::UnsupportedExpression(
+                "Array expressions not supported in this context".to_string(),
+            )),
             Expr::Subquery(stmt) => {
                 // Execute scalar subquery
                 if let Some(catalog) = catalog {
@@ -407,6 +410,13 @@ impl Eval {
             BinaryOperator::JsonExists => Self::eval_json_exists(left, right),
             BinaryOperator::JsonExistsAny => Self::eval_json_exists_any(left, right),
             BinaryOperator::JsonExistsAll => Self::eval_json_exists_all(left, right),
+
+            // Array operators
+            BinaryOperator::ArrayContains => Self::eval_array_contains(left, right),
+            BinaryOperator::ArrayContainedBy => Self::eval_array_contained_by(left, right),
+            BinaryOperator::ArrayOverlaps => Self::eval_array_overlaps(left, right),
+            BinaryOperator::ArrayConcat => Self::eval_array_concat(left, right),
+            BinaryOperator::ArrayAccess => Self::eval_array_access(left, right),
         }
     }
 
@@ -809,6 +819,139 @@ impl Eval {
         }
     }
 
+    /// Evaluate array contains operator (@>)
+    fn eval_array_contains(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Array(left_arr), Value::Array(right_arr)) => {
+                for elem in right_arr {
+                    let mut found = false;
+                    for item in left_arr {
+                        if item == elem {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        return Ok(Value::Bool(false));
+                    }
+                }
+                Ok(Value::Bool(true))
+            }
+            (Value::Array(arr), elem) => {
+                for item in arr {
+                    if item == elem {
+                        return Ok(Value::Bool(true));
+                    }
+                }
+                Ok(Value::Bool(false))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Array contains (@>) requires array on left side".to_string(),
+            )),
+        }
+    }
+
+    /// Evaluate array contained by operator (<@)
+    fn eval_array_contained_by(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Array(left_arr), Value::Array(right_arr)) => {
+                for elem in left_arr {
+                    let mut found = false;
+                    for item in right_arr {
+                        if item == elem {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        return Ok(Value::Bool(false));
+                    }
+                }
+                Ok(Value::Bool(true))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Array contained by (<@) requires arrays on both sides".to_string(),
+            )),
+        }
+    }
+
+    /// Evaluate array overlaps operator (&&)
+    fn eval_array_overlaps(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        let (left_arr, right_arr) = match (left, right) {
+            (Value::Array(l), Value::Array(r)) => (l, r),
+            _ => {
+                return Err(ExecutorError::TypeMismatch(
+                    "Array overlaps (&&) requires arrays on both sides".to_string(),
+                ));
+            }
+        };
+
+        for left_item in left_arr {
+            for right_item in right_arr {
+                if left_item == right_item {
+                    return Ok(Value::Bool(true));
+                }
+            }
+        }
+        Ok(Value::Bool(false))
+    }
+
+    /// Evaluate array concat operator (||)
+    fn eval_array_concat(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Array(l), Value::Array(r)) => {
+                let mut result = l.clone();
+                result.extend(r.clone());
+                Ok(Value::Array(result))
+            }
+            (Value::Array(arr), elem) => {
+                let mut result = arr.clone();
+                result.push(elem.clone());
+                Ok(Value::Array(result))
+            }
+            (elem, Value::Array(arr)) => {
+                let mut result = vec![elem.clone()];
+                result.extend(arr.clone());
+                Ok(Value::Array(result))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Array concat (||) requires at least one array operand".to_string(),
+            )),
+        }
+    }
+
+    /// Evaluate array element access (arr[1])
+    fn eval_array_access(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        let arr = match left {
+            Value::Array(arr) => arr,
+            _ => {
+                return Err(ExecutorError::TypeMismatch(
+                    "Array element access requires array on left side".to_string(),
+                ));
+            }
+        };
+
+        let idx = match right {
+            Value::Int(idx) => *idx,
+            _ => {
+                return Err(ExecutorError::TypeMismatch(
+                    "Array index must be an integer".to_string(),
+                ));
+            }
+        };
+
+        if idx <= 0 {
+            return Err(ExecutorError::InvalidArrayIndex("Array index must be >= 1".to_string()));
+        }
+
+        let idx = idx as usize;
+        if idx > arr.len() {
+            return Ok(Value::Null);
+        }
+
+        Ok(arr[idx - 1].clone())
+    }
+
     /// Evaluate a function call
     pub fn eval_function(name: &str, args: Vec<Value>) -> Result<Value, ExecutorError> {
         match name.to_uppercase().as_str() {
@@ -1201,5 +1344,173 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result, Value::Text("first".to_string()));
+    }
+
+    #[test]
+    fn test_array_contains_true() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let right = Value::Int(2);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_array_contains_false() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let right = Value::Int(5);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_array_contains_empty_array() {
+        let left = Value::Array(vec![]);
+        let right = Value::Int(1);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_array_contained_by() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let right = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayContainedBy, &right).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_array_contained_by_false() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let right = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayContainedBy, &right).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_array_overlaps_true() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let right = Value::Array(vec![Value::Int(2), Value::Int(3)]);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayOverlaps, &right).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_array_overlaps_false() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let right = Value::Array(vec![Value::Int(3), Value::Int(4)]);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayOverlaps, &right).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_array_concat_two_arrays() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let right = Value::Array(vec![Value::Int(3), Value::Int(4)]);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        assert_eq!(
+            result,
+            Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)])
+        );
+    }
+
+    #[test]
+    fn test_array_concat_array_and_element() {
+        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let right = Value::Int(3);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        assert_eq!(result, Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+    }
+
+    #[test]
+    fn test_array_concat_element_and_array() {
+        let left = Value::Int(1);
+        let right = Value::Array(vec![Value::Int(2), Value::Int(3)]);
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        assert_eq!(result, Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+    }
+
+    #[test]
+    fn test_array_concat_with_strings() {
+        let left = Value::Array(vec![Value::Text("a".to_string()), Value::Text("b".to_string())]);
+        let right = Value::Text("c".to_string());
+        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        assert_eq!(
+            result,
+            Value::Array(vec![
+                Value::Text("a".to_string()),
+                Value::Text("b".to_string()),
+                Value::Text("c".to_string())
+            ])
+        );
+    }
+
+    #[test]
+    fn test_array_element_access_valid_index() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(2);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Int(20));
+    }
+
+    #[test]
+    fn test_array_element_access_first_index() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(1);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Int(10));
+    }
+
+    #[test]
+    fn test_array_element_access_last_index() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(3);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Int(30));
+    }
+
+    #[test]
+    fn test_array_element_access_out_of_bounds() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(5);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Null);
+    }
+
+    #[test]
+    fn test_array_element_access_zero_index() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(0);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_array_element_access_negative_index() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let idx = Value::Int(-1);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_array_element_access_empty_array() {
+        let arr = Value::Array(vec![]);
+        let idx = Value::Int(1);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Null);
+    }
+
+    #[test]
+    fn test_array_element_access_string_array() {
+        let arr = Value::Array(vec![
+            Value::Text("apple".to_string()),
+            Value::Text("banana".to_string()),
+            Value::Text("cherry".to_string()),
+        ]);
+        let idx = Value::Int(2);
+        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        assert_eq!(result, Value::Text("banana".to_string()));
     }
 }

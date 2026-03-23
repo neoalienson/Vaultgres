@@ -3,6 +3,7 @@
 mod advanced_index_test;
 mod advanced_sql_test;
 mod alias_test;
+mod array_test;
 mod bind_param_test;
 mod buffer_pool_disk_test;
 mod catalog;

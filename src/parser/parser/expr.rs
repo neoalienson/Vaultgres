@@ -151,6 +151,10 @@ fn parse_comparison(parser: &mut Parser) -> Result<Expr> {
         Token::GreaterThan => BinaryOperator::GreaterThan,
         Token::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
         Token::Like => BinaryOperator::Like,
+        Token::AtGreater => BinaryOperator::ArrayContains,
+        Token::LessAt => BinaryOperator::ArrayContainedBy,
+        Token::AndAnd => BinaryOperator::ArrayOverlaps,
+        Token::PipePipe => BinaryOperator::ArrayConcat,
         _ => return Ok(left),
     };
 
@@ -209,7 +213,20 @@ fn parse_unary(parser: &mut Parser) -> Result<Expr> {
             expr: Box::new(expr),
         });
     }
-    parse_primary(parser)
+    let mut expr = parse_primary(parser)?;
+
+    while parser.current_token() == &Token::LeftBracket {
+        parser.advance();
+        let index = parse_expr(parser)?;
+        parser.expect(Token::RightBracket)?;
+        expr = Expr::BinaryOp {
+            left: Box::new(expr),
+            op: crate::parser::ast::BinaryOperator::ArrayAccess,
+            right: Box::new(index),
+        };
+    }
+
+    Ok(expr)
 }
 
 pub fn parse_primary(parser: &mut Parser) -> Result<Expr> {
@@ -269,6 +286,39 @@ pub fn parse_primary(parser: &mut Parser) -> Result<Expr> {
         Token::Star => {
             parser.advance();
             Ok(Expr::Star)
+        }
+        Token::Array => {
+            parser.advance();
+            parser.expect(Token::LeftBracket)?;
+            let mut elements = Vec::new();
+            while parser.current_token() != &Token::RightBracket {
+                if parser.current_token() == &Token::Comma {
+                    parser.advance();
+                    continue;
+                }
+                elements.push(parse_expr(parser)?);
+                if parser.current_token() == &Token::Comma {
+                    parser.advance();
+                }
+            }
+            parser.expect(Token::RightBracket)?;
+            Ok(Expr::Array(elements))
+        }
+        Token::LeftBracket => {
+            parser.advance();
+            let mut elements = Vec::new();
+            while parser.current_token() != &Token::RightBracket {
+                if parser.current_token() == &Token::Comma {
+                    parser.advance();
+                    continue;
+                }
+                elements.push(parse_expr(parser)?);
+                if parser.current_token() == &Token::Comma {
+                    parser.advance();
+                }
+            }
+            parser.expect(Token::RightBracket)?;
+            Ok(Expr::Array(elements))
         }
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
@@ -683,6 +733,178 @@ mod tests {
                 assert!(matches!(*right, Expr::String(ref s) if s == "suffix"));
             }
             _ => panic!("Expected Add with String"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_bracket_syntax() {
+        let expr = parse("[1, 2, 3]").unwrap();
+        match expr {
+            Expr::Array(elems) => {
+                assert_eq!(elems.len(), 3);
+                assert!(matches!(&elems[0], Expr::Number(1)));
+                assert!(matches!(&elems[1], Expr::Number(2)));
+                assert!(matches!(&elems[2], Expr::Number(3)));
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_array_keyword() {
+        let expr = parse("ARRAY[1, 2, 3]").unwrap();
+        match expr {
+            Expr::Array(elems) => {
+                assert_eq!(elems.len(), 3);
+                assert!(matches!(&elems[0], Expr::Number(1)));
+                assert!(matches!(&elems[1], Expr::Number(2)));
+                assert!(matches!(&elems[2], Expr::Number(3)));
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_parse_empty_array() {
+        let expr = parse("[]").unwrap();
+        match expr {
+            Expr::Array(elems) => {
+                assert_eq!(elems.len(), 0);
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_with_strings() {
+        let expr = parse("['apple', 'banana', 'cherry']").unwrap();
+        match expr {
+            Expr::Array(elems) => {
+                assert_eq!(elems.len(), 3);
+                assert!(matches!(&elems[0], Expr::String(s) if s == "apple"));
+                assert!(matches!(&elems[1], Expr::String(s) if s == "banana"));
+                assert!(matches!(&elems[2], Expr::String(s) if s == "cherry"));
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_with_mixed_types() {
+        let expr = parse("[1, 'two', 3]").unwrap();
+        match expr {
+            Expr::Array(elems) => {
+                assert_eq!(elems.len(), 3);
+                assert!(matches!(&elems[0], Expr::Number(1)));
+                assert!(matches!(&elems[1], Expr::String(s) if s == "two"));
+                assert!(matches!(&elems[2], Expr::Number(3)));
+            }
+            _ => panic!("Expected Array"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_contains_operator() {
+        let expr = parse("a @> b").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayContains, .. } => {}
+            _ => panic!("Expected BinaryOp::ArrayContains"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_contained_by_operator() {
+        let expr = parse("a <@ b").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayContainedBy, .. } => {}
+            _ => panic!("Expected BinaryOp::ArrayContainedBy"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_overlaps_operator() {
+        let expr = parse("a && b").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayOverlaps, .. } => {}
+            _ => panic!("Expected BinaryOp::ArrayOverlaps"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_concat_operator() {
+        let expr = parse("a || b").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayConcat, .. } => {}
+            _ => panic!("Expected BinaryOp::ArrayConcat"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_contains_with_arrays() {
+        let expr = parse("[1, 2] @> [1]").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayContains, left, right } => {
+                assert!(matches!(*left.as_ref(), Expr::Array(_)));
+                assert!(matches!(*right.as_ref(), Expr::Array(_)));
+            }
+            _ => panic!("Expected ArrayContains BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_concat_with_element() {
+        let expr = parse("[1, 2] || 3").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayConcat, left, right } => {
+                assert!(matches!(*left.as_ref(), Expr::Array(_)));
+                assert!(matches!(*right.as_ref(), Expr::Number(3)));
+            }
+            _ => panic!("Expected ArrayConcat BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_element_access() {
+        let expr = parse("arr[1]").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayAccess, left, right } => {
+                assert!(matches!(left.as_ref(), Expr::Column(name) if name == "arr"));
+                assert!(matches!(right.as_ref(), Expr::Number(1)));
+            }
+            _ => panic!("Expected ArrayAccess BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_element_access_with_expression() {
+        let expr = parse("arr[1 + 1]").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayAccess, left, right } => {
+                assert!(matches!(left.as_ref(), Expr::Column(name) if name == "arr"));
+                assert!(matches!(right.as_ref(), Expr::BinaryOp { op: BinaryOperator::Add, .. }));
+            }
+            _ => panic!("Expected ArrayAccess BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_array_access() {
+        let expr = parse("arr[1][2]").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayAccess, .. } => {}
+            _ => panic!("Expected ArrayAccess BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_element_access() {
+        let expr = parse("[1, 2, 3][2]").unwrap();
+        match expr {
+            Expr::BinaryOp { op: BinaryOperator::ArrayAccess, left, right } => {
+                assert!(matches!(left.as_ref(), Expr::Array(_)));
+                assert!(matches!(right.as_ref(), Expr::Number(2)));
+            }
+            _ => panic!("Expected ArrayAccess BinaryOp"),
         }
     }
 }

@@ -419,6 +419,7 @@ pub enum DataType {
     Json,
     Jsonb,
     Enum(String),
+    Array(Box<DataType>),
 }
 
 /// SELECT statement
@@ -525,6 +526,7 @@ pub enum Expr {
         order_by: Vec<OrderByExpr>,
     },
     List(Vec<Expr>),
+    Array(Vec<Expr>),
     IsNull(Box<Expr>),
     IsNotNull(Box<Expr>),
     Subquery(Box<SelectStmt>),
@@ -589,6 +591,11 @@ pub enum BinaryOperator {
     JsonExists,
     JsonExistsAny,
     JsonExistsAll,
+    ArrayContains,
+    ArrayContainedBy,
+    ArrayOverlaps,
+    ArrayConcat,
+    ArrayAccess,
 }
 
 /// Unary operator

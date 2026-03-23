@@ -15,6 +15,10 @@ name = "smoke"
 path = "scenarios/smoke_tests.rs"
 
 [[test]]
+name = "array"
+path = "scenarios/array_tests.rs"
+
+[[test]]
 name = "scenarios"
 path = "scenarios/oltp_workload.rs"
 

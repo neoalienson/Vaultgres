@@ -404,7 +404,7 @@ fn parse_column_def(parser: &mut Parser) -> Result<ColumnDef> {
 }
 
 fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
-    let dtype = match parser.current_token() {
+    let base_dtype = match parser.current_token() {
         Token::Int => DataType::Int,
         Token::Serial => DataType::Serial,
         Token::Text => DataType::Text,
@@ -415,12 +415,39 @@ fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
         Token::Bytea | Token::Blob => DataType::Bytea,
         Token::Json => DataType::Json,
         Token::Jsonb => DataType::Jsonb,
+        Token::Enum => {
+            parser.advance();
+            if let Token::Identifier(type_name) = parser.current_token() {
+                let type_name = type_name.clone();
+                parser.advance();
+                return Ok(DataType::Enum(type_name));
+            } else {
+                return Err(ParseError::UnexpectedToken(format!(
+                    "Expected enum type name, got {:?}",
+                    parser.current_token()
+                )));
+            }
+        }
+        Token::Array => {
+            parser.advance();
+            parser.expect(Token::LeftBracket)?;
+            parser.expect(Token::RightBracket)?;
+            let inner = parse_data_type(parser)?;
+            return Ok(DataType::Array(Box::new(inner)));
+        }
         Token::Varchar => return parse_varchar(parser),
         Token::Decimal | Token::Numeric => return parse_decimal(parser),
         _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     };
     parser.advance();
-    Ok(dtype)
+
+    if parser.current_token() == &Token::LeftBracket {
+        parser.advance();
+        parser.expect(Token::RightBracket)?;
+        return Ok(DataType::Array(Box::new(base_dtype)));
+    }
+
+    Ok(base_dtype)
 }
 
 fn parse_varchar(parser: &mut Parser) -> Result<DataType> {

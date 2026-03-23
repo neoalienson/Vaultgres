@@ -194,6 +194,13 @@ impl UpdateDeleteExecutor {
                     .collect();
                 Self::eval_function(name, evaluated_args?)
             }
+            Expr::Array(arr) => {
+                let mut values = Vec::new();
+                for elem in arr {
+                    values.push(Self::evaluate_expr(elem, tuple_data, schema, catalog)?);
+                }
+                Ok(Value::Array(values))
+            }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
         }
     }
@@ -386,6 +393,20 @@ impl UpdateDeleteExecutor {
                     .collect();
                 Self::eval_function(name, evaluated_args?)
             }
+            Expr::Array(arr) => {
+                let mut values = Vec::new();
+                for elem in arr {
+                    values.push(Self::evaluate_expr_with_tuples(
+                        elem,
+                        tuple_data,
+                        schema,
+                        catalog,
+                        subquery_tuples,
+                        snapshot,
+                    )?);
+                }
+                Ok(Value::Array(values))
+            }
             _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
         }
     }
@@ -400,7 +421,8 @@ impl UpdateDeleteExecutor {
             | (DataType::Boolean, Value::Bool(_))
             | (DataType::Json, Value::Json(_))
             | (DataType::Jsonb, Value::Json(_))
-            | (DataType::Enum(_), Value::Enum(_)) => Ok(()),
+            | (DataType::Enum(_), Value::Enum(_))
+            | (DataType::Array(_), Value::Array(_)) => Ok(()),
             _ => Err(format!("Type mismatch for column '{}'", col_name)),
         }
     }

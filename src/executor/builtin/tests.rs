@@ -337,6 +337,59 @@ mod tests {
     }
 
     #[test]
+    fn test_unnest() {
+        let arr = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let result = BuiltinFunctions::execute("unnest", vec![arr]).unwrap();
+        assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_unnest_empty_array() {
+        let arr = Value::Array(vec![]);
+        let result = BuiltinFunctions::execute("unnest", vec![arr]).unwrap();
+        assert_eq!(result, Value::Null);
+    }
+
+    #[test]
+    fn test_array_position_found() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let result =
+            BuiltinFunctions::execute("array_position", vec![arr, Value::Int(20)]).unwrap();
+        assert_eq!(result, Value::Int(2));
+    }
+
+    #[test]
+    fn test_array_position_first_element() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let result =
+            BuiltinFunctions::execute("array_position", vec![arr, Value::Int(10)]).unwrap();
+        assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_array_position_not_found() {
+        let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+        let result =
+            BuiltinFunctions::execute("array_position", vec![arr, Value::Int(40)]).unwrap();
+        assert_eq!(result, Value::Null);
+    }
+
+    #[test]
+    fn test_array_position_with_strings() {
+        let arr = Value::Array(vec![
+            Value::Text("apple".to_string()),
+            Value::Text("banana".to_string()),
+            Value::Text("cherry".to_string()),
+        ]);
+        let result = BuiltinFunctions::execute(
+            "array_position",
+            vec![arr, Value::Text("banana".to_string())],
+        )
+        .unwrap();
+        assert_eq!(result, Value::Int(2));
+    }
+
+    #[test]
     fn test_split_part() {
         let result = BuiltinFunctions::execute(
             "split_part",

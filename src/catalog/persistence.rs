@@ -265,6 +265,10 @@ fn write_data_type<W: Write>(writer: &mut W, dt: &DataType) -> Result<(), String
             writer.write_all(&[12]).map_err(|e| format!("Write error: {}", e))?;
             write_string(writer, type_name)?;
         }
+        DataType::Array(inner) => {
+            writer.write_all(&[13]).map_err(|e| format!("Write error: {}", e))?;
+            write_data_type(writer, inner)?;
+        }
     }
     Ok(())
 }
@@ -296,6 +300,10 @@ fn read_data_type<R: Read>(reader: &mut R) -> Result<DataType, String> {
         12 => {
             let type_name = read_string(reader)?;
             Ok(DataType::Enum(type_name))
+        }
+        13 => {
+            let inner = read_data_type(reader)?;
+            Ok(DataType::Array(Box::new(inner)))
         }
         _ => Err(format!("Unknown data type: {}", buf[0])),
     }
