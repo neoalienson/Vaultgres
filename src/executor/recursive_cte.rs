@@ -57,6 +57,11 @@ impl RecursiveCTEExecutor {
                 Value::Timestamp(ts) => key.extend_from_slice(&ts.to_le_bytes()),
                 Value::Decimal(v, _) => key.extend_from_slice(&v.to_le_bytes()),
                 Value::Bytea(b) => key.extend_from_slice(b),
+                Value::Enum(e) => {
+                    key.extend_from_slice(e.type_name.as_bytes());
+                    key.push(0);
+                    key.extend_from_slice(&e.index.to_le_bytes());
+                }
                 Value::Null => key.push(0),
             }
             key.push(255);

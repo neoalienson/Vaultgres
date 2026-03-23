@@ -118,6 +118,11 @@ impl UnionExecutor {
                 v.hash(hasher);
                 s.hash(hasher);
             }
+            Value::Enum(e) => {
+                "Enum".hash(hasher);
+                e.type_name.hash(hasher);
+                e.index.hash(hasher);
+            }
         }
     }
 }

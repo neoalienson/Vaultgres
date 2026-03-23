@@ -1,6 +1,7 @@
 // Pet Store Test Modules
 pub mod cleanup;
 pub mod edge_case_tests;
+pub mod enum_tests;
 pub mod insert_tests;
 pub mod persistence_tests;
 pub mod select_tests;
@@ -35,6 +36,11 @@ pub fn test_pet_store_comprehensive() {
     );
     assert!(result.is_ok());
     assert!(result.unwrap().contains("Alice"));
+
+    // Enum type tests
+    eprintln!("[PetStore] Testing ENUM types...");
+    enum_tests::run_enum_tests(&db);
+    enum_tests::cleanup_enum_types(&db);
 
     eprintln!("[PetStore] Testing LEFT JOIN...");
     let result = db

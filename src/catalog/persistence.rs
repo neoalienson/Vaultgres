@@ -1,4 +1,4 @@
-use super::{Function, TableSchema, Tuple, Value};
+use super::{EnumValue, Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
@@ -342,6 +342,11 @@ fn write_value<W: Write>(writer: &mut W, value: &Value) -> Result<(), String> {
             write_u32(writer, b.len() as u32)?;
             writer.write_all(b).map_err(|e| format!("Write error: {}", e))?;
         }
+        Value::Enum(e) => {
+            writer.write_all(&[12]).map_err(|e| format!("Write error: {}", e))?;
+            write_string(writer, &e.type_name)?;
+            writer.write_all(&e.index.to_le_bytes()).map_err(|e| format!("Write error: {}", e))?;
+        }
         Value::Null => {
             writer.write_all(&[2]).map_err(|e| format!("Write error: {}", e))?;
         }
@@ -414,6 +419,13 @@ fn read_value<R: Read>(reader: &mut R) -> Result<Value, String> {
             let mut buf = vec![0u8; len as usize];
             reader.read_exact(&mut buf).map_err(|e| format!("Read error: {}", e))?;
             Ok(Value::Bytea(buf))
+        }
+        12 => {
+            let type_name = read_string(reader)?;
+            let mut buf = [0u8; 4];
+            reader.read_exact(&mut buf).map_err(|e| format!("Read error: {}", e))?;
+            let index = i32::from_le_bytes(buf);
+            Ok(Value::Enum(EnumValue { type_name, index }))
         }
         _ => Err(format!("Unknown value type: {}", buf[0])),
     }

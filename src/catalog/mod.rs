@@ -34,4 +34,4 @@ pub use schema::TableSchema;
 pub use string_functions::StringFunctions;
 pub use tuple::Tuple;
 pub use unique::UniqueValidator;
-pub use value::Value;
+pub use value::{EnumValue, Value};

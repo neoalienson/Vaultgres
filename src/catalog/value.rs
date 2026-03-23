@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EnumValue {
+    pub type_name: String,
+    pub index: i32,
+}
+
 /// Value types stored in tuples
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
@@ -14,6 +20,7 @@ pub enum Value {
     Timestamp(i64),
     Decimal(i128, u8),
     Bytea(Vec<u8>),
+    Enum(EnumValue),
     Null,
 }
 
@@ -31,6 +38,12 @@ impl Value {
             Value::Timestamp(ts) => ts.to_le_bytes().to_vec(),
             Value::Decimal(_, _) => b"DECIMAL".to_vec(), // Placeholder
             Value::Bytea(b) => b.clone(),
+            Value::Enum(e) => {
+                let mut bytes = e.type_name.as_bytes().to_vec();
+                bytes.push(0);
+                bytes.extend_from_slice(&e.index.to_le_bytes());
+                bytes
+            }
             Value::Null => vec![],
         }
     }
@@ -58,6 +71,12 @@ impl PartialOrd for Value {
             (Value::Timestamp(a), Value::Timestamp(b)) => a.partial_cmp(b),
             (Value::Decimal(a, s1), Value::Decimal(b, s2)) if s1 == s2 => a.partial_cmp(b),
             (Value::Bytea(a), Value::Bytea(b)) => a.partial_cmp(b),
+            (Value::Enum(a), Value::Enum(b)) => {
+                if a.type_name != b.type_name {
+                    return None;
+                }
+                a.index.partial_cmp(&b.index)
+            }
             (Value::Null, Value::Null) => Some(std::cmp::Ordering::Equal),
             _ => None,
         }
@@ -85,6 +104,10 @@ impl Ord for Value {
             (Value::Timestamp(a), Value::Timestamp(b)) => a.cmp(b),
             (Value::Decimal(a, _), Value::Decimal(b, _)) => a.cmp(b),
             (Value::Bytea(a), Value::Bytea(b)) => a.cmp(b),
+            (Value::Enum(a), Value::Enum(b)) => match a.type_name.cmp(&b.type_name) {
+                std::cmp::Ordering::Equal => a.index.cmp(&b.index),
+                other => other,
+            },
             (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
             _ => std::cmp::Ordering::Equal,
         }
@@ -108,6 +131,11 @@ impl std::hash::Hash for Value {
                 s.hash(state);
             }
             Value::Bytea(b) => b.hash(state),
+            Value::Enum(e) => {
+                "Enum".hash(state);
+                e.type_name.hash(state);
+                e.index.hash(state);
+            }
             Value::Null => 0.hash(state),
         }
     }
@@ -127,6 +155,7 @@ impl std::fmt::Display for Value {
             Value::Timestamp(ts) => write!(f, "{}", ts), // TODO: Proper timestamp display
             Value::Decimal(v, s) => write!(f, "{}.{}", v, s), // TODO: Proper decimal display
             Value::Bytea(_) => write!(f, "BYTEA"), // TODO: Proper bytea display
+            Value::Enum(e) => write!(f, "{}[{}]", e.type_name, e.index),
             Value::Null => write!(f, "NULL"),
         }
     }

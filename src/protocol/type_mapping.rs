@@ -11,6 +11,7 @@ pub mod pg_types {
     pub const FLOAT4: i32 = 700;
     pub const FLOAT8: i32 = 701;
     pub const VARCHAR: i32 = 1043;
+    pub const ENUM: i32 = 3500;
 }
 
 /// Map VaultGres Value to PostgreSQL type OID and size
@@ -27,6 +28,7 @@ pub fn value_to_pg_type(value: &Value) -> (i32, i16) {
         Value::Timestamp(_) => (pg_types::INT8, 8),
         Value::Decimal(_, _) => (pg_types::TEXT, -1),
         Value::Bytea(_) => (pg_types::TEXT, -1),
+        Value::Enum(_) => (pg_types::ENUM, 4),
         Value::Null => (pg_types::TEXT, -1),
     }
 }
@@ -78,6 +80,7 @@ pub fn serialize_value(value: &Value) -> Option<Vec<u8>> {
             let hex_str = b.iter().map(|byte| format!("{:02x}", byte)).collect::<String>();
             Some(format!("\\x{}", hex_str).into_bytes())
         }
+        Value::Enum(e) => Some(format!("{}[{}]", e.type_name, e.index).into_bytes()),
         Value::Null => None,
     }
 }
