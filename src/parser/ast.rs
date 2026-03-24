@@ -545,6 +545,7 @@ pub enum Expr {
         arg: Box<Expr>,
         partition_by: Vec<String>,
         order_by: Vec<OrderByExpr>,
+        window_frame: Option<WindowFrame>,
     },
     List(Vec<Expr>),
     Array(Vec<Expr>),
@@ -584,8 +585,41 @@ pub enum WindowFunc {
     RowNumber,
     Rank,
     DenseRank,
+    DenseRankWithNulls,
+    PercentRank,
+    CumeDist,
     Lag,
     Lead,
+    FirstValue,
+    LastValue,
+    NthValue,
+    Ntile,
+}
+
+/// Window frame type
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum WindowFrameMode {
+    Rows,
+    Range,
+    Groups,
+}
+
+/// Window frame bound
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum WindowFrameBound {
+    UnboundedPreceding,
+    UnboundedFollowing,
+    CurrentRow,
+    Preceding(i64),
+    Following(i64),
+}
+
+/// Window frame specification
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WindowFrame {
+    pub mode: WindowFrameMode,
+    pub start: WindowFrameBound,
+    pub end: Option<WindowFrameBound>,
 }
 
 /// Binary operator
@@ -1105,6 +1139,7 @@ mod tests {
             arg: Box::new(Expr::Star),
             partition_by: vec!["department".to_string()],
             order_by: vec![OrderByExpr { column: "salary".to_string(), ascending: false }],
+            window_frame: None,
         };
         assert!(matches!(window, Expr::Window { .. }));
 

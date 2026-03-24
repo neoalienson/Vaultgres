@@ -114,7 +114,7 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ CaseExecutor (volcano module)
 - ✅ GroupByExecutor (volcano module - sort-based grouping, alternative to HashAggExecutor)
 - ✅ CTEExecutor with WITH/WITH RECURSIVE support (volcano module, planner integration)
-- ⏸️ WindowExecutor (deferred - requires partition handling)
+- ✅ WindowExecutor (volcano module - supports ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, NTH_VALUE, PERCENT_RANK, CUME_DIST)
 
 **Phase 6: Parallel Execution Infrastructure** ✅ COMPLETED
 - ✅ Work-stealing scheduler migrated to Tuple format

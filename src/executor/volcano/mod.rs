@@ -25,6 +25,7 @@ mod sort;
 mod subquery;
 mod subquery_scan;
 mod union;
+mod window;
 
 pub use aggregate::{AggregateExecutor, AggregateFunction};
 pub use case::CaseExecutor;
@@ -50,3 +51,4 @@ pub use sort::SortExecutor;
 pub use subquery::SubqueryExecutor;
 pub use subquery_scan::SubqueryScanExecutor;
 pub use union::{UnionExecutor, UnionType};
+pub use window::{WindowExecutor, create_window_info};

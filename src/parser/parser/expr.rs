@@ -416,7 +416,7 @@ fn parse_window(parser: &mut Parser) -> Result<Expr> {
 
     parser.expect(Token::RightParen)?;
 
-    Ok(Expr::Window { func, arg, partition_by, order_by })
+    Ok(Expr::Window { func, arg, partition_by, order_by, window_frame: None })
 }
 
 fn parse_case(parser: &mut Parser) -> Result<Expr> {

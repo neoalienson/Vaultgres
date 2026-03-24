@@ -4,9 +4,11 @@ use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
 use crate::executor::volcano::{
     CTEExecutor, DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType,
     LimitExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
-    VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState,
+    VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState, WindowExecutor,
 };
-use crate::parser::ast::{AggregateFunc, CTE, ColumnDef, DataType, Expr, SelectStmt, WithStmt};
+use crate::parser::ast::{
+    AggregateFunc, CTE, ColumnDef, DataType, Expr, SelectStmt, WindowFunc, WithStmt,
+};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -249,6 +251,36 @@ impl Planner {
             );
         }
 
+        // 4b. Window Functions (after HAVING, before ORDER BY)
+        let window_exprs: Vec<_> =
+            stmt.columns.iter().filter(|col| Self::contains_window(col)).collect();
+
+        if !window_exprs.is_empty() {
+            use crate::executor::volcano::create_window_info;
+
+            let window_infos: Vec<_> = window_exprs
+                .iter()
+                .filter_map(|col| {
+                    if let Expr::Window { func, arg, partition_by, order_by, window_frame } = col {
+                        Some(create_window_info(
+                            func.clone(),
+                            arg.clone(),
+                            partition_by.clone(),
+                            order_by.clone(),
+                            window_frame.clone(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if !window_infos.is_empty() {
+                let window_output_schema = current_schema.clone();
+                plan = Box::new(WindowExecutor::new(plan, window_infos, window_output_schema)?);
+            }
+        }
+
         // 5. Order By (BEFORE projection so ORDER BY can reference non-selected columns)
         if let Some(order_by_exprs) = &stmt.order_by {
             if !order_by_exprs.is_empty() {
@@ -319,6 +351,43 @@ impl Planner {
             Expr::Alias { expr, .. } => Self::contains_aggregate(expr),
             _ => false,
         }
+    }
+
+    /// Helper to determine if an Expr contains a window function
+    fn contains_window(expr: &Expr) -> bool {
+        match expr {
+            Expr::Window { .. } => true,
+            Expr::FunctionCall { args, .. } => args.iter().any(Self::contains_window),
+            Expr::Alias { expr, .. } => Self::contains_window(expr),
+            _ => false,
+        }
+    }
+
+    /// Extract window expressions from SELECT columns
+    fn extract_window_exprs(
+        columns: &[Expr],
+    ) -> Vec<(
+        usize,
+        WindowFunc,
+        Box<Expr>,
+        Vec<String>,
+        Vec<crate::parser::ast::OrderByExpr>,
+        Option<crate::parser::ast::WindowFrame>,
+    )> {
+        let mut window_exprs = Vec::new();
+        for (idx, col) in columns.iter().enumerate() {
+            if let Expr::Window { func, arg, partition_by, order_by, window_frame } = col {
+                window_exprs.push((
+                    idx,
+                    func.clone(),
+                    arg.clone(),
+                    partition_by.clone(),
+                    order_by.clone(),
+                    window_frame.clone(),
+                ));
+            }
+        }
+        window_exprs
     }
 
     /// Helper to derive the output schema after aggregation
