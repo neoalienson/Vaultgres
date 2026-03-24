@@ -116,15 +116,15 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ CTEExecutor with WITH/WITH RECURSIVE support (volcano module, planner integration)
 - ⏸️ WindowExecutor (deferred - requires partition handling)
 
-**Phase 6: Parallel Execution Infrastructure** ⚠️ PARTIALLY COMPLETED
+**Phase 6: Parallel Execution Infrastructure** ✅ COMPLETED
 - ✅ Work-stealing scheduler migrated to Tuple format
 - ✅ Worker pool migrated to Tuple format
 - ✅ Morsel type migrated to Tuple format
 - ✅ ParallelCoordinator migrated to Tuple format
 - ✅ ParallelSeqScan migrated to Tuple format
 - ✅ ParallelSort migrated to Tuple format
-- ⏸️ ParallelHashJoin (infrastructure complete, join logic needs Tuple key extraction refactor)
-- ⏸️ ParallelHashAgg (infrastructure complete, aggregation logic needs Tuple-based grouping refactor)
+- ✅ ParallelHashJoin (infrastructure complete, join logic complete with Tuple key extraction, all join types supported)
+- ✅ ParallelHashAgg (infrastructure complete, aggregation logic complete with Tuple-based grouping, all aggregate functions supported)
 
 
 ## Version 0.2.0 (Current - Alpha)
@@ -172,9 +172,9 @@ VaultGres development roadmap with planned features and milestones.
 ## Version 0.4.0 (Beta)
 
 **Parallel Execution**
-- ⚠️ Parallel sequential scan with worker threads (infrastructure complete, operators need Tuple refactor)
-- ⚠️ Parallel hash join (infrastructure complete, join logic needs Tuple key extraction refactor)
-- ⚠️ Parallel aggregation (infrastructure complete, aggregation logic needs Tuple-based grouping refactor)
+- ✅ Parallel sequential scan with worker threads
+- ✅ Parallel hash join (all join types supported)
+- ✅ Parallel aggregation (all aggregate functions supported)
 - ⚠️ Parallel sort with merge (infrastructure complete, needs full implementation)
 - ✅ Work-stealing scheduler
 - ✅ Configurable parallelism (max_parallel_workers)

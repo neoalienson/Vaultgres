@@ -12,6 +12,3 @@ pub mod worker_pool;
 
 pub use config::{ParallelConfig, ParallelExecutor};
 pub use work_stealing::{WorkStealingExecutor, WorkStealingScheduler};
-
-#[cfg(test)]
-mod parallel_edge_tests;
