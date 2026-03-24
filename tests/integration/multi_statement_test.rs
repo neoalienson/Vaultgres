@@ -47,16 +47,26 @@ mod tests {
             )
             .unwrap();
 
-        catalog.begin_transaction().unwrap();
+        let txn = catalog.begin_transaction().unwrap();
         catalog
-            .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
+            .insert_with_txn(
+                "users",
+                &[],
+                vec![Expr::Number(1), Expr::String("Alice".to_string())],
+                &txn,
+            )
             .unwrap();
         catalog
-            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .insert_with_txn(
+                "users",
+                &[],
+                vec![Expr::Number(2), Expr::String("Bob".to_string())],
+                &txn,
+            )
             .unwrap();
         catalog.rollback_transaction().unwrap();
 
-        assert_eq!(catalog.row_count("users"), 2);
+        assert_eq!(catalog.row_count("users"), 0);
     }
 
     #[test]
@@ -77,12 +87,17 @@ mod tests {
             .insert("users", &[], vec![Expr::Number(1), Expr::String("Alice".to_string())])
             .unwrap();
 
-        catalog.begin_transaction().unwrap();
+        let txn = catalog.begin_transaction().unwrap();
         catalog
-            .insert("users", &[], vec![Expr::Number(2), Expr::String("Bob".to_string())])
+            .insert_with_txn(
+                "users",
+                &[],
+                vec![Expr::Number(2), Expr::String("Bob".to_string())],
+                &txn,
+            )
             .unwrap();
         catalog
-            .update(
+            .update_with_txn(
                 "users",
                 vec![("name".to_string(), Expr::String("Bobby".to_string()))],
                 Some(Expr::BinaryOp {
@@ -90,21 +105,23 @@ mod tests {
                     op: BinaryOperator::Equals,
                     right: Box::new(Expr::Number(2)),
                 }),
+                &txn,
             )
             .unwrap();
         catalog
-            .delete(
+            .delete_with_txn(
                 "users",
                 Some(Expr::BinaryOp {
                     left: Box::new(Expr::Column("id".to_string())),
                     op: BinaryOperator::Equals,
                     right: Box::new(Expr::Number(1)),
                 }),
+                &txn,
             )
             .unwrap();
         catalog.commit_transaction().unwrap();
 
-        assert_eq!(catalog.row_count("users"), 2);
+        assert_eq!(catalog.row_count("users"), 1);
     }
 
     #[test]

@@ -665,6 +665,19 @@ impl Catalog {
     }
 
     pub fn insert(&self, table: &str, columns: &[String], values: Vec<Expr>) -> Result<(), String> {
+        let txn = self.txn_mgr.begin();
+        let result = self.insert_with_txn(table, columns, values, &txn);
+        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
+        result
+    }
+
+    pub fn insert_with_txn(
+        &self,
+        table: &str,
+        columns: &[String],
+        values: Vec<Expr>,
+        txn: &Transaction,
+    ) -> Result<(), String> {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
@@ -674,7 +687,6 @@ impl Catalog {
             return Err(format!("Too many values: expected {}, got {}", num_cols, values.len()));
         }
 
-        let txn = self.txn_mgr.begin();
         let header = crate::transaction::TupleHeader::new(txn.xid);
 
         let tuple_data: Result<Vec<Value>, String> = schema
@@ -748,7 +760,6 @@ impl Catalog {
         data.get_mut(table).unwrap().push(tuple);
         drop(data);
 
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
         log::debug!("insert: inserted row into '{}', triggering synchronous save", table);
         // Force immediate synchronous save after each insert to ensure data persistence
         self.force_save()?;
@@ -757,7 +768,14 @@ impl Catalog {
 
     pub fn row_count(&self, table: &str) -> usize {
         let data = self.data.read().unwrap();
-        data.get(table).map(|rows| rows.len()).unwrap_or(0)
+        data.get(table)
+            .map(|rows| {
+                let snapshot = self.txn_mgr.get_snapshot();
+                rows.iter()
+                    .filter(|tuple| tuple.header.is_visible(&snapshot, &self.txn_mgr))
+                    .count()
+            })
+            .unwrap_or(0)
     }
 
     pub fn batch_insert(
@@ -999,10 +1017,22 @@ impl Catalog {
         assignments: Vec<(String, Expr)>,
         where_clause: Option<Expr>,
     ) -> Result<usize, String> {
+        let txn = self.txn_mgr.begin();
+        let result = self.update_with_txn(table, assignments, where_clause, &txn);
+        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
+        result
+    }
+
+    pub fn update_with_txn(
+        &self,
+        table: &str,
+        assignments: Vec<(String, Expr)>,
+        where_clause: Option<Expr>,
+        txn: &Transaction,
+    ) -> Result<usize, String> {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
-        let txn = self.txn_mgr.begin();
         let snapshot = txn.snapshot.clone();
 
         // Get tuples with read lock first (before write lock)
@@ -1027,16 +1057,26 @@ impl Catalog {
             &table_tuples,
         )?;
 
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
         self.auto_save();
         Ok(updated)
     }
 
     pub fn delete(&self, table: &str, where_clause: Option<Expr>) -> Result<usize, String> {
+        let txn = self.txn_mgr.begin();
+        let result = self.delete_with_txn(table, where_clause, &txn);
+        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
+        result
+    }
+
+    pub fn delete_with_txn(
+        &self,
+        table: &str,
+        where_clause: Option<Expr>,
+        txn: &Transaction,
+    ) -> Result<usize, String> {
         let schema =
             self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
 
-        let txn = self.txn_mgr.begin();
         let snapshot = txn.snapshot.clone();
 
         let mut data = self.data.write().unwrap();
@@ -1051,7 +1091,6 @@ impl Catalog {
             txn.xid,
         )?;
 
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
         self.auto_save();
         Ok(deleted)
     }
@@ -1130,17 +1169,21 @@ impl Catalog {
         result
     }
 
-    pub fn begin_transaction(&self) -> Result<(), String> {
+    pub fn begin_transaction(&self) -> Result<Transaction, String> {
         self.begin_transaction_with_isolation(IsolationLevel::ReadCommitted)
     }
 
-    pub fn begin_transaction_with_isolation(&self, level: IsolationLevel) -> Result<(), String> {
+    pub fn begin_transaction_with_isolation(
+        &self,
+        level: IsolationLevel,
+    ) -> Result<Transaction, String> {
         let mut active = self.active_txn.write().unwrap();
         if active.is_some() {
             return Err("Transaction already in progress".to_string());
         }
-        *active = Some(self.txn_mgr.begin_with_isolation(level));
-        Ok(())
+        let txn = self.txn_mgr.begin_with_isolation(level);
+        *active = Some(txn.clone());
+        Ok(txn)
     }
 
     pub fn set_transaction_isolation(&self, level: IsolationLevel) -> Result<(), String> {

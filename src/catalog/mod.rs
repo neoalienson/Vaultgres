@@ -29,6 +29,10 @@ mod datatype_tests;
 mod enum_tests;
 #[cfg(test)]
 mod json_tests;
+#[cfg(test)]
+mod materialized_view_tests;
+#[cfg(test)]
+mod type_tests;
 
 // Re-export public types
 pub use crate::parser::ast::{ColumnDef as Column, CompositeTypeDef, DataType, EnumTypeDef};

@@ -29,6 +29,7 @@ pub enum IsolationLevel {
 }
 
 /// Transaction context
+#[derive(Clone, Debug)]
 pub struct Transaction {
     pub xid: TransactionId,
     pub snapshot: Snapshot,
