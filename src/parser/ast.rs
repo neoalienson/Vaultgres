@@ -267,11 +267,25 @@ pub struct EnumTypeDef {
     pub labels: Vec<String>,
 }
 
+/// Composite type definition
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CompositeTypeDef {
+    pub type_name: String,
+    pub fields: Vec<(String, DataType)>,
+}
+
+/// Kind of type (enum or composite)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum TypeKind {
+    Enum(Vec<String>),
+    Composite(Vec<ColumnDef>),
+}
+
 /// CREATE TYPE statement
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateTypeStmt {
     pub type_name: String,
-    pub labels: Vec<String>,
+    pub kind: TypeKind,
 }
 
 /// DROP TYPE statement
@@ -420,6 +434,13 @@ pub enum DataType {
     Jsonb,
     Enum(String),
     Array(Box<DataType>),
+    Composite(String),
+    Int4Range,
+    Int8Range,
+    NumRange,
+    DateRange,
+    TsRange,
+    TsTzRange,
 }
 
 /// SELECT statement
@@ -527,6 +548,13 @@ pub enum Expr {
     },
     List(Vec<Expr>),
     Array(Vec<Expr>),
+    Range {
+        lower: Box<Expr>,
+        lower_inclusive: bool,
+        upper: Box<Expr>,
+        upper_inclusive: bool,
+    },
+    Row(Vec<Expr>),
     IsNull(Box<Expr>),
     IsNotNull(Box<Expr>),
     Subquery(Box<SelectStmt>),
@@ -596,6 +624,12 @@ pub enum BinaryOperator {
     ArrayOverlaps,
     ArrayConcat,
     ArrayAccess,
+    RangeContains,
+    RangeContainedBy,
+    RangeOverlaps,
+    RangeLeftOf,
+    RangeRightOf,
+    RangeAdjacent,
 }
 
 /// Unary operator

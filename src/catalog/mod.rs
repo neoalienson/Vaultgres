@@ -22,6 +22,8 @@ mod batch_insert_tests;
 #[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
+mod composite_tests;
+#[cfg(test)]
 mod datatype_tests;
 #[cfg(test)]
 mod enum_tests;
@@ -29,7 +31,7 @@ mod enum_tests;
 mod json_tests;
 
 // Re-export public types
-pub use crate::parser::ast::{ColumnDef as Column, DataType, EnumTypeDef};
+pub use crate::parser::ast::{ColumnDef as Column, CompositeTypeDef, DataType, EnumTypeDef};
 pub use catalog::Catalog;
 pub use check::CheckValidator;
 pub use datetime_functions::DateTimeFunctions;
@@ -38,4 +40,4 @@ pub use schema::TableSchema;
 pub use string_functions::StringFunctions;
 pub use tuple::Tuple;
 pub use unique::UniqueValidator;
-pub use value::{EnumValue, Value};
+pub use value::{CompositeValue, EnumValue, Range, RangeBound, Value};

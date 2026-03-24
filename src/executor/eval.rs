@@ -195,6 +195,19 @@ impl Eval {
             Expr::Array(_) => Err(ExecutorError::UnsupportedExpression(
                 "Array expressions not supported in this context".to_string(),
             )),
+            Expr::Range { .. } => Err(ExecutorError::UnsupportedExpression(
+                "Range literals not supported in this context".to_string(),
+            )),
+            Expr::Row(exprs) => {
+                let mut values = Vec::new();
+                for expr in exprs {
+                    values.push(Self::eval_expr_with_catalog(expr, tuple, catalog)?);
+                }
+                Ok(Value::Text(format!(
+                    "ROW({})",
+                    values.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join(", ")
+                )))
+            }
             Expr::Subquery(stmt) => {
                 // Execute scalar subquery
                 if let Some(catalog) = catalog {
@@ -417,6 +430,14 @@ impl Eval {
             BinaryOperator::ArrayOverlaps => Self::eval_array_overlaps(left, right),
             BinaryOperator::ArrayConcat => Self::eval_array_concat(left, right),
             BinaryOperator::ArrayAccess => Self::eval_array_access(left, right),
+
+            // Range operators
+            BinaryOperator::RangeContains => Self::eval_range_contains(left, right),
+            BinaryOperator::RangeContainedBy => Self::eval_range_contained_by(left, right),
+            BinaryOperator::RangeOverlaps => Self::eval_range_overlaps(left, right),
+            BinaryOperator::RangeLeftOf => Self::eval_range_left_of(left, right),
+            BinaryOperator::RangeRightOf => Self::eval_range_right_of(left, right),
+            BinaryOperator::RangeAdjacent => Self::eval_range_adjacent(left, right),
         }
     }
 
@@ -952,6 +973,162 @@ impl Eval {
         Ok(arr[idx - 1].clone())
     }
 
+    fn eval_range_contains(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Range(range), Value::Int(elem)) => {
+                if let Some(lower) = range.lower_bound() {
+                    if let Value::Int(lv) = lower {
+                        if !range.lower_inclusive() && *lv >= *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                        if range.lower_inclusive() && *lv > *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                    }
+                }
+                if let Some(upper) = range.upper_bound() {
+                    if let Value::Int(uv) = upper {
+                        if !range.upper_inclusive() && *uv <= *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                        if range.upper_inclusive() && *uv < *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                    }
+                }
+                Ok(Value::Bool(true))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range contains (@>) requires range on left side and element on right side"
+                    .to_string(),
+            )),
+        }
+    }
+
+    fn eval_range_contained_by(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Int(elem), Value::Range(range)) => {
+                if let Some(lower) = range.lower_bound() {
+                    if let Value::Int(lv) = lower {
+                        if !range.lower_inclusive() && *lv >= *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                        if range.lower_inclusive() && *lv > *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                    }
+                }
+                if let Some(upper) = range.upper_bound() {
+                    if let Value::Int(uv) = upper {
+                        if !range.upper_inclusive() && *uv <= *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                        if range.upper_inclusive() && *uv < *elem {
+                            return Ok(Value::Bool(false));
+                        }
+                    }
+                }
+                Ok(Value::Bool(true))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range contained by (<@) requires element on left side and range on right side"
+                    .to_string(),
+            )),
+        }
+    }
+
+    fn eval_range_overlaps(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Range(r1), Value::Range(r2)) => {
+                let r1_lower = r1.lower_bound();
+                let r1_upper = r1.upper_bound();
+                let r2_lower = r2.lower_bound();
+                let r2_upper = r2.upper_bound();
+
+                if let (Some(l1), Some(u1), Some(l2), Some(u2)) =
+                    (r1_lower, r1_upper, r2_lower, r2_upper)
+                {
+                    if let (Value::Int(l1v), Value::Int(u1v), Value::Int(l2v), Value::Int(u2v)) =
+                        (l1, u1, l2, u2)
+                    {
+                        let r1_left_of_r2 =
+                            if r1.upper_inclusive() { *u1v <= *l2v } else { *u1v < *l2v };
+                        let r2_left_of_r1 =
+                            if r2.upper_inclusive() { *u2v <= *l1v } else { *u2v < *l1v };
+                        return Ok(Value::Bool(!(r1_left_of_r2 || r2_left_of_r1)));
+                    }
+                }
+                Err(ExecutorError::TypeMismatch(
+                    "Range overlaps (&&) requires compatible range types".to_string(),
+                ))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range overlaps (&&) requires range operands".to_string(),
+            )),
+        }
+    }
+
+    fn eval_range_left_of(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Range(r1), Value::Range(r2)) => {
+                if let (Some(u1), Some(l2)) = (r1.upper_bound(), r2.lower_bound()) {
+                    if let (Value::Int(u1v), Value::Int(l2v)) = (u1, l2) {
+                        let result = if r1.upper_inclusive() { *u1v <= *l2v } else { *u1v < *l2v };
+                        return Ok(Value::Bool(result));
+                    }
+                }
+                Err(ExecutorError::TypeMismatch(
+                    "Range left of (<<) requires integer range operands".to_string(),
+                ))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range left of (<<) requires range operands".to_string(),
+            )),
+        }
+    }
+
+    fn eval_range_right_of(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Range(r1), Value::Range(r2)) => {
+                if let (Some(l1), Some(u2)) = (r1.lower_bound(), r2.upper_bound()) {
+                    if let (Value::Int(l1v), Value::Int(u2v)) = (l1, u2) {
+                        let result = if r2.upper_inclusive() { *l1v > *u2v } else { *l1v >= *u2v };
+                        return Ok(Value::Bool(result));
+                    }
+                }
+                Err(ExecutorError::TypeMismatch(
+                    "Range right of (>>) requires integer range operands".to_string(),
+                ))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range right of (>>) requires range operands".to_string(),
+            )),
+        }
+    }
+
+    fn eval_range_adjacent(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
+        match (left, right) {
+            (Value::Range(r1), Value::Range(r2)) => {
+                if let (Some(u1), Some(l2)) = (r1.upper_bound(), r2.lower_bound()) {
+                    if let (Value::Int(u1v), Value::Int(l2v)) = (u1, l2) {
+                        let diff = if r1.upper_inclusive() != r2.lower_inclusive() {
+                            (*l2v as i64 - *u1v as i64).abs()
+                        } else {
+                            (*l2v as i64 - *u1v as i64).abs() - 1
+                        };
+                        return Ok(Value::Bool(diff == 1));
+                    }
+                }
+                Err(ExecutorError::TypeMismatch(
+                    "Range adjacent (-|-) requires integer range operands".to_string(),
+                ))
+            }
+            _ => Err(ExecutorError::TypeMismatch(
+                "Range adjacent (-|-) requires range operands".to_string(),
+            )),
+        }
+    }
+
     /// Evaluate a function call
     pub fn eval_function(name: &str, args: Vec<Value>) -> Result<Value, ExecutorError> {
         match name.to_uppercase().as_str() {
@@ -1039,6 +1216,7 @@ impl Eval {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::Range;
     use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
 
     fn create_test_tuple() -> Tuple {
@@ -1371,20 +1549,24 @@ mod tests {
     }
 
     #[test]
-    fn test_array_contained_by() {
-        let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
-        let right = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+    fn test_range_adjacent_true() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(7)), false, Some(Value::Int(10)), false));
         let result =
-            Eval::eval_binary_op(&left, &BinaryOperator::ArrayContainedBy, &right).unwrap();
+            Eval::eval_binary_op(&range1, &BinaryOperator::RangeAdjacent, &range2).unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
     #[test]
-    fn test_array_contained_by_false() {
-        let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let right = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+    fn test_range_adjacent_false() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(5)), false, Some(Value::Int(10)), false));
         let result =
-            Eval::eval_binary_op(&left, &BinaryOperator::ArrayContainedBy, &right).unwrap();
+            Eval::eval_binary_op(&range1, &BinaryOperator::RangeAdjacent, &range2).unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1512,5 +1694,119 @@ mod tests {
         let idx = Value::Int(2);
         let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
         assert_eq!(result, Value::Text("banana".to_string()));
+    }
+
+    #[test]
+    fn test_range_contains_element() {
+        let range =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
+        let elem = Value::Int(5);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_contains_element_at_lower_bound() {
+        let range =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
+        let elem = Value::Int(1);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_contains_element_at_upper_bound() {
+        let range =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
+        let elem = Value::Int(10);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_range_contains_element_outside() {
+        let range =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
+        let elem = Value::Int(15);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_element_contained_by_range() {
+        let elem = Value::Int(5);
+        let range =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
+        let result =
+            Eval::eval_binary_op(&elem, &BinaryOperator::RangeContainedBy, &range).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_overlaps_true() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(3)), true, Some(Value::Int(10)), false));
+        let result =
+            Eval::eval_binary_op(&range1, &BinaryOperator::RangeOverlaps, &range2).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_overlaps_false() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
+        let result =
+            Eval::eval_binary_op(&range1, &BinaryOperator::RangeOverlaps, &range2).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_range_left_of() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
+        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeLeftOf, &range2).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_left_of_adjacent() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(5)), false, Some(Value::Int(10)), false));
+        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeLeftOf, &range2).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_range_right_of() {
+        let range1 =
+            Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
+        let range2 =
+            Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
+        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeRightOf, &range2).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_range_contains_empty() {
+        let range = Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(1)), true));
+        let elem = Value::Int(1);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_unbounded_range_contains() {
+        let range = Value::Range(Range::new(Some(Value::Int(1)), true, None, false));
+        let elem = Value::Int(100);
+        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        assert_eq!(result, Value::Bool(true));
     }
 }

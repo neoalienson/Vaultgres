@@ -4,8 +4,8 @@ use super::persistence::Persistence;
 use super::update_delete_executor::UpdateDeleteExecutor;
 use super::{Function, TableSchema, Value};
 use crate::parser::ast::{
-    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, EnumTypeDef, Expr, ForeignKeyAction,
-    ForeignKeyDef, OrderByExpr, SelectStmt,
+    ColumnDef, CompositeTypeDef, CreateIndexStmt, CreateTriggerStmt, DataType, EnumTypeDef, Expr,
+    ForeignKeyAction, ForeignKeyDef, OrderByExpr, SelectStmt,
 };
 use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
@@ -24,6 +24,7 @@ pub struct Catalog {
     pub(crate) indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     pub(crate) functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
     pub(crate) enum_types: Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    pub(crate) composite_types: Arc<RwLock<HashMap<String, CompositeTypeDef>>>,
     pub(crate) data: Arc<RwLock<HashMap<String, Vec<crate::catalog::tuple::Tuple>>>>,
     pub(crate) sequences: Arc<RwLock<HashMap<String, i64>>>,
     pub(crate) active_txn: Arc<RwLock<Option<Transaction>>>,
@@ -43,6 +44,7 @@ impl Catalog {
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
             enum_types: Arc::new(RwLock::new(HashMap::new())),
+            composite_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             sequences: Arc::new(RwLock::new(HashMap::new())),
             active_txn: Arc::new(RwLock::new(None)),
@@ -64,6 +66,7 @@ impl Catalog {
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
             enum_types: Arc::new(RwLock::new(HashMap::new())),
+            composite_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
             sequences: Arc::new(RwLock::new(HashMap::new())),
             active_txn: Arc::new(RwLock::new(None)),
@@ -258,6 +261,16 @@ impl Catalog {
             }
         }
 
+        let composite_types = self.composite_types.read().unwrap();
+        for col in &columns {
+            if let DataType::Composite(ref type_name) = col.data_type {
+                if !composite_types.contains_key(type_name) {
+                    return Err(format!("type '{}' does not exist", type_name));
+                }
+            }
+        }
+        drop(composite_types);
+
         tables.insert(name.clone(), TableSchema::with_constraints(name.clone(), columns, pk, fks));
         drop(tables);
 
@@ -281,6 +294,10 @@ impl Catalog {
             return Err(format!("Type '{}' already exists", type_name));
         }
 
+        if self.composite_types.read().unwrap().contains_key(&type_name) {
+            return Err(format!("Type '{}' already exists as composite type", type_name));
+        }
+
         let def = EnumTypeDef { type_name: type_name.clone(), labels };
         enum_types.insert(type_name, def);
 
@@ -289,10 +306,52 @@ impl Catalog {
         Ok(())
     }
 
+    pub fn create_composite_type(
+        &self,
+        type_name: String,
+        fields: Vec<(String, DataType)>,
+    ) -> Result<(), String> {
+        if fields.is_empty() {
+            return Err(format!("Composite type '{}' must have at least one field", type_name));
+        }
+
+        let mut composite_types = self.composite_types.write().unwrap();
+
+        if composite_types.contains_key(&type_name) {
+            return Err(format!("Type '{}' already exists", type_name));
+        }
+
+        if self.enum_types.read().unwrap().contains_key(&type_name) {
+            return Err(format!("Type '{}' already exists as enum type", type_name));
+        }
+
+        let mut seen_names: std::collections::HashSet<&String> = std::collections::HashSet::new();
+        for (name, _) in &fields {
+            if !seen_names.insert(name) {
+                return Err(format!(
+                    "Composite type '{}' cannot have duplicate field names",
+                    type_name
+                ));
+            }
+        }
+
+        let def = CompositeTypeDef { type_name: type_name.clone(), fields };
+        composite_types.insert(type_name, def);
+
+        drop(composite_types);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn get_composite_type(&self, type_name: &str) -> Option<CompositeTypeDef> {
+        self.composite_types.read().unwrap().get(type_name).cloned()
+    }
+
     pub fn drop_type(&self, type_name: &str, if_exists: bool, cascade: bool) -> Result<(), String> {
         {
             let enum_types = self.enum_types.read().unwrap();
-            if !enum_types.contains_key(type_name) {
+            let composite_types = self.composite_types.read().unwrap();
+            if !enum_types.contains_key(type_name) && !composite_types.contains_key(type_name) {
                 if if_exists {
                     return Ok(());
                 }
@@ -305,11 +364,16 @@ impl Catalog {
             let mut deps = Vec::new();
             for (table_name, schema) in tables.iter() {
                 for col in &schema.columns {
-                    if let DataType::Enum(ref t) = col.data_type {
-                        if t == type_name {
+                    match col.data_type {
+                        DataType::Enum(ref t) if t == type_name => {
                             deps.push(table_name.clone());
                             break;
                         }
+                        DataType::Composite(ref t) if t == type_name => {
+                            deps.push(table_name.clone());
+                            break;
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -329,9 +393,14 @@ impl Catalog {
             }
         }
 
-        let mut enum_types = self.enum_types.write().unwrap();
-        enum_types.remove(type_name);
-        drop(enum_types);
+        {
+            let mut enum_types = self.enum_types.write().unwrap();
+            enum_types.remove(type_name);
+        }
+        {
+            let mut composite_types = self.composite_types.write().unwrap();
+            composite_types.remove(type_name);
+        }
         self.auto_save();
         Ok(())
     }
@@ -621,6 +690,7 @@ impl Catalog {
                         table,
                         &self.sequences,
                         &self.enum_types,
+                        &self.composite_types,
                     )
                 } else {
                     if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
@@ -632,6 +702,7 @@ impl Catalog {
                                 table,
                                 &self.sequences,
                                 &self.enum_types,
+                                &self.composite_types,
                             )
                         } else {
                             Err(format!("Column {} has no value", col.name))
@@ -644,6 +715,7 @@ impl Catalog {
                             table,
                             &self.sequences,
                             &self.enum_types,
+                            &self.composite_types,
                         )
                     }
                 }
@@ -730,6 +802,7 @@ impl Catalog {
                                 table,
                                 &self.sequences,
                                 &self.enum_types,
+                                &self.composite_types,
                             )
                         } else {
                             if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
@@ -741,6 +814,7 @@ impl Catalog {
                                         table,
                                         &self.sequences,
                                         &self.enum_types,
+                                        &self.composite_types,
                                     )
                                 } else {
                                     Err(format!("Column {} has no value", col.name))
@@ -753,6 +827,7 @@ impl Catalog {
                                     table,
                                     &self.sequences,
                                     &self.enum_types,
+                                    &self.composite_types,
                                 )
                             }
                         }

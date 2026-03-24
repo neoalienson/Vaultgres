@@ -1,4 +1,4 @@
-use super::{EnumValue, Function, TableSchema, Tuple, Value};
+use super::{CompositeValue, EnumValue, Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
@@ -269,6 +269,24 @@ fn write_data_type<W: Write>(writer: &mut W, dt: &DataType) -> Result<(), String
             writer.write_all(&[13]).map_err(|e| format!("Write error: {}", e))?;
             write_data_type(writer, inner)?;
         }
+        DataType::Int4Range => {
+            writer.write_all(&[14]).map_err(|e| format!("Write error: {}", e))?
+        }
+        DataType::Int8Range => {
+            writer.write_all(&[15]).map_err(|e| format!("Write error: {}", e))?
+        }
+        DataType::NumRange => writer.write_all(&[16]).map_err(|e| format!("Write error: {}", e))?,
+        DataType::DateRange => {
+            writer.write_all(&[17]).map_err(|e| format!("Write error: {}", e))?
+        }
+        DataType::TsRange => writer.write_all(&[18]).map_err(|e| format!("Write error: {}", e))?,
+        DataType::TsTzRange => {
+            writer.write_all(&[19]).map_err(|e| format!("Write error: {}", e))?
+        }
+        DataType::Composite(type_name) => {
+            writer.write_all(&[20]).map_err(|e| format!("Write error: {}", e))?;
+            write_string(writer, type_name)?;
+        }
     }
     Ok(())
 }
@@ -304,6 +322,16 @@ fn read_data_type<R: Read>(reader: &mut R) -> Result<DataType, String> {
         13 => {
             let inner = read_data_type(reader)?;
             Ok(DataType::Array(Box::new(inner)))
+        }
+        14 => Ok(DataType::Int4Range),
+        15 => Ok(DataType::Int8Range),
+        16 => Ok(DataType::NumRange),
+        17 => Ok(DataType::DateRange),
+        18 => Ok(DataType::TsRange),
+        19 => Ok(DataType::TsTzRange),
+        20 => {
+            let type_name = read_string(reader)?;
+            Ok(DataType::Composite(type_name))
         }
         _ => Err(format!("Unknown data type: {}", buf[0])),
     }
@@ -366,6 +394,18 @@ fn write_value<W: Write>(writer: &mut W, value: &Value) -> Result<(), String> {
             writer.write_all(&[12]).map_err(|e| format!("Write error: {}", e))?;
             write_string(writer, &e.type_name)?;
             writer.write_all(&e.index.to_le_bytes()).map_err(|e| format!("Write error: {}", e))?;
+        }
+        Value::Composite(c) => {
+            writer.write_all(&[21]).map_err(|e| format!("Write error: {}", e))?;
+            write_string(writer, &c.type_name)?;
+            write_u32(writer, c.fields.len() as u32)?;
+            for (name, val) in &c.fields {
+                write_string(writer, name)?;
+                write_value(writer, val)?;
+            }
+        }
+        Value::Range(_) => {
+            writer.write_all(&[20]).map_err(|e| format!("Write error: {}", e))?;
         }
         Value::Null => {
             writer.write_all(&[2]).map_err(|e| format!("Write error: {}", e))?;
@@ -447,6 +487,18 @@ fn read_value<R: Read>(reader: &mut R) -> Result<Value, String> {
             let index = i32::from_le_bytes(buf);
             Ok(Value::Enum(EnumValue { type_name, index }))
         }
+        21 => {
+            let type_name = read_string(reader)?;
+            let len = read_u32(reader)?;
+            let mut fields = Vec::new();
+            for _ in 0..len {
+                let name = read_string(reader)?;
+                let val = read_value(reader)?;
+                fields.push((name, val));
+            }
+            Ok(Value::Composite(CompositeValue { type_name, fields }))
+        }
+        20 => Ok(Value::Range(crate::catalog::value::Range::empty())),
         _ => Err(format!("Unknown value type: {}", buf[0])),
     }
 }

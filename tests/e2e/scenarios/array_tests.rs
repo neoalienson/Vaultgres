@@ -37,7 +37,7 @@ fn test_insert_array_bracket_syntax() {
 
 #[test]
 fn test_insert_array_literal_syntax() {
-    eprintln!("\n=== Test: INSERT with {...} literal syntax ===");
+    eprintln!("\n=== Test: INSERT with {{...}} literal syntax ===");
     let env = TestEnv::new().with_vaultgres().start();
     let db = env.vaultgres();
 

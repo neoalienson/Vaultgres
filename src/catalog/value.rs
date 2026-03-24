@@ -6,6 +6,122 @@ pub struct EnumValue {
     pub index: i32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+pub struct CompositeValue {
+    pub type_name: String,
+    pub fields: Vec<(String, Value)>,
+}
+
+impl std::fmt::Display for CompositeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "({})",
+            self.fields.iter().map(|(_, v)| format!("{}", v)).collect::<Vec<_>>().join(", ")
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RangeBound {
+    pub value: Box<Value>,
+    pub inclusive: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Range {
+    pub lower: Option<RangeBound>,
+    pub upper: Option<RangeBound>,
+}
+
+impl std::fmt::Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let lower_bracket = if self.lower_inclusive() { '[' } else { '(' };
+        let upper_bracket = if self.upper_inclusive() { ']' } else { ')' };
+        write!(f, "{}", lower_bracket)?;
+        if let Some(l) = self.lower_bound() {
+            write!(f, "{}", l)?;
+        }
+        write!(f, ",")?;
+        if let Some(u) = self.upper_bound() {
+            write!(f, "{}", u)?;
+        }
+        write!(f, "{}", upper_bracket)
+    }
+}
+
+impl Range {
+    pub fn new(
+        lower: Option<Value>,
+        lower_inclusive: bool,
+        upper: Option<Value>,
+        upper_inclusive: bool,
+    ) -> Self {
+        Self {
+            lower: lower.map(|v| RangeBound { value: Box::new(v), inclusive: lower_inclusive }),
+            upper: upper.map(|v| RangeBound { value: Box::new(v), inclusive: upper_inclusive }),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self { lower: None, upper: None }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match (&self.lower, &self.upper) {
+            (Some(l), Some(u)) => {
+                let lower_val = l.value.as_ref();
+                let upper_val = u.value.as_ref();
+                match (lower_val, upper_val) {
+                    (Value::Int(lv), Value::Int(uv)) => {
+                        if l.inclusive && u.inclusive {
+                            *lv > *uv
+                        } else if l.inclusive && !u.inclusive {
+                            *lv >= *uv
+                        } else if !l.inclusive && u.inclusive {
+                            *lv > *uv
+                        } else {
+                            *lv >= *uv
+                        }
+                    }
+                    (Value::Date(lv), Value::Date(uv)) => {
+                        if l.inclusive && u.inclusive {
+                            *lv > *uv
+                        } else {
+                            *lv >= *uv
+                        }
+                    }
+                    (Value::Timestamp(lv), Value::Timestamp(uv)) => {
+                        if l.inclusive && u.inclusive {
+                            *lv > *uv
+                        } else {
+                            *lv >= *uv
+                        }
+                    }
+                    _ => true,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub fn lower_bound(&self) -> Option<&Value> {
+        self.lower.as_ref().map(|b| b.value.as_ref())
+    }
+
+    pub fn upper_bound(&self) -> Option<&Value> {
+        self.upper.as_ref().map(|b| b.value.as_ref())
+    }
+
+    pub fn lower_inclusive(&self) -> bool {
+        self.lower.as_ref().map(|b| b.inclusive).unwrap_or(false)
+    }
+
+    pub fn upper_inclusive(&self) -> bool {
+        self.upper.as_ref().map(|b| b.inclusive).unwrap_or(false)
+    }
+}
+
 /// Value types stored in tuples
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
@@ -21,6 +137,8 @@ pub enum Value {
     Decimal(i128, u8),
     Bytea(Vec<u8>),
     Enum(EnumValue),
+    Composite(CompositeValue),
+    Range(Range),
     Null,
 }
 
@@ -42,6 +160,30 @@ impl Value {
                 let mut bytes = e.type_name.as_bytes().to_vec();
                 bytes.push(0);
                 bytes.extend_from_slice(&e.index.to_le_bytes());
+                bytes
+            }
+            Value::Composite(c) => {
+                let mut bytes = c.type_name.as_bytes().to_vec();
+                bytes.push(b':');
+                for (i, (_, field_val)) in c.fields.iter().enumerate() {
+                    if i > 0 {
+                        bytes.push(b',');
+                    }
+                    bytes.extend_from_slice(field_val.to_bytes().as_slice());
+                }
+                bytes
+            }
+            Value::Range(r) => {
+                let mut bytes = vec![];
+                bytes.push(if r.lower_inclusive() { b'[' } else { b'(' });
+                if let Some(l) = r.lower.as_ref() {
+                    bytes.extend_from_slice(l.value.to_bytes().as_slice());
+                }
+                bytes.push(b',');
+                if let Some(u) = r.upper.as_ref() {
+                    bytes.extend_from_slice(u.value.to_bytes().as_slice());
+                }
+                bytes.push(if r.upper_inclusive() { b']' } else { b')' });
                 bytes
             }
             Value::Null => vec![],
@@ -77,6 +219,19 @@ impl PartialOrd for Value {
                 }
                 a.index.partial_cmp(&b.index)
             }
+            (Value::Composite(a), Value::Composite(b)) => {
+                if a.type_name != b.type_name {
+                    return None;
+                }
+                for ((_, av), (_, bv)) in a.fields.iter().zip(b.fields.iter()) {
+                    match av.partial_cmp(bv) {
+                        Some(std::cmp::Ordering::Equal) => continue,
+                        other => return other,
+                    }
+                }
+                Some(std::cmp::Ordering::Equal)
+            }
+            (Value::Range(_), Value::Range(_)) => None,
             (Value::Null, Value::Null) => Some(std::cmp::Ordering::Equal),
             _ => None,
         }
@@ -108,6 +263,18 @@ impl Ord for Value {
                 std::cmp::Ordering::Equal => a.index.cmp(&b.index),
                 other => other,
             },
+            (Value::Composite(a), Value::Composite(b)) => match a.type_name.cmp(&b.type_name) {
+                std::cmp::Ordering::Equal => {
+                    for ((_, av), (_, bv)) in a.fields.iter().zip(b.fields.iter()) {
+                        match av.cmp(bv) {
+                            std::cmp::Ordering::Equal => continue,
+                            other => return other,
+                        }
+                    }
+                    std::cmp::Ordering::Equal
+                }
+                other => other,
+            },
             (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
             _ => std::cmp::Ordering::Equal,
         }
@@ -136,6 +303,25 @@ impl std::hash::Hash for Value {
                 e.type_name.hash(state);
                 e.index.hash(state);
             }
+            Value::Composite(c) => {
+                "Composite".hash(state);
+                c.type_name.hash(state);
+                for (name, val) in &c.fields {
+                    name.hash(state);
+                    val.hash(state);
+                }
+            }
+            Value::Range(r) => {
+                "Range".hash(state);
+                if let Some(l) = &r.lower {
+                    l.value.hash(state);
+                    l.inclusive.hash(state);
+                }
+                if let Some(u) = &r.upper {
+                    u.value.hash(state);
+                    u.inclusive.hash(state);
+                }
+            }
             Value::Null => 0.hash(state),
         }
     }
@@ -148,14 +334,34 @@ impl std::fmt::Display for Value {
             Value::Float(fl) => write!(f, "{}", fl),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Text(s) => write!(f, "{}", s),
-            Value::Array(_) => write!(f, "ARRAY"), // TODO: Proper array display
+            Value::Array(_) => write!(f, "ARRAY"),
             Value::Json(j) => write!(f, "{}", j),
-            Value::Date(d) => write!(f, "{}", d), // TODO: Proper date display
-            Value::Time(t) => write!(f, "{}", t), // TODO: Proper time display
-            Value::Timestamp(ts) => write!(f, "{}", ts), // TODO: Proper timestamp display
-            Value::Decimal(v, s) => write!(f, "{}.{}", v, s), // TODO: Proper decimal display
-            Value::Bytea(_) => write!(f, "BYTEA"), // TODO: Proper bytea display
+            Value::Date(d) => write!(f, "{}", d),
+            Value::Time(t) => write!(f, "{}", t),
+            Value::Timestamp(ts) => write!(f, "{}", ts),
+            Value::Decimal(v, s) => write!(f, "{}.{}", v, s),
+            Value::Bytea(_) => write!(f, "BYTEA"),
             Value::Enum(e) => write!(f, "{}[{}]", e.type_name, e.index),
+            Value::Composite(c) => {
+                write!(
+                    f,
+                    "({})",
+                    c.fields.iter().map(|(_, v)| format!("{}", v)).collect::<Vec<_>>().join(", ")
+                )
+            }
+            Value::Range(r) => {
+                let lower_bracket = if r.lower_inclusive() { '[' } else { '(' };
+                let upper_bracket = if r.upper_inclusive() { ']' } else { ')' };
+                write!(f, "{}", lower_bracket)?;
+                if let Some(l) = r.lower_bound() {
+                    write!(f, "{}", l)?;
+                }
+                write!(f, ",")?;
+                if let Some(u) = r.upper_bound() {
+                    write!(f, "{}", u)?;
+                }
+                write!(f, "{}", upper_bracket)
+            }
             Value::Null => write!(f, "NULL"),
         }
     }
@@ -278,5 +484,130 @@ mod tests {
         assert_eq!(format!("{}", Value::Decimal(123, 2)), "123.2");
         assert_eq!(format!("{}", Value::Bytea(vec![1, 2, 3])), "BYTEA");
         assert_eq!(format!("{}", Value::Null), "NULL");
+    }
+
+    #[test]
+    fn test_composite_value_creation() {
+        let composite = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Text("123 Main St".to_string())),
+                ("city".to_string(), Value::Text("NYC".to_string())),
+            ],
+        });
+        assert!(matches!(composite, Value::Composite(_)));
+    }
+
+    #[test]
+    fn test_composite_value_to_bytes() {
+        let composite = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Int(123)),
+                ("city".to_string(), Value::Int(456)),
+            ],
+        });
+        let bytes = composite.to_bytes();
+        assert!(bytes.starts_with(b"address:"));
+    }
+
+    #[test]
+    fn test_composite_value_partial_eq() {
+        let composite1 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Int(123)),
+                ("city".to_string(), Value::Int(456)),
+            ],
+        });
+        let composite2 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Int(123)),
+                ("city".to_string(), Value::Int(456)),
+            ],
+        });
+        let composite3 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Int(789)),
+                ("city".to_string(), Value::Int(456)),
+            ],
+        });
+        assert_eq!(composite1, composite2);
+        assert_ne!(composite1, composite3);
+    }
+
+    #[test]
+    fn test_composite_value_partial_ord() {
+        let composite1 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![("a".to_string(), Value::Int(1))],
+        });
+        let composite2 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![("a".to_string(), Value::Int(2))],
+        });
+        assert_eq!(composite1.partial_cmp(&composite2), Some(std::cmp::Ordering::Less));
+        assert_eq!(composite2.partial_cmp(&composite1), Some(std::cmp::Ordering::Greater));
+        assert_eq!(composite1.partial_cmp(&composite1), Some(std::cmp::Ordering::Equal));
+    }
+
+    #[test]
+    fn test_composite_value_hash() {
+        let composite1 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![("street".to_string(), Value::Text("123 Main St".to_string()))],
+        });
+        let composite2 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![("street".to_string(), Value::Text("123 Main St".to_string()))],
+        });
+        let composite3 = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![("street".to_string(), Value::Text("456 Oak Ave".to_string()))],
+        });
+        assert_eq!(calculate_hash(&composite1), calculate_hash(&composite2));
+        assert_ne!(calculate_hash(&composite1), calculate_hash(&composite3));
+    }
+
+    #[test]
+    fn test_composite_value_display() {
+        let composite = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Text("123 Main St".to_string())),
+                ("city".to_string(), Value::Text("NYC".to_string())),
+            ],
+        });
+        assert_eq!(format!("{}", composite), "(123 Main St, NYC)");
+    }
+
+    #[test]
+    fn test_composite_value_with_null_field() {
+        let composite = Value::Composite(CompositeValue {
+            type_name: "address".to_string(),
+            fields: vec![
+                ("street".to_string(), Value::Text("123 Main St".to_string())),
+                ("city".to_string(), Value::Null),
+            ],
+        });
+        assert!(matches!(composite, Value::Composite(_)));
+    }
+
+    #[test]
+    fn test_composite_value_nested() {
+        let inner = Value::Composite(CompositeValue {
+            type_name: "inner_type".to_string(),
+            fields: vec![("x".to_string(), Value::Int(10))],
+        });
+        let outer = Value::Composite(CompositeValue {
+            type_name: "outer_type".to_string(),
+            fields: vec![
+                ("inner".to_string(), inner),
+                ("name".to_string(), Value::Text("test".to_string())),
+            ],
+        });
+        assert!(matches!(outer, Value::Composite(_)));
     }
 }

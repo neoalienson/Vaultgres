@@ -115,6 +115,15 @@ impl ExceptExecutor {
                 e.type_name.hash(hasher);
                 e.index.hash(hasher);
             }
+            Value::Range(r) => {
+                "Range".hash(hasher);
+                r.lower_bound().hash(hasher);
+                r.upper_bound().hash(hasher);
+            }
+            Value::Composite(c) => {
+                "Composite".hash(hasher);
+                c.hash(hasher);
+            }
         }
     }
 }

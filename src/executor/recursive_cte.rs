@@ -62,6 +62,27 @@ impl RecursiveCTEExecutor {
                     key.push(0);
                     key.extend_from_slice(&e.index.to_le_bytes());
                 }
+                Value::Range(r) => {
+                    if let Some(l) = r.lower_bound() {
+                        if let Value::Int(n) = l {
+                            key.extend_from_slice(&n.to_le_bytes());
+                        }
+                    }
+                    if let Some(u) = r.upper_bound() {
+                        if let Value::Int(n) = u {
+                            key.extend_from_slice(&n.to_le_bytes());
+                        }
+                    }
+                }
+                Value::Composite(c) => {
+                    for (_, v) in &c.fields {
+                        match v {
+                            Value::Int(n) => key.extend_from_slice(&n.to_le_bytes()),
+                            Value::Text(s) => key.extend_from_slice(s.as_bytes()),
+                            _ => {}
+                        }
+                    }
+                }
                 Value::Null => key.push(0),
             }
             key.push(255);

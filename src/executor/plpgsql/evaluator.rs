@@ -69,6 +69,8 @@ impl<'a> PlPgSqlExprEvaluator<'a> {
                     Value::Decimal(v, _) => v.to_string(),
                     Value::Bytea(_) => "[binary]".to_string(),
                     Value::Enum(e) => format!("{}[{}]", e.type_name, e.index),
+                    Value::Composite(c) => format!("{}", c),
+                    Value::Range(r) => format!("{}", r),
                     Value::Null => "NULL".to_string(),
                 };
                 result = result.replace(&placeholder, &val_str);

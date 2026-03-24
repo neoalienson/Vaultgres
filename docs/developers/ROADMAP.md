@@ -260,9 +260,36 @@ VaultGres development roadmap with planned features and milestones.
   - ✅ INSERT validation and type checking
   - ✅ Integration with catalog and persistence layers
   - ✅ Unit tests (16 tests) and integration tests (22 tests)
-- Array types and operations
-- Range types (int4range, tsrange, etc.)
-- Composite types (user-defined types)
+- ✅ Array types and operations
+  - ✅ DataType::Array with nested type support
+  - ✅ Value::Array implementation
+  - ✅ Array literals with Expr::Array
+  - ✅ Array operators: @>, <@, &&, ||, [] (indexing)
+  - ✅ unnest() table function
+  - ✅ ArraySubqueryExecutor for subquery execution
+  - ✅ Unit tests and integration tests
+- ✅ Range types (int4range, int8range, numrange, daterange, tsrange, tstzrange)
+  - ✅ DataType::Int4Range, Int8Range, NumRange, DateRange, TsRange, TsTzRange
+  - ✅ Value::Range implementation with RangeBound struct
+  - ✅ Range literals with Expr::Range
+  - ✅ Range operators: @> (contains), <@ (contained by), && (overlaps), << (left of), >> (right of), -|- (adjacent)
+  - ✅ Range evaluation in executor
+  - ✅ Display trait for Range
+  - ✅ Hash trait for Range
+  - ✅ Unit tests (19 tests in eval.rs, 25 tests in datatype_tests.rs)
+  - ✅ Integration tests and E2E tests
+- ✅ Composite types (user-defined types)
+  - ✅ DataType::Composite(String) in AST
+  - ✅ CompositeTypeDef struct with fields
+  - ✅ Value::Composite(CompositeValue) for runtime values
+  - ✅ CREATE TYPE ... AS (col1 type1, col2 type2, ...) parsing
+  - ✅ DROP TYPE ... [CASCADE | RESTRICT]
+  - ✅ Composite type registry in Catalog
+  - ✅ Composite value validation on INSERT (ROW(...) syntax)
+  - ✅ Nested composite types (composite containing another composite)
+  - ✅ Composite types with enum fields
+  - ✅ Unit tests (19 tests) and integration tests (14 tests)
+  - ✅ E2E tests (8 tests in scenarios/composite_tests.rs)
 - ✅ Enum types
   - ✅ DataType::Enum(String) in AST
   - ✅ CREATE TYPE ... AS ENUM parsing

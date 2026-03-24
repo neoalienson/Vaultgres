@@ -15,12 +15,20 @@ name = "smoke"
 path = "scenarios/smoke_tests.rs"
 
 [[test]]
+name = "composite"
+path = "scenarios/composite_tests.rs"
+
+[[test]]
 name = "array"
 path = "scenarios/array_tests.rs"
 
 [[test]]
 name = "cte"
 path = "scenarios/cte_tests.rs"
+
+[[test]]
+name = "range"
+path = "scenarios/range_tests.rs"
 
 [[test]]
 name = "scenarios"

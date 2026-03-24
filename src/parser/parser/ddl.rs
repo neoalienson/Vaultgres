@@ -7,7 +7,7 @@ use crate::parser::ast::{
     DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt, DropTypeStmt, DropViewStmt, Expr,
     FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
     FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, Statement,
-    TriggerEvent, TriggerFor, TriggerTiming,
+    TriggerEvent, TriggerFor, TriggerTiming, TypeKind,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -435,8 +435,19 @@ fn parse_data_type(parser: &mut Parser) -> Result<DataType> {
             let inner = parse_data_type(parser)?;
             return Ok(DataType::Array(Box::new(inner)));
         }
+        Token::Int4Range => DataType::Int4Range,
+        Token::Int8Range => DataType::Int8Range,
+        Token::NumRange => DataType::NumRange,
+        Token::DateRange => DataType::DateRange,
+        Token::TsRange => DataType::TsRange,
+        Token::TsTzRange => DataType::TsTzRange,
         Token::Varchar => return parse_varchar(parser),
         Token::Decimal | Token::Numeric => return parse_decimal(parser),
+        Token::Identifier(type_name) => {
+            let type_name = type_name.clone();
+            parser.advance();
+            return Ok(DataType::Composite(type_name));
+        }
         _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     };
     parser.advance();
@@ -791,33 +802,82 @@ fn parse_create_type(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Type)?;
     let type_name = parser.expect_identifier()?;
     parser.expect(Token::As)?;
-    parser.expect(Token::Enum)?;
-    parser.expect(Token::LeftParen)?;
 
-    let mut labels = Vec::new();
-    loop {
-        match parser.current_token() {
-            Token::String(s) => {
-                labels.push(s.clone());
-                parser.advance();
+    if parser.current_token() == &Token::Enum {
+        parser.advance();
+        parser.expect(Token::LeftParen)?;
+
+        let mut labels = Vec::new();
+        loop {
+            match parser.current_token() {
+                Token::String(s) => {
+                    labels.push(s.clone());
+                    parser.advance();
+                }
+                _ => {
+                    return Err(ParseError::UnexpectedToken(format!(
+                        "Expected enum label, got {:?}",
+                        parser.current_token()
+                    )));
+                }
             }
-            _ => {
+            if parser.current_token() == &Token::Comma {
+                parser.advance();
+                continue;
+            }
+            break;
+        }
+
+        parser.expect(Token::RightParen)?;
+
+        Ok(Statement::CreateType(CreateTypeStmt { type_name, kind: TypeKind::Enum(labels) }))
+    } else if parser.current_token() == &Token::LeftParen {
+        parser.advance();
+
+        let mut columns = Vec::new();
+        loop {
+            if parser.current_token() == &Token::RightParen {
+                break;
+            }
+
+            let field_name = parser.expect_identifier()?;
+            let field_type = parse_data_type(parser)?;
+            columns.push(ColumnDef::new(field_name, field_type));
+
+            if parser.current_token() == &Token::Comma {
+                parser.advance();
+            } else if parser.current_token() != &Token::RightParen {
                 return Err(ParseError::UnexpectedToken(format!(
-                    "Expected enum label, got {:?}",
+                    "Expected ',' or ')', got {:?}",
                     parser.current_token()
                 )));
             }
         }
-        if parser.current_token() == &Token::Comma {
-            parser.advance();
-            continue;
+
+        parser.expect(Token::RightParen)?;
+
+        if columns.is_empty() {
+            return Err(ParseError::UnexpectedToken(
+                "Composite type must have at least one field".to_string(),
+            ));
         }
-        break;
+
+        let mut seen_names: std::collections::HashSet<&String> = std::collections::HashSet::new();
+        for col in &columns {
+            if !seen_names.insert(&col.name) {
+                return Err(ParseError::UnexpectedToken(
+                    "Composite type cannot have duplicate field names".to_string(),
+                ));
+            }
+        }
+
+        Ok(Statement::CreateType(CreateTypeStmt { type_name, kind: TypeKind::Composite(columns) }))
+    } else {
+        Err(ParseError::UnexpectedToken(format!(
+            "Expected ENUM or '(', got {:?}",
+            parser.current_token()
+        )))
     }
-
-    parser.expect(Token::RightParen)?;
-
-    Ok(Statement::CreateType(CreateTypeStmt { type_name, labels }))
 }
 
 fn parse_drop_type(parser: &mut Parser) -> Result<Statement> {

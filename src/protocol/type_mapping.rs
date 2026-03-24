@@ -12,6 +12,7 @@ pub mod pg_types {
     pub const FLOAT8: i32 = 701;
     pub const VARCHAR: i32 = 1043;
     pub const ENUM: i32 = 3500;
+    pub const COMPOSITE: i32 = 3501;
 }
 
 /// Map VaultGres Value to PostgreSQL type OID and size
@@ -29,6 +30,8 @@ pub fn value_to_pg_type(value: &Value) -> (i32, i16) {
         Value::Decimal(_, _) => (pg_types::TEXT, -1),
         Value::Bytea(_) => (pg_types::TEXT, -1),
         Value::Enum(_) => (pg_types::ENUM, 4),
+        Value::Composite(_) => (pg_types::COMPOSITE, -1),
+        Value::Range(_) => (pg_types::TEXT, -1),
         Value::Null => (pg_types::TEXT, -1),
     }
 }
@@ -81,6 +84,12 @@ pub fn serialize_value(value: &Value) -> Option<Vec<u8>> {
             Some(format!("\\x{}", hex_str).into_bytes())
         }
         Value::Enum(e) => Some(format!("{}[{}]", e.type_name, e.index).into_bytes()),
+        Value::Composite(c) => {
+            let field_values: Vec<String> =
+                c.fields.iter().map(|(_, v)| format!("{}", v)).collect();
+            Some(format!("({})", field_values.join(", ")).into_bytes())
+        }
+        Value::Range(r) => Some(format!("{}", r).into_bytes()),
         Value::Null => None,
     }
 }

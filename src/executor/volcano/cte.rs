@@ -123,6 +123,19 @@ impl VolcanoRecursiveCTEState {
                 key.push(0);
                 key.extend_from_slice(&e.index.to_le_bytes());
             }
+            Value::Range(r) => {
+                if let Some(l) = r.lower_bound() {
+                    Self::value_to_key(key, l);
+                }
+                if let Some(u) = r.upper_bound() {
+                    Self::value_to_key(key, u);
+                }
+            }
+            Value::Composite(c) => {
+                for (_, v) in &c.fields {
+                    Self::value_to_key(key, v);
+                }
+            }
             Value::Null => key.push(0),
         }
     }

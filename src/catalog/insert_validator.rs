@@ -1,4 +1,4 @@
-use super::{TableSchema, Tuple, UniqueValidator, Value};
+use super::{CompositeTypeDef, TableSchema, Tuple, UniqueValidator, Value};
 use crate::parser::ast::{ColumnDef, DataType, EnumTypeDef, Expr};
 use crate::transaction::TransactionManager;
 use std::collections::HashMap;
@@ -14,13 +14,14 @@ impl InsertValidator {
         table: &str,
         sequences: &Arc<RwLock<HashMap<String, i64>>>,
         enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+        composite_types: &Arc<RwLock<HashMap<String, CompositeTypeDef>>>,
     ) -> Result<Value, String> {
         if i < values.len() {
-            Self::parse_and_validate_value(&values[i], col, enum_types)
+            Self::parse_and_validate_value(&values[i], col, enum_types, composite_types)
         } else if col.is_auto_increment || col.data_type == DataType::Serial {
             Self::generate_sequence(table, &col.name, sequences)
         } else if let Some(ref default_expr) = col.default_value {
-            Self::parse_value(default_expr, enum_types)
+            Self::parse_value(default_expr, enum_types, composite_types)
         } else {
             Err(format!("Column '{}' has no default value", col.name))
         }
@@ -29,6 +30,7 @@ impl InsertValidator {
     fn parse_value(
         expr: &Expr,
         _enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+        _composite_types: &Arc<RwLock<HashMap<String, CompositeTypeDef>>>,
     ) -> Result<Value, String> {
         match expr {
             Expr::Number(n) => Ok(Value::Int(*n)),
@@ -38,9 +40,19 @@ impl InsertValidator {
             Expr::Array(arr) => {
                 let mut values = Vec::new();
                 for elem in arr {
-                    values.push(Self::parse_value(elem, _enum_types)?);
+                    values.push(Self::parse_value(elem, _enum_types, _composite_types)?);
                 }
                 Ok(Value::Array(values))
+            }
+            Expr::Row(row_exprs) => {
+                let mut values = Vec::new();
+                for elem in row_exprs {
+                    values.push(Self::parse_value(elem, _enum_types, _composite_types)?);
+                }
+                Ok(Value::Text(format!(
+                    "ROW({})",
+                    values.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join(", ")
+                )))
             }
             _ => Err("Invalid value expression".to_string()),
         }
@@ -50,8 +62,9 @@ impl InsertValidator {
         expr: &Expr,
         col: &ColumnDef,
         enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+        composite_types: &Arc<RwLock<HashMap<String, CompositeTypeDef>>>,
     ) -> Result<Value, String> {
-        let val = Self::parse_value(expr, enum_types)?;
+        let val = Self::parse_value(expr, enum_types, composite_types)?;
         if matches!(val, Value::Null) {
             return Ok(val);
         }
@@ -80,7 +93,61 @@ impl InsertValidator {
                     Err(format!("type '{}' does not exist", type_name))
                 }
             }
+            (DataType::Composite(type_name), Value::Text(_)) => {
+                let composite_types = composite_types.read().unwrap();
+                if let Some(def) = composite_types.get(type_name) {
+                    Self::validate_composite_value(&val, def)
+                } else {
+                    Err(format!("type '{}' does not exist", type_name))
+                }
+            }
+            (DataType::Composite(type_name), Value::Composite(_)) => {
+                let composite_types = composite_types.read().unwrap();
+                if let Some(def) = composite_types.get(type_name) {
+                    Self::validate_composite_value(&val, def)
+                } else {
+                    Err(format!("type '{}' does not exist", type_name))
+                }
+            }
             _ => Err(format!("Type mismatch for column '{}'", col.name)),
+        }
+    }
+
+    fn validate_composite_value(val: &Value, def: &CompositeTypeDef) -> Result<Value, String> {
+        match val {
+            Value::Text(s) if s.starts_with("ROW(") => {
+                let inner = &s[4..s.len() - 1];
+                let field_strs: Vec<&str> =
+                    if inner.is_empty() { vec![] } else { inner.split(", ").collect() };
+
+                if field_strs.len() != def.fields.len() {
+                    return Err(format!(
+                        "Composite type '{}' requires {} fields, got {}",
+                        def.type_name,
+                        def.fields.len(),
+                        field_strs.len()
+                    ));
+                }
+                Ok(val.clone())
+            }
+            Value::Composite(c) => {
+                if c.type_name != def.type_name {
+                    return Err(format!(
+                        "Composite value type '{}' does not match column type '{}'",
+                        c.type_name, def.type_name
+                    ));
+                }
+                if c.fields.len() != def.fields.len() {
+                    return Err(format!(
+                        "Composite type '{}' requires {} fields, got {}",
+                        def.type_name,
+                        def.fields.len(),
+                        c.fields.len()
+                    ));
+                }
+                Ok(val.clone())
+            }
+            _ => Err(format!("Invalid composite value: {:?}", val)),
         }
     }
 
@@ -260,9 +327,17 @@ mod tests {
         let values = vec![Expr::Number(10)];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
         let enum_types = Arc::new(RwLock::new(HashMap::new()));
-        let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
-                .unwrap();
+        let composite_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        )
+        .unwrap();
         assert_eq!(resolved, Value::Int(10));
     }
 
@@ -272,8 +347,16 @@ mod tests {
         let values = vec![Expr::String("hello".to_string())];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
         let enum_types = Arc::new(RwLock::new(HashMap::new()));
-        let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types);
+        let composite_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        );
         assert!(resolved.is_err());
         assert_eq!(resolved.unwrap_err(), "Type mismatch for column 'id'");
     }
@@ -284,14 +367,29 @@ mod tests {
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
         let enum_types = Arc::new(RwLock::new(HashMap::new()));
-        let resolved1 =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
-                .unwrap();
+        let composite_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved1 = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        )
+        .unwrap();
         assert_eq!(resolved1, Value::Int(1));
 
-        let resolved2 =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
-                .unwrap();
+        let resolved2 = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        )
+        .unwrap();
         assert_eq!(resolved2, Value::Int(2));
     }
 
@@ -308,9 +406,17 @@ mod tests {
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
         let enum_types = Arc::new(RwLock::new(HashMap::new()));
-        let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types)
-                .unwrap();
+        let composite_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        )
+        .unwrap();
         assert_eq!(resolved, Value::Text("default_name".to_string()));
     }
 
@@ -320,8 +426,16 @@ mod tests {
         let values = vec![];
         let sequences = Arc::new(RwLock::new(HashMap::new()));
         let enum_types = Arc::new(RwLock::new(HashMap::new()));
-        let resolved =
-            InsertValidator::resolve_value(&col, 0, &values, "test_table", &sequences, &enum_types);
+        let composite_types = Arc::new(RwLock::new(HashMap::new()));
+        let resolved = InsertValidator::resolve_value(
+            &col,
+            0,
+            &values,
+            "test_table",
+            &sequences,
+            &enum_types,
+            &composite_types,
+        );
         assert!(resolved.is_err());
         assert_eq!(resolved.unwrap_err(), "Column 'age' has no default value");
     }
