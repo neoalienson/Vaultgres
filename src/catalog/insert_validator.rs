@@ -451,6 +451,11 @@ mod tests {
             foreign_keys: vec![],
             unique_constraints: vec![],
             check_constraints: vec![],
+            partition_method: None,
+            partition_keys: vec![],
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         };
         let tuple_data = vec![Value::Int(1), Value::Text("test".to_string())];
         assert!(InsertValidator::validate_not_null(&schema, &tuple_data).is_ok());
@@ -467,6 +472,11 @@ mod tests {
             foreign_keys: vec![],
             unique_constraints: vec![],
             check_constraints: vec![],
+            partition_method: None,
+            partition_keys: vec![],
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         };
         let tuple_data = vec![Value::Null, Value::Text("test".to_string())];
         let result = InsertValidator::validate_not_null(&schema, &tuple_data);
@@ -485,6 +495,11 @@ mod tests {
             foreign_keys: vec![],
             unique_constraints: vec![],
             check_constraints: vec![],
+            partition_method: None,
+            partition_keys: vec![],
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         };
         let tuple_data = vec![Value::Null, Value::Text("test".to_string())];
         let result = InsertValidator::validate_not_null(&schema, &tuple_data);
@@ -501,6 +516,11 @@ mod tests {
             foreign_keys: vec![],
             unique_constraints: vec![],
             check_constraints: vec![],
+            partition_method: None,
+            partition_keys: vec![],
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         };
         let tuple_data = vec![];
         assert!(InsertValidator::validate_not_null(&schema, &tuple_data).is_ok());

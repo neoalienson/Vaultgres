@@ -1,14 +1,14 @@
 //! HashAggExecutor - Performs hash-based aggregation (GROUP BY and aggregates)
 
-use crate::catalog::{TableSchema, Value};
+use crate::catalog::{Aggregate, Catalog, TableSchema, Value};
 use crate::executor::eval::Eval;
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
-use crate::parser::ast::{AggregateFunc, Expr};
+use crate::parser::ast::{AggregateFunc, DataType, Expr};
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
-/// Aggregate state for tracking aggregation progress
 #[derive(Debug, Clone)]
 enum AggregateState {
     Count(i64),
@@ -16,6 +16,13 @@ enum AggregateState {
     Avg { sum: i64, count: i64 },
     Min(Value),
     Max(Value),
+    Custom(CustomAggregateState),
+}
+
+#[derive(Debug, Clone)]
+struct CustomAggregateState {
+    info: Aggregate,
+    state: Value,
 }
 
 pub struct HashAggExecutor {
@@ -31,22 +38,25 @@ impl HashAggExecutor {
         aggregates: Vec<Expr>,
         output_schema: TableSchema,
     ) -> Result<Self, ExecutorError> {
-        // Group tuples by group_by keys
+        Self::new_with_catalog(child, group_by, aggregates, output_schema, None)
+    }
+
+    pub fn new_with_catalog(
+        mut child: Box<dyn Executor>,
+        group_by: Vec<Expr>,
+        aggregates: Vec<Expr>,
+        output_schema: TableSchema,
+        catalog: Option<Arc<Catalog>>,
+    ) -> Result<Self, ExecutorError> {
+        let catalog_clone = catalog.as_ref().map(|c| Arc::clone(c));
         let mut groups: HashMap<u64, (Tuple, Vec<AggregateState>)> = HashMap::new();
 
         while let Some(tuple) = child.next()? {
-            // Compute group key hash
-            let group_key = if group_by.is_empty() {
-                // No GROUP BY - all tuples go into one group
-                0
-            } else {
-                Self::compute_group_key(&tuple, &group_by)?
-            };
+            let group_key =
+                if group_by.is_empty() { 0 } else { Self::compute_group_key(&tuple, &group_by)? };
 
-            // Initialize or update group
             let entry = groups.entry(group_key).or_insert_with(|| {
                 let mut group_tuple = Tuple::new();
-                // Initialize group-by columns
                 for expr in &group_by {
                     match expr {
                         Expr::Column(name) => {
@@ -55,7 +65,6 @@ impl HashAggExecutor {
                             }
                         }
                         Expr::QualifiedColumn { table, column } => {
-                            // For qualified columns, try prefixed name first, then fall back to unqualified
                             let qualified_name = format!("{}.{}", table, column);
                             if let Some(val) =
                                 tuple.get(&qualified_name).or_else(|| tuple.get(column))
@@ -63,137 +72,109 @@ impl HashAggExecutor {
                                 group_tuple.insert(qualified_name, val.clone());
                             }
                         }
-                        _ => {} // Should be caught by planner
+                        _ => {}
                     }
                 }
-                // Initialize aggregate states based on the aggregate function type
                 let agg_states: Vec<AggregateState> = aggregates
                     .iter()
-                    .map(|agg_expr| {
-                        if let Expr::Aggregate { func, .. } = agg_expr {
-                            match func {
-                                AggregateFunc::Count => AggregateState::Count(0),
-                                AggregateFunc::Sum => AggregateState::Sum(0),
-                                AggregateFunc::Avg => AggregateState::Avg { sum: 0, count: 0 },
-                                AggregateFunc::Min => AggregateState::Min(Value::Null),
-                                AggregateFunc::Max => AggregateState::Max(Value::Null),
-                            }
-                        } else {
-                            AggregateState::Count(0)
-                        }
-                    })
+                    .map(|agg_expr| Self::create_initial_state(agg_expr, &catalog_clone))
                     .collect();
                 (group_tuple, agg_states)
             });
 
-            // Update aggregate states
             for (i, agg_expr) in aggregates.iter().enumerate() {
-                if let Expr::Aggregate { func: _func, arg } = agg_expr {
-                    // Handle COUNT(*) specially - it counts all rows regardless of NULL
-                    let arg_val = if matches!(arg.as_ref(), Expr::Star) {
-                        // For COUNT(*), we use a non-null value to always increment count
-                        Value::Int(1)
-                    } else {
-                        Eval::eval_expr(arg, &tuple)?
-                    };
+                match agg_expr {
+                    Expr::Aggregate { func: _func, arg } => {
+                        let arg_val = if matches!(arg.as_ref(), Expr::Star) {
+                            Value::Int(1)
+                        } else {
+                            Eval::eval_expr(arg, &tuple)?
+                        };
 
-                    match &mut entry.1[i] {
-                        AggregateState::Count(c) => {
-                            if !matches!(arg_val, Value::Null) {
-                                *c += 1;
+                        match &mut entry.1[i] {
+                            AggregateState::Count(c) => {
+                                if !matches!(arg_val, Value::Null) {
+                                    *c += 1;
+                                }
                             }
-                        }
-                        AggregateState::Sum(s) => {
-                            if let Value::Int(v) = arg_val {
-                                *s += v;
+                            AggregateState::Sum(s) => {
+                                if let Value::Int(v) = arg_val {
+                                    *s += v;
+                                }
                             }
-                        }
-                        AggregateState::Avg { sum, count } => {
-                            if let Value::Int(v) = arg_val {
-                                *sum += v;
-                                *count += 1;
+                            AggregateState::Avg { sum, count } => {
+                                if let Value::Int(v) = arg_val {
+                                    *sum += v;
+                                    *count += 1;
+                                }
                             }
-                        }
-                        AggregateState::Min(current_min) => {
-                            if matches!(current_min, Value::Null)
-                                || Self::compare_values(&arg_val, current_min)?
-                                    == std::cmp::Ordering::Less
-                            {
-                                entry.1[i] = AggregateState::Min(arg_val);
+                            AggregateState::Min(current_min) => {
+                                if matches!(current_min, Value::Null)
+                                    || Self::compare_values(&arg_val, current_min)?
+                                        == std::cmp::Ordering::Less
+                                {
+                                    entry.1[i] = AggregateState::Min(arg_val);
+                                }
                             }
+                            AggregateState::Max(current_max) => {
+                                if matches!(current_max, Value::Null)
+                                    || Self::compare_values(&arg_val, current_max)?
+                                        == std::cmp::Ordering::Greater
+                                {
+                                    entry.1[i] = AggregateState::Max(arg_val);
+                                }
+                            }
+                            AggregateState::Custom(_) => {}
                         }
-                        AggregateState::Max(current_max) => {
-                            if matches!(current_max, Value::Null)
-                                || Self::compare_values(&arg_val, current_max)?
-                                    == std::cmp::Ordering::Greater
-                            {
-                                entry.1[i] = AggregateState::Max(arg_val);
+                    }
+                    Expr::FunctionCall { name, args } => {
+                        if let Some(agg) =
+                            catalog_clone.as_ref().and_then(|c| c.get_aggregate(name))
+                        {
+                            let arg_val = if !args.is_empty() {
+                                Eval::eval_expr(&args[0], &tuple)?
+                            } else {
+                                Value::Null
+                            };
+
+                            if let AggregateState::Custom(ref mut custom_state) = entry.1[i] {
+                                let new_state = Self::call_sfunc(
+                                    &custom_state.info.sfunc,
+                                    custom_state.state.clone(),
+                                    arg_val,
+                                    &catalog_clone,
+                                )?;
+                                custom_state.state = new_state;
                             }
                         }
                     }
+                    _ => {}
                 }
             }
         }
 
-        // Convert groups to result tuples
         let mut buffered_results = Vec::new();
 
-        // If no GROUP BY and no input tuples, still return one row with aggregates (SQL standard behavior)
         if group_by.is_empty() && groups.is_empty() {
             let mut group_tuple = Tuple::new();
-            // Initialize aggregate states for empty input
             let agg_states: Vec<AggregateState> = aggregates
                 .iter()
-                .map(|agg_expr| {
-                    if let Expr::Aggregate { func, .. } = agg_expr {
-                        match func {
-                            AggregateFunc::Count => AggregateState::Count(0),
-                            AggregateFunc::Sum => AggregateState::Sum(0),
-                            AggregateFunc::Avg => AggregateState::Avg { sum: 0, count: 0 },
-                            AggregateFunc::Min => AggregateState::Min(Value::Null),
-                            AggregateFunc::Max => AggregateState::Max(Value::Null),
-                        }
-                    } else {
-                        AggregateState::Count(0)
-                    }
-                })
+                .map(|agg_expr| Self::create_initial_state(agg_expr, &catalog_clone))
                 .collect();
 
-            // Add aggregate results to the tuple
             for (i, agg_expr) in aggregates.iter().enumerate() {
                 let agg_name = Self::get_aggregate_name(agg_expr);
-                let agg_value = match &agg_states[i] {
-                    AggregateState::Count(c) => Value::Int(*c),
-                    AggregateState::Sum(s) => Value::Int(*s),
-                    AggregateState::Avg { sum: _, count: _count } => {
-                        // For empty input, AVG returns NULL
-                        Value::Null
-                    }
-                    AggregateState::Min(v) => v.clone(),
-                    AggregateState::Max(v) => v.clone(),
-                };
+                let agg_value =
+                    Self::compute_final_value(&agg_states[i], agg_expr, &catalog_clone)?;
                 group_tuple.insert(agg_name, agg_value);
             }
             buffered_results.push(group_tuple);
         } else {
-            // Normal case: convert groups to result tuples
             for (_, (mut group_tuple, agg_states)) in groups {
-                // Add aggregate results to the tuple
                 for (i, agg_expr) in aggregates.iter().enumerate() {
                     let agg_name = Self::get_aggregate_name(agg_expr);
-                    let agg_value = match &agg_states[i] {
-                        AggregateState::Count(c) => Value::Int(*c),
-                        AggregateState::Sum(s) => Value::Int(*s),
-                        AggregateState::Avg { sum, count } => {
-                            if *count > 0 {
-                                Value::Int(*sum / *count)
-                            } else {
-                                Value::Null
-                            }
-                        }
-                        AggregateState::Min(v) => v.clone(),
-                        AggregateState::Max(v) => v.clone(),
-                    };
+                    let agg_value =
+                        Self::compute_final_value(&agg_states[i], agg_expr, &catalog_clone)?;
                     group_tuple.insert(agg_name, agg_value);
                 }
                 buffered_results.push(group_tuple);
@@ -203,7 +184,117 @@ impl HashAggExecutor {
         Ok(Self { buffered_results, current_idx: 0, output_schema })
     }
 
-    /// Compute a hash key for a group based on group-by expressions
+    fn create_initial_state(agg_expr: &Expr, catalog: &Option<Arc<Catalog>>) -> AggregateState {
+        match agg_expr {
+            Expr::Aggregate { func, .. } => match func {
+                AggregateFunc::Count => AggregateState::Count(0),
+                AggregateFunc::Sum => AggregateState::Sum(0),
+                AggregateFunc::Avg => AggregateState::Avg { sum: 0, count: 0 },
+                AggregateFunc::Min => AggregateState::Min(Value::Null),
+                AggregateFunc::Max => AggregateState::Max(Value::Null),
+            },
+            Expr::FunctionCall { name, .. } => {
+                if let Some(agg) = catalog.as_ref().and_then(|c| c.get_aggregate(name)) {
+                    let init_state = Self::parse_initcond(&agg.initcond, &agg.stype);
+                    AggregateState::Custom(CustomAggregateState {
+                        info: agg.clone(),
+                        state: init_state,
+                    })
+                } else {
+                    AggregateState::Count(0)
+                }
+            }
+            _ => AggregateState::Count(0),
+        }
+    }
+
+    fn parse_initcond(initcond: &Option<String>, stype: &str) -> Value {
+        match initcond {
+            Some(cond) => {
+                if cond.is_empty() {
+                    return Self::default_state_for_type(stype);
+                }
+                if let Ok(v) = cond.parse::<i64>() {
+                    return Value::Int(v);
+                }
+                if let Ok(v) = cond.parse::<f64>() {
+                    return Value::Float(v);
+                }
+                if cond == "NULL" || cond.is_empty() {
+                    return Value::Null;
+                }
+                Value::Text(cond.to_string())
+            }
+            None => Self::default_state_for_type(stype),
+        }
+    }
+
+    fn default_state_for_type(stype: &str) -> Value {
+        match stype.to_uppercase().as_str() {
+            "INT" | "INT4" | "INT8" | "BIGINT" | "SMALLINT" | "OID" => Value::Int(0),
+            "FLOAT" | "FLOAT4" | "FLOAT8" | "DOUBLE" | "NUMERIC" | "DECIMAL" => Value::Float(0.0),
+            "TEXT" | "VARCHAR" | "CHAR" | "BPCHAR" => Value::Text(String::new()),
+            "BOOL" | "BOOLEAN" => Value::Bool(false),
+            _ => Value::Null,
+        }
+    }
+
+    fn call_sfunc(
+        sfunc_name: &str,
+        current_state: Value,
+        new_value: Value,
+        catalog: &Option<Arc<Catalog>>,
+    ) -> Result<Value, ExecutorError> {
+        if let Some(cat) = catalog {
+            Eval::eval_function_call(sfunc_name, vec![current_state, new_value], Some(cat.as_ref()))
+        } else {
+            Err(ExecutorError::InternalError(
+                "Catalog required for custom aggregate sfunc".to_string(),
+            ))
+        }
+    }
+
+    fn call_finalfunc(
+        finalfunc_name: &str,
+        state: Value,
+        catalog: &Option<Arc<Catalog>>,
+    ) -> Result<Value, ExecutorError> {
+        if let Some(cat) = catalog {
+            Eval::eval_function_call(finalfunc_name, vec![state], Some(cat.as_ref()))
+        } else {
+            Err(ExecutorError::InternalError(
+                "Catalog required for custom aggregate finalfunc".to_string(),
+            ))
+        }
+    }
+
+    fn compute_final_value(
+        state: &AggregateState,
+        agg_expr: &Expr,
+        catalog: &Option<Arc<Catalog>>,
+    ) -> Result<Value, ExecutorError> {
+        match state {
+            AggregateState::Count(c) => Ok(Value::Int(*c)),
+            AggregateState::Sum(s) => Ok(Value::Int(*s)),
+            AggregateState::Avg { sum, count } => {
+                if *count > 0 {
+                    Ok(Value::Int(*sum / *count))
+                } else {
+                    Ok(Value::Null)
+                }
+            }
+            AggregateState::Min(v) => Ok(v.clone()),
+            AggregateState::Max(v) => Ok(v.clone()),
+            AggregateState::Custom(custom_state) => {
+                if let Some(ref finalfunc) = custom_state.info.finalfunc {
+                    Self::call_finalfunc(finalfunc, custom_state.state.clone(), catalog)
+                } else {
+                    Ok(custom_state.state.clone())
+                }
+            }
+        }
+    }
+
     fn compute_group_key(tuple: &Tuple, group_by: &[Expr]) -> Result<u64, ExecutorError> {
         let mut hasher = DefaultHasher::new();
         for expr in group_by {
@@ -214,7 +305,6 @@ impl HashAggExecutor {
                     }
                 }
                 Expr::QualifiedColumn { table, column } => {
-                    // For qualified columns, try prefixed name first, then fall back to unqualified
                     let qualified_name = format!("{}.{}", table, column);
                     if let Some(val) = tuple.get(&qualified_name).or_else(|| tuple.get(column)) {
                         Self::hash_value(val, &mut hasher);
@@ -231,7 +321,6 @@ impl HashAggExecutor {
         Ok(hasher.finish())
     }
 
-    /// Hash a value
     fn hash_value(value: &Value, hasher: &mut DefaultHasher) {
         match value {
             Value::Int(n) => {
@@ -255,7 +344,6 @@ impl HashAggExecutor {
         }
     }
 
-    /// Compare two values
     fn compare_values(a: &Value, b: &Value) -> Result<std::cmp::Ordering, ExecutorError> {
         match (a, b) {
             (Value::Int(a), Value::Int(b)) => Ok(a.cmp(b)),
@@ -267,7 +355,6 @@ impl HashAggExecutor {
         }
     }
 
-    /// Get a name for an aggregate expression
     fn get_aggregate_name(expr: &Expr) -> String {
         match expr {
             Expr::Aggregate { func, arg } => {
@@ -278,6 +365,17 @@ impl HashAggExecutor {
                     _ => "expr".to_string(),
                 };
                 format!("{:?}({})", func, arg_name).to_lowercase()
+            }
+            Expr::FunctionCall { name, args } => {
+                let arg_name = if !args.is_empty() {
+                    match &args[0] {
+                        Expr::Column(col_name) => col_name.clone(),
+                        _ => "expr".to_string(),
+                    }
+                } else {
+                    "expr".to_string()
+                };
+                format!("{}({})", name, arg_name)
             }
             Expr::Alias { alias, .. } => alias.clone(),
             _ => format!("{:?}", expr),
@@ -304,7 +402,6 @@ mod tests {
     use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
     use crate::parser::ast::{AggregateFunc, Expr};
 
-    // A mock executor to feed tuples to the HashAggExecutor
     struct MockExecutor {
         tuples: Vec<Tuple>,
         idx: usize,
@@ -488,7 +585,6 @@ mod tests {
 
     #[test]
     fn test_count_star() {
-        // Test COUNT(*) - should count all rows including those with NULL values
         let tuples = vec![
             [("a".to_string(), Value::Int(10))].into(),
             [("a".to_string(), Value::Null)].into(),
@@ -502,14 +598,12 @@ mod tests {
             HashAggExecutor::new(child, vec![], aggregates, output_schema).unwrap();
 
         let result = agg_executor.next().unwrap().unwrap();
-        // COUNT(*) should return 3 (all rows), not 2 (non-null values)
         assert_eq!(result.get("count(*)"), Some(&Value::Int(3)));
         assert!(agg_executor.next().unwrap().is_none());
     }
 
     #[test]
     fn test_count_star_empty_input() {
-        // Test COUNT(*) with empty input - should return 0
         let tuples = vec![];
         let child = Box::new(MockExecutor::new(tuples));
         let aggregates =
@@ -525,7 +619,6 @@ mod tests {
 
     #[test]
     fn test_count_star_with_group_by() {
-        // Test COUNT(*) with GROUP BY
         let tuples = vec![
             [
                 ("category".to_string(), Value::Text("A".to_string())),
@@ -575,6 +668,380 @@ mod tests {
             } else {
                 panic!("Unexpected group key");
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_int() {
+        let agg = Aggregate {
+            name: "my_sum".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "int8pl".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: Some("int8out".to_string()),
+            initcond: Some("0".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_sum".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        assert!(matches!(state, AggregateState::Custom(_)));
+    }
+
+    #[test]
+    fn test_parse_initcond_null() {
+        let agg = Aggregate {
+            name: "my_sum".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "int8pl".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: Some("int8out".to_string()),
+            initcond: None,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_sum".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        assert!(matches!(state, AggregateState::Custom(_)));
+    }
+
+    #[test]
+    fn test_custom_aggregate_with_catalog() {
+        let agg = Aggregate {
+            name: "my_count".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "my_count_sfunc".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: None,
+            initcond: Some("0".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_count".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.info.name, "my_count");
+                assert_eq!(custom.info.sfunc, "my_count_sfunc");
+                assert_eq!(custom.state, Value::Int(0));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_custom_aggregate_initcond_text() {
+        let agg = Aggregate {
+            name: "my_concat".to_string(),
+            input_type: "TEXT".to_string(),
+            sfunc: "text_concat".to_string(),
+            stype: "TEXT".to_string(),
+            finalfunc: None,
+            initcond: Some("hello".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_concat".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Text("hello".to_string()));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_with_numeric() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: None,
+            initcond: Some("42".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Int(42));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_with_null() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: None,
+            initcond: Some("NULL".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Null);
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_default_for_int() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: None,
+            initcond: None,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Int(0));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_default_for_float() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "FLOAT".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "FLOAT8".to_string(),
+            finalfunc: None,
+            initcond: None,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Float(0.0));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_default_for_bool() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "BOOL".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "BOOL".to_string(),
+            finalfunc: None,
+            initcond: None,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Bool(false));
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_parse_initcond_unknown_type_defaults_to_null() {
+        let agg = Aggregate {
+            name: "my_agg".to_string(),
+            input_type: "UNKNOWN".to_string(),
+            sfunc: "my_sfunc".to_string(),
+            stype: "UNKNOWN".to_string(),
+            finalfunc: None,
+            initcond: None,
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_agg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.state, Value::Null);
+            }
+            _ => panic!("Expected Custom aggregate state"),
+        }
+    }
+
+    #[test]
+    fn test_non_custom_function_call_returns_count() {
+        let catalog = Catalog::new();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "regular_function".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        assert!(matches!(state, AggregateState::Count(0)));
+    }
+
+    #[test]
+    fn test_get_aggregate_name_function_call() {
+        let name = HashAggExecutor::get_aggregate_name(&Expr::FunctionCall {
+            name: "my_sum".to_string(),
+            args: vec![Expr::Column("x".to_string())],
+        });
+        assert_eq!(name, "my_sum(x)");
+
+        let name2 = HashAggExecutor::get_aggregate_name(&Expr::FunctionCall {
+            name: "count_star".to_string(),
+            args: vec![],
+        });
+        assert_eq!(name2, "count_star(expr)");
+    }
+
+    #[test]
+    fn test_custom_aggregate_with_finalfunc() {
+        let agg = Aggregate {
+            name: "my_avg".to_string(),
+            input_type: "INT".to_string(),
+            sfunc: "int8_avg_accum".to_string(),
+            stype: "INT8".to_string(),
+            finalfunc: Some("int8_avg".to_string()),
+            initcond: Some("0".to_string()),
+            volatility: crate::catalog::FunctionVolatility::Immutable,
+            cost: 100.0,
+        };
+
+        let catalog = Catalog::new();
+        catalog.create_aggregate(agg).unwrap();
+
+        let state = HashAggExecutor::create_initial_state(
+            &Expr::FunctionCall {
+                name: "my_avg".to_string(),
+                args: vec![Expr::Column("x".to_string())],
+            },
+            &Some(Arc::new(catalog)),
+        );
+
+        match state {
+            AggregateState::Custom(custom) => {
+                assert_eq!(custom.info.finalfunc, Some("int8_avg".to_string()));
+            }
+            _ => panic!("Expected Custom aggregate state"),
         }
     }
 }

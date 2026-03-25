@@ -1,9 +1,227 @@
 use std::sync::Arc;
 use vaultgres::catalog::*;
-use vaultgres::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr};
+use vaultgres::parser::ast::{AggregateFunc, ColumnDef, DataType, Expr, Statement};
+
+fn create_test_table(catalog: &Catalog, name: &str, columns: Vec<ColumnDef>) {
+    catalog.create_table(name.to_string(), columns).unwrap();
+}
+
+fn insert_values(catalog: &Catalog, table: &str, values: Vec<Expr>) {
+    catalog.insert(table, &[], values).unwrap();
+}
+
+fn execute_sql(catalog: &Catalog, sql: &str) -> Vec<Vec<Value>> {
+    let stmt = vaultgres::parser::parse(sql).unwrap();
+    match stmt {
+        Statement::Select(select) => {
+            let catalog_arc = Arc::new(catalog.clone());
+            let planner =
+                vaultgres::planner::planner::Planner::new_with_catalog(catalog_arc.clone());
+            let mut plan = planner.plan(&select).unwrap();
+            let mut results = Vec::new();
+            while let Some(tuple) = plan.next().unwrap() {
+                let row: Vec<Value> = tuple.into_iter().map(|(_, v)| v).collect();
+                results.push(row);
+            }
+            results
+        }
+        _ => vec![],
+    }
+}
+
+fn register_sql_function(catalog: &Catalog, name: &str, body: &str, return_type: &str) {
+    use vaultgres::catalog::{Function, FunctionLanguage, FunctionVolatility, Parameter};
+    let func = Function {
+        name: name.to_string(),
+        parameters: vec![
+            Parameter { name: "state".to_string(), data_type: "INT".to_string(), default: None },
+            Parameter { name: "value".to_string(), data_type: "INT".to_string(), default: None },
+        ],
+        return_type: return_type.to_string(),
+        language: FunctionLanguage::Sql,
+        body: body.to_string(),
+        is_variadic: false,
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+        rows: 1,
+    };
+    catalog.create_function(func).unwrap();
+}
 
 #[test]
-fn test_aggregate_count() {
+fn test_custom_aggregate_detection() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    create_test_table(&catalog, "data", columns);
+    insert_values(&catalog, "data", vec![Expr::Number(10)]);
+    insert_values(&catalog, "data", vec![Expr::Number(20)]);
+
+    let agg = Aggregate {
+        name: "my_sum".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "int8pl".to_string(),
+        stype: "INT8".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+    catalog.create_aggregate(agg).unwrap();
+
+    let retrieved = catalog.get_aggregate("my_sum").unwrap();
+    assert_eq!(retrieved.name, "my_sum");
+    assert_eq!(retrieved.sfunc, "int8pl");
+}
+
+#[test]
+fn test_custom_aggregate_with_parse_and_execute() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    create_test_table(&catalog, "data", columns);
+    insert_values(&catalog, "data", vec![Expr::Number(10)]);
+    insert_values(&catalog, "data", vec![Expr::Number(20)]);
+    insert_values(&catalog, "data", vec![Expr::Number(30)]);
+
+    register_sql_function(&catalog, "my_add", "SELECT $1 + $2", "INT");
+
+    let agg = Aggregate {
+        name: "my_sum".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "my_add".to_string(),
+        stype: "INT".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+    catalog.create_aggregate(agg).unwrap();
+
+    let sql = "SELECT my_sum(value) FROM data";
+    let results = execute_sql(&catalog, sql);
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn test_custom_aggregate_with_group_by() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("category".to_string(), DataType::Text),
+        ColumnDef::new("value".to_string(), DataType::Int),
+    ];
+    create_test_table(&catalog, "data", columns);
+    insert_values(&catalog, "data", vec![Expr::String("A".to_string()), Expr::Number(10)]);
+    insert_values(&catalog, "data", vec![Expr::String("B".to_string()), Expr::Number(20)]);
+    insert_values(&catalog, "data", vec![Expr::String("A".to_string()), Expr::Number(30)]);
+
+    register_sql_function(&catalog, "my_add", "SELECT $1 + $2", "INT");
+
+    let agg = Aggregate {
+        name: "my_sum".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "my_add".to_string(),
+        stype: "INT".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+    catalog.create_aggregate(agg).unwrap();
+
+    let sql = "SELECT category, my_sum(value) FROM data GROUP BY category";
+    let results = execute_sql(&catalog, sql);
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_custom_aggregate_with_finalfunc() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    create_test_table(&catalog, "data", columns);
+    insert_values(&catalog, "data", vec![Expr::Number(10)]);
+    insert_values(&catalog, "data", vec![Expr::Number(20)]);
+
+    register_sql_function(&catalog, "my_add", "SELECT $1 + $2", "INT");
+    register_sql_function(&catalog, "my_double", "SELECT $1 * 2", "INT");
+
+    let agg = Aggregate {
+        name: "my_avg".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "my_add".to_string(),
+        stype: "INT".to_string(),
+        finalfunc: Some("my_double".to_string()),
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+    catalog.create_aggregate(agg).unwrap();
+
+    assert!(catalog.get_aggregate("my_avg").is_some());
+    let retrieved = catalog.get_aggregate("my_avg").unwrap();
+    assert_eq!(retrieved.finalfunc, Some("my_double".to_string()));
+}
+
+#[test]
+fn test_custom_aggregate_empty_input() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    create_test_table(&catalog, "data", columns);
+
+    let agg = Aggregate {
+        name: "my_sum".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "int8pl".to_string(),
+        stype: "INT8".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+    catalog.create_aggregate(agg).unwrap();
+
+    let sql = "SELECT my_sum(value) FROM data";
+    let results = execute_sql(&catalog, sql);
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn test_custom_aggregate_multiple_functions() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("value".to_string(), DataType::Int)];
+    create_test_table(&catalog, "data", columns);
+    insert_values(&catalog, "data", vec![Expr::Number(10)]);
+    insert_values(&catalog, "data", vec![Expr::Number(20)]);
+
+    let agg1 = Aggregate {
+        name: "my_count".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "int8pl".to_string(),
+        stype: "INT8".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+
+    let agg2 = Aggregate {
+        name: "my_sum".to_string(),
+        input_type: "INT".to_string(),
+        sfunc: "int8pl".to_string(),
+        stype: "INT8".to_string(),
+        finalfunc: None,
+        initcond: Some("0".to_string()),
+        volatility: FunctionVolatility::Immutable,
+        cost: 100.0,
+    };
+
+    catalog.create_aggregate(agg1).unwrap();
+    catalog.create_aggregate(agg2).unwrap();
+
+    assert!(catalog.get_aggregate("my_count").is_some());
+    assert!(catalog.get_aggregate("my_sum").is_some());
+}
+
+#[test]
+fn test_custom_aggregate_aggregate_count() {
     let catalog = Catalog::new();
     let catalog_arc = Arc::new(catalog.clone());
     let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];

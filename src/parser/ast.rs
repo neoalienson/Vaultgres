@@ -28,6 +28,8 @@ pub enum Statement {
     CreateType(CreateTypeStmt),
     DropType(DropTypeStmt),
     AlterType(AlterTypeStmt),
+    AttachPartition(AttachPartitionStmt),
+    DetachPartition(DetachPartitionStmt),
     DeclareCursor(DeclareCursorStmt),
     FetchCursor(FetchCursorStmt),
     CloseCursor(CloseCursorStmt),
@@ -326,6 +328,72 @@ pub struct AlterTypeStmt {
     pub after_label: Option<String>,
 }
 
+/// Partition method (RANGE, LIST, HASH)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum PartitionMethod {
+    Range,
+    List,
+    Hash,
+}
+
+/// Partition key specification
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartitionKey {
+    pub column: String,
+    pub opclass: Option<String>,
+}
+
+/// FOR VALUES FROM ... TO ... (for RANGE partitions)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartitionRangeBound {
+    pub from_values: Vec<Expr>,
+    pub to_values: Vec<Expr>,
+}
+
+/// FOR VALUES IN ... (for LIST partitions)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartitionListBound {
+    pub values: Vec<Expr>,
+}
+
+/// FOR VALUES WITH (MODULUS n, REMAINDER r) (for HASH partitions)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartitionHashBound {
+    pub modulus: u64,
+    pub remainder: u64,
+}
+
+/// Partition bound specification
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum PartitionBoundSpec {
+    Range(PartitionRangeBound),
+    List(PartitionListBound),
+    Hash(PartitionHashBound),
+    Default,
+}
+
+/// Partition definition (for a child partition)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartitionDef {
+    pub name: String,
+    pub bound: PartitionBoundSpec,
+}
+
+/// ATTACH PARTITION statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AttachPartitionStmt {
+    pub parent_table: String,
+    pub partition_name: String,
+    pub bound: PartitionBoundSpec,
+}
+
+/// DETACH PARTITION statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DetachPartitionStmt {
+    pub parent_table: String,
+    pub partition_name: String,
+}
+
 /// DECLARE CURSOR statement
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeclareCursorStmt {
@@ -369,6 +437,11 @@ pub struct CreateTableStmt {
     pub foreign_keys: Vec<ForeignKeyDef>,
     pub check_constraints: Vec<CheckConstraint>,
     pub unique_constraints: Vec<UniqueConstraint>,
+    pub partition_by: Option<(PartitionMethod, Vec<PartitionKey>)>,
+    pub partitions: Vec<PartitionDef>,
+    pub is_partition: bool,
+    pub parent_table: Option<String>,
+    pub partition_bound: Option<PartitionBoundSpec>,
 }
 
 /// Column definition
@@ -560,6 +633,10 @@ pub enum Expr {
     },
     Aggregate {
         func: AggregateFunc,
+        arg: Box<Expr>,
+    },
+    CustomAggregate {
+        name: String,
         arg: Box<Expr>,
     },
     Window {
@@ -1041,6 +1118,11 @@ mod tests {
             foreign_keys: vec![fk_def],
             check_constraints: vec![check_constraint],
             unique_constraints: vec![unique_constraint],
+            partition_by: None,
+            partitions: vec![],
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         };
         assert_eq!(create_table.table, "new_table");
         assert_eq!(create_table.columns.len(), 1);

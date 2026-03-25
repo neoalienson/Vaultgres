@@ -1,11 +1,23 @@
 use super::{Aggregate, CompositeValue, EnumValue, Function, TableSchema, Tuple, Value};
-use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
+use crate::parser::ast::{
+    ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, PartitionBoundSpec, PartitionKey,
+    PartitionMethod, SelectStmt,
+};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TablePartitionInfo {
+    pub partition_method: Option<PartitionMethod>,
+    pub partition_keys: Vec<PartitionKey>,
+    pub is_partition: bool,
+    pub parent_table: Option<String>,
+    pub partition_bound: Option<PartitionBoundSpec>,
+}
 
 pub struct Persistence;
 
@@ -180,6 +192,49 @@ impl Persistence {
         let json = std::fs::read_to_string(&path)
             .map_err(|e| format!("Failed to read aggregates: {}", e))?;
         serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize aggregates: {}", e))
+    }
+
+    pub fn save_partitions(
+        data_dir: &str,
+        tables: &HashMap<String, TableSchema>,
+    ) -> Result<(), String> {
+        let mut partition_info = HashMap::new();
+
+        for (name, schema) in tables.iter() {
+            if schema.partition_method.is_some()
+                || schema.is_partition
+                || schema.parent_table.is_some()
+                || schema.partition_bound.is_some()
+            {
+                partition_info.insert(
+                    name.clone(),
+                    TablePartitionInfo {
+                        partition_method: schema.partition_method.clone(),
+                        partition_keys: schema.partition_keys.clone(),
+                        is_partition: schema.is_partition,
+                        parent_table: schema.parent_table.clone(),
+                        partition_bound: schema.partition_bound.clone(),
+                    },
+                );
+            }
+        }
+
+        let path = format!("{}/partitions.json", data_dir);
+        let json = serde_json::to_string_pretty(&partition_info)
+            .map_err(|e| format!("Failed to serialize partitions: {}", e))?;
+        std::fs::write(&path, json).map_err(|e| format!("Failed to write partitions: {}", e))?;
+        log::info!("💾 Saved {} partition entries", partition_info.len());
+        Ok(())
+    }
+
+    pub fn load_partitions(data_dir: &str) -> Result<HashMap<String, TablePartitionInfo>, String> {
+        let path = format!("{}/partitions.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read partitions: {}", e))?;
+        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize partitions: {}", e))
     }
 
     pub fn load(
@@ -528,7 +583,10 @@ fn read_value<R: Read>(reader: &mut R) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::{ColumnDef, Expr, SelectStmt};
+    use crate::parser::ast::{
+        ColumnDef, Expr, PartitionBoundSpec, PartitionHashBound, PartitionKey, PartitionMethod,
+        PartitionRangeBound, SelectStmt,
+    };
     use crate::transaction::TupleHeader;
     use std::fs;
 
@@ -690,6 +748,107 @@ mod tests {
 
         let result = Persistence::load_views(test_dir);
         assert!(result.is_err());
+
+        fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[test]
+    fn test_save_and_load_partitions() {
+        let test_dir = "/tmp/vaultgres_test_partitions";
+        let _ = fs::remove_dir_all(test_dir);
+        fs::create_dir_all(test_dir).unwrap();
+
+        let mut tables = HashMap::new();
+
+        let schema = TableSchema::with_partition(
+            "orders".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("order_date".to_string(), DataType::Date),
+            ],
+            PartitionMethod::Range,
+            vec![PartitionKey { column: "order_date".to_string(), opclass: None }],
+        );
+
+        let partition_schema = TableSchema::as_partition(
+            "orders_2024_01".to_string(),
+            "orders".to_string(),
+            PartitionBoundSpec::Range(PartitionRangeBound {
+                from_values: vec![Expr::String("2024-01-01".to_string())],
+                to_values: vec![Expr::String("2024-02-01".to_string())],
+            }),
+        );
+
+        tables.insert("orders".to_string(), schema);
+        tables.insert("orders_2024_01".to_string(), partition_schema);
+
+        Persistence::save_partitions(test_dir, &tables).unwrap();
+        let loaded_partitions = Persistence::load_partitions(test_dir).unwrap();
+
+        assert_eq!(loaded_partitions.len(), 2);
+
+        let orders_info = loaded_partitions.get("orders").unwrap();
+        assert_eq!(orders_info.partition_method, Some(PartitionMethod::Range));
+        assert_eq!(orders_info.is_partition, false);
+        assert!(orders_info.partition_keys.len() == 1);
+
+        let partition_info = loaded_partitions.get("orders_2024_01").unwrap();
+        assert_eq!(partition_info.is_partition, true);
+        assert_eq!(partition_info.parent_table, Some("orders".to_string()));
+        match &partition_info.partition_bound {
+            Some(PartitionBoundSpec::Range(_)) => {}
+            _ => panic!("Expected Range bound"),
+        }
+
+        fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[test]
+    fn test_load_nonexistent_partitions() {
+        let test_dir = "/tmp/vaultgres_test_nonexistent_partitions";
+        let _ = fs::remove_dir_all(test_dir);
+
+        let loaded_partitions = Persistence::load_partitions(test_dir).unwrap();
+        assert!(loaded_partitions.is_empty());
+    }
+
+    #[test]
+    fn test_save_and_load_hash_partition() {
+        let test_dir = "/tmp/vaultgres_test_hash_partition";
+        let _ = fs::remove_dir_all(test_dir);
+        fs::create_dir_all(test_dir).unwrap();
+
+        let mut tables = HashMap::new();
+
+        let schema = TableSchema::with_partition(
+            "customers".to_string(),
+            vec![ColumnDef::new("customer_id".to_string(), DataType::Int)],
+            PartitionMethod::Hash,
+            vec![PartitionKey { column: "customer_id".to_string(), opclass: None }],
+        );
+
+        let partition_schema = TableSchema::as_partition(
+            "customers_0".to_string(),
+            "customers".to_string(),
+            PartitionBoundSpec::Hash(PartitionHashBound { modulus: 4, remainder: 0 }),
+        );
+
+        tables.insert("customers".to_string(), schema);
+        tables.insert("customers_0".to_string(), partition_schema);
+
+        Persistence::save_partitions(test_dir, &tables).unwrap();
+        let loaded_partitions = Persistence::load_partitions(test_dir).unwrap();
+
+        assert_eq!(loaded_partitions.len(), 2);
+
+        let partition_info = loaded_partitions.get("customers_0").unwrap();
+        match &partition_info.partition_bound {
+            Some(PartitionBoundSpec::Hash(hash_bound)) => {
+                assert_eq!(hash_bound.modulus, 4);
+                assert_eq!(hash_bound.remainder, 0);
+            }
+            _ => panic!("Expected Hash bound"),
+        }
 
         fs::remove_dir_all(test_dir).unwrap();
     }

@@ -4,8 +4,9 @@ use super::persistence::Persistence;
 use super::update_delete_executor::UpdateDeleteExecutor;
 use super::{Aggregate, Function, TableSchema, Value};
 use crate::parser::ast::{
-    ColumnDef, CompositeTypeDef, CreateIndexStmt, CreateTriggerStmt, DataType, EnumTypeDef, Expr,
-    ForeignKeyAction, ForeignKeyDef, OrderByExpr, SelectStmt,
+    AttachPartitionStmt, ColumnDef, CompositeTypeDef, CreateIndexStmt, CreateTriggerStmt, DataType,
+    DetachPartitionStmt, EnumTypeDef, Expr, ForeignKeyAction, ForeignKeyDef, OrderByExpr,
+    PartitionBoundSpec, SelectStmt,
 };
 use crate::transaction::{IsolationLevel, Transaction, TransactionManager};
 use std::collections::HashMap;
@@ -142,6 +143,11 @@ impl Catalog {
                     log::error!("Async aggregates save failed: {}", e);
                 }
 
+                let tables_for_partitions = tables.read().unwrap().clone();
+                if let Err(e) = Persistence::save_partitions(&dir, &tables_for_partitions) {
+                    log::error!("Async partitions save failed: {}", e);
+                }
+
                 last_save = std::time::Instant::now();
                 log::debug!("Background save: cycle complete");
             }
@@ -198,6 +204,23 @@ impl Catalog {
 
         if let Ok(aggregates) = Persistence::load_aggregates(data_dir) {
             *catalog.aggregates.write().unwrap() = aggregates;
+        }
+
+        if let Ok(partitions) = Persistence::load_partitions(data_dir) {
+            if !partitions.is_empty() {
+                let num_partitions = partitions.len();
+                let mut tables_lock = catalog.tables.write().unwrap();
+                for (name, partition_info) in partitions {
+                    if let Some(table) = tables_lock.get_mut(&name) {
+                        table.partition_method = partition_info.partition_method;
+                        table.partition_keys = partition_info.partition_keys;
+                        table.is_partition = partition_info.is_partition;
+                        table.parent_table = partition_info.parent_table;
+                        table.partition_bound = partition_info.partition_bound;
+                    }
+                }
+                log::info!("📂 Applied partition info to {} tables", num_partitions);
+            }
         }
 
         catalog
@@ -294,6 +317,140 @@ impl Catalog {
         log::debug!("create_table: created table '{}', triggering synchronous save", name);
         self.force_save()?;
         Ok(())
+    }
+
+    pub fn create_partitioned_table(&self, schema: TableSchema) -> Result<(), String> {
+        let name = schema.name.clone();
+        let mut tables = self.tables.write().unwrap();
+
+        if tables.contains_key(&name) {
+            return Err(format!("Table '{}' already exists", name));
+        }
+
+        tables.insert(name.clone(), schema);
+        drop(tables);
+
+        let mut data = self.data.write().unwrap();
+        data.insert(name.clone(), Vec::new());
+        drop(data);
+
+        log::debug!("create_partitioned_table: created partitioned table '{}'", name);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn create_partition(&self, schema: TableSchema) -> Result<(), String> {
+        let name = schema.name.clone();
+        let parent_table = schema.parent_table.clone();
+
+        {
+            let tables = self.tables.read().unwrap();
+            if !parent_table.as_ref().map(|p| tables.contains_key(p)).unwrap_or(false) {
+                return Err(format!(
+                    "Parent table '{}' does not exist",
+                    parent_table.as_ref().unwrap()
+                ));
+            }
+        }
+
+        let mut tables = self.tables.write().unwrap();
+        tables.insert(name.clone(), schema);
+        drop(tables);
+
+        let mut data = self.data.write().unwrap();
+        data.insert(name.clone(), Vec::new());
+        drop(data);
+
+        log::debug!("create_partition: created partition '{}'", name);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn attach_partition(&self, stmt: &AttachPartitionStmt) -> Result<(), String> {
+        let mut tables = self.tables.write().unwrap();
+
+        let parent_exists = tables.contains_key(&stmt.parent_table);
+        if !parent_exists {
+            return Err(format!("Parent table '{}' does not exist", stmt.parent_table));
+        }
+
+        let partition_exists = tables.contains_key(&stmt.partition_name);
+        if !partition_exists {
+            return Err(format!("Partition '{}' does not exist", stmt.partition_name));
+        }
+
+        let partition_schema = tables.get_mut(&stmt.partition_name).unwrap();
+        partition_schema.is_partition = true;
+        partition_schema.parent_table = Some(stmt.parent_table.clone());
+        partition_schema.partition_bound = Some(stmt.bound.clone());
+
+        log::debug!(
+            "attach_partition: attached partition '{}' to '{}'",
+            stmt.partition_name,
+            stmt.parent_table
+        );
+        drop(tables);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn detach_partition(&self, stmt: &DetachPartitionStmt) -> Result<(), String> {
+        let mut tables = self.tables.write().unwrap();
+
+        let partition_exists = tables.contains_key(&stmt.partition_name);
+        if !partition_exists {
+            return Err(format!("Partition '{}' does not exist", stmt.partition_name));
+        }
+
+        let partition_schema = tables.get_mut(&stmt.partition_name).unwrap();
+        if !partition_schema.is_partition {
+            return Err(format!("Table '{}' is not a partition", stmt.partition_name));
+        }
+        if partition_schema.parent_table.as_ref() != Some(&stmt.parent_table) {
+            return Err(format!(
+                "Partition '{}' is not attached to '{}'",
+                stmt.partition_name, stmt.parent_table
+            ));
+        }
+
+        partition_schema.is_partition = false;
+        partition_schema.parent_table = None;
+        partition_schema.partition_bound = None;
+
+        log::debug!(
+            "detach_partition: detached partition '{}' from '{}'",
+            stmt.partition_name,
+            stmt.parent_table
+        );
+        drop(tables);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn get_partitions(&self, parent_table: &str) -> Vec<String> {
+        let tables = self.tables.read().unwrap();
+        tables
+            .values()
+            .filter(|s| {
+                s.is_partition && s.parent_table.as_ref() == Some(&parent_table.to_string())
+            })
+            .map(|s| s.name.clone())
+            .collect()
+    }
+
+    pub fn is_partitioned_table(&self, name: &str) -> bool {
+        let tables = self.tables.read().unwrap();
+        if let Some(schema) = tables.get(name) { schema.partition_method.is_some() } else { false }
+    }
+
+    pub fn is_partition(&self, name: &str) -> bool {
+        let tables = self.tables.read().unwrap();
+        if let Some(schema) = tables.get(name) { schema.is_partition } else { false }
+    }
+
+    pub fn get_parent_table(&self, partition: &str) -> Option<String> {
+        let tables = self.tables.read().unwrap();
+        tables.get(partition).and_then(|s| s.parent_table.clone())
     }
 
     pub fn create_type(&self, type_name: String, labels: Vec<String>) -> Result<(), String> {
@@ -1156,6 +1313,7 @@ impl Catalog {
         );
         let result = Persistence::save(data_dir, &tables, &data);
         if result.is_ok() {
+            Persistence::save_partitions(data_dir, &tables)?;
             log::info!("✅ save_to_disk: save completed successfully");
         } else {
             log::error!("❌ save_to_disk: save failed: {:?}", result);
@@ -1194,6 +1352,7 @@ impl Catalog {
             Persistence::save_triggers(data_dir, &triggers)?;
             Persistence::save_indexes(data_dir, &indexes)?;
             Persistence::save_functions(data_dir, &functions)?;
+            Persistence::save_partitions(data_dir, &tables)?;
 
             log::info!("✅ force_save: synchronous save completed successfully");
             return Ok(());
@@ -1213,6 +1372,29 @@ impl Catalog {
                 tables.len(),
                 data.values().map(|v| v.len()).sum::<usize>()
             );
+
+            drop(tables);
+            drop(data);
+
+            if let Ok(partitions) = Persistence::load_partitions(data_dir) {
+                if !partitions.is_empty() {
+                    let num_partitions = partitions.len();
+                    let mut tables = self.tables.write().unwrap();
+                    for (name, partition_info) in partitions {
+                        if let Some(table) = tables.get_mut(&name) {
+                            table.partition_method = partition_info.partition_method;
+                            table.partition_keys = partition_info.partition_keys;
+                            table.is_partition = partition_info.is_partition;
+                            table.parent_table = partition_info.parent_table;
+                            table.partition_bound = partition_info.partition_bound;
+                        }
+                    }
+                    log::info!(
+                        "📂 load_from_disk: applied partition info to {} tables",
+                        num_partitions
+                    );
+                }
+            }
         } else {
             log::error!("❌ load_from_disk: load failed: {:?}", result);
         }

@@ -169,13 +169,44 @@ impl<S: Read + Write> Connection<S> {
     fn execute_statement(&self, stmt: Statement) -> Result<ExecutionResult, String> {
         match stmt {
             Statement::CreateTable(create) => {
-                self.catalog.create_table_with_constraints(
-                    create.table.clone(),
-                    create.columns,
-                    create.primary_key,
-                    create.foreign_keys,
-                )?;
-                Ok(ExecutionResult::CommandComplete("CREATE TABLE".to_string()))
+                if create.is_partition {
+                    let bound = create
+                        .partition_bound
+                        .clone()
+                        .unwrap_or(crate::parser::ast::PartitionBoundSpec::Default);
+                    let schema = crate::catalog::TableSchema::as_partition(
+                        create.table.clone(),
+                        create.parent_table.clone().unwrap_or_default(),
+                        bound,
+                    );
+                    self.catalog.create_partition(schema)?;
+                    Ok(ExecutionResult::CommandComplete("CREATE TABLE PARTITION".to_string()))
+                } else if let Some((method, keys)) = &create.partition_by {
+                    let schema = crate::catalog::TableSchema::with_partition(
+                        create.table.clone(),
+                        create.columns.clone(),
+                        method.clone(),
+                        keys.clone(),
+                    );
+                    self.catalog.create_partitioned_table(schema)?;
+                    Ok(ExecutionResult::CommandComplete("CREATE TABLE".to_string()))
+                } else {
+                    self.catalog.create_table_with_constraints(
+                        create.table.clone(),
+                        create.columns,
+                        create.primary_key,
+                        create.foreign_keys,
+                    )?;
+                    Ok(ExecutionResult::CommandComplete("CREATE TABLE".to_string()))
+                }
+            }
+            Statement::AttachPartition(attach) => {
+                self.catalog.attach_partition(&attach)?;
+                Ok(ExecutionResult::CommandComplete("ALTER TABLE ATTACH PARTITION".to_string()))
+            }
+            Statement::DetachPartition(detach) => {
+                self.catalog.detach_partition(&detach)?;
+                Ok(ExecutionResult::CommandComplete("ALTER TABLE DETACH PARTITION".to_string()))
             }
             Statement::DropTable(drop) => {
                 self.catalog.drop_table(&drop.table, drop.if_exists)?;

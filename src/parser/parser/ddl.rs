@@ -1,13 +1,15 @@
 use super::Parser;
 use super::select;
 use crate::parser::ast::{
-    AlterTypeStmt, CloseCursorStmt, ColumnDef, CreateAggregateStmt, CreateFunctionStmt,
-    CreateIndexStmt, CreateMaterializedViewStmt, CreateTableStmt, CreateTriggerStmt,
-    CreateTypeStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt, DropAggregateStmt,
-    DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
-    DropTypeStmt, DropViewStmt, Expr, FetchCursorStmt, FetchDirection, ForeignKeyAction,
-    ForeignKeyDef, ForeignKeyRef, FunctionParameter, FunctionReturnType, FunctionVolatility,
-    ParameterMode, Statement, TriggerEvent, TriggerFor, TriggerTiming, TypeKind,
+    AlterTypeStmt, AttachPartitionStmt, CloseCursorStmt, ColumnDef, CreateAggregateStmt,
+    CreateFunctionStmt, CreateIndexStmt, CreateMaterializedViewStmt, CreateTableStmt,
+    CreateTriggerStmt, CreateTypeStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt,
+    DetachPartitionStmt, DropAggregateStmt, DropFunctionStmt, DropIndexStmt,
+    DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt, DropTypeStmt, DropViewStmt, Expr,
+    FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
+    FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, PartitionBoundSpec,
+    PartitionDef, PartitionHashBound, PartitionKey, PartitionListBound, PartitionMethod,
+    PartitionRangeBound, Statement, TriggerEvent, TriggerFor, TriggerTiming, TypeKind,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -95,6 +97,11 @@ fn parse_table_element(parser: &mut Parser) -> Result<TableElement> {
 fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     parser.expect(Token::Table)?;
     let table = parser.expect_identifier()?;
+
+    if parser.current_token() == &Token::Partition {
+        return parse_create_table_as_partition(parser, table);
+    }
+
     parser.expect(Token::LeftParen)?;
 
     let mut columns = Vec::new();
@@ -114,6 +121,19 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
     }
 
     parser.expect(Token::RightParen)?;
+
+    let partition_by = if parser.current_token() == &Token::Partition {
+        parser.advance();
+        parser.expect(Token::By)?;
+        Some(parse_partition_method(parser)?)
+    } else {
+        None
+    };
+
+    let partitions = Vec::new();
+    let is_partition = false;
+    let parent_table = None;
+
     Ok(Statement::CreateTable(CreateTableStmt {
         table,
         columns,
@@ -121,7 +141,163 @@ fn parse_create_table(parser: &mut Parser) -> Result<Statement> {
         foreign_keys,
         check_constraints: Vec::new(),
         unique_constraints: Vec::new(),
+        partition_by,
+        partitions,
+        is_partition,
+        parent_table,
+        partition_bound: None,
     }))
+}
+
+fn parse_create_table_as_partition(parser: &mut Parser, table: String) -> Result<Statement> {
+    parser.expect(Token::Partition)?;
+    parser.expect(Token::Of)?;
+    let parent_table = parser.expect_identifier()?;
+
+    let bound = parse_partition_bound(parser)?;
+
+    Ok(Statement::CreateTable(CreateTableStmt {
+        table,
+        columns: Vec::new(),
+        primary_key: None,
+        foreign_keys: Vec::new(),
+        check_constraints: Vec::new(),
+        unique_constraints: Vec::new(),
+        partition_by: None,
+        partitions: Vec::new(),
+        is_partition: true,
+        parent_table: Some(parent_table),
+        partition_bound: Some(bound),
+    }))
+}
+
+fn parse_partition_method(parser: &mut Parser) -> Result<(PartitionMethod, Vec<PartitionKey>)> {
+    let method = match parser.current_token() {
+        Token::Range => {
+            parser.advance();
+            PartitionMethod::Range
+        }
+        Token::List => {
+            parser.advance();
+            PartitionMethod::List
+        }
+        Token::Hash => {
+            parser.advance();
+            PartitionMethod::Hash
+        }
+        _ => {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected RANGE, LIST, or HASH, got {:?}",
+                parser.current_token()
+            )));
+        }
+    };
+
+    parser.expect(Token::LeftParen)?;
+    let mut keys = Vec::new();
+    keys.push(PartitionKey { column: parser.expect_identifier()?, opclass: None });
+    while parser.current_token() == &Token::Comma {
+        parser.advance();
+        keys.push(PartitionKey { column: parser.expect_identifier()?, opclass: None });
+    }
+    parser.expect(Token::RightParen)?;
+
+    Ok((method, keys))
+}
+
+fn parse_partition_bound(parser: &mut Parser) -> Result<PartitionBoundSpec> {
+    if parser.current_token() == &Token::Default {
+        parser.advance();
+        return Ok(PartitionBoundSpec::Default);
+    }
+
+    parser.expect(Token::For)?;
+    parser.expect(Token::Values)?;
+
+    if parser.current_token() == &Token::With {
+        parser.advance();
+        parser.expect(Token::LeftParen)?;
+        parser.expect(Token::Modulus)?;
+        let modulus = if let Token::Number(n) = parser.current_token() {
+            *n as u64
+        } else {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected number for MODULUS, got {:?}",
+                parser.current_token()
+            )));
+        };
+        parser.advance();
+        parser.expect(Token::Comma)?;
+        parser.expect(Token::Remainder)?;
+        let remainder = if let Token::Number(n) = parser.current_token() {
+            *n as u64
+        } else {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected number for REMAINDER, got {:?}",
+                parser.current_token()
+            )));
+        };
+        parser.advance();
+        parser.expect(Token::RightParen)?;
+        return Ok(PartitionBoundSpec::Hash(PartitionHashBound { modulus, remainder }));
+    }
+
+    if parser.current_token() == &Token::In {
+        parser.advance();
+        let values = parse_partition_values_list(parser)?;
+        return Ok(PartitionBoundSpec::List(PartitionListBound { values }));
+    }
+
+    parser.expect(Token::From)?;
+    let from_values = parse_partition_values_list(parser)?;
+    parser.expect(Token::To)?;
+    let to_values = parse_partition_values_list(parser)?;
+    Ok(PartitionBoundSpec::Range(PartitionRangeBound { from_values, to_values }))
+}
+
+fn parse_partition_values_list(parser: &mut Parser) -> Result<Vec<Expr>> {
+    parser.expect(Token::LeftParen)?;
+    let mut values = Vec::new();
+    loop {
+        match parser.current_token() {
+            Token::String(s) => {
+                values.push(Expr::String(s.clone()));
+                parser.advance();
+            }
+            Token::Number(n) => {
+                values.push(Expr::Number(*n));
+                parser.advance();
+            }
+            Token::Identifier(id) => {
+                values.push(Expr::Column(id.clone()));
+                parser.advance();
+            }
+            Token::Minus => {
+                parser.advance();
+                if let Token::Number(n) = parser.current_token() {
+                    values.push(Expr::Number(-*n));
+                    parser.advance();
+                } else {
+                    return Err(ParseError::UnexpectedToken(format!(
+                        "Expected number after '-', got {:?}",
+                        parser.current_token()
+                    )));
+                }
+            }
+            _ => {
+                return Err(ParseError::UnexpectedToken(format!(
+                    "Expected value in partition bound, got {:?}",
+                    parser.current_token()
+                )));
+            }
+        }
+        if parser.current_token() != &Token::Comma {
+            break;
+        }
+        parser.advance();
+    }
+    parser.expect(Token::RightParen)?;
+    Ok(values)
 }
 
 fn parse_create_view(parser: &mut Parser) -> Result<Statement> {
@@ -900,11 +1076,52 @@ pub fn parse_alter(parser: &mut Parser) -> Result<Statement> {
 
     match parser.current_token() {
         Token::Type => parse_alter_type(parser),
+        Token::Table => parse_alter_table(parser),
         _ => Err(ParseError::UnexpectedToken(format!(
             "ALTER not supported for {:?}",
             parser.current_token()
         ))),
     }
+}
+
+fn parse_alter_table(parser: &mut Parser) -> Result<Statement> {
+    parser.expect(Token::Table)?;
+    let table = parser.expect_identifier()?;
+
+    match parser.current_token() {
+        Token::Attach => parse_attach_partition(parser, table),
+        Token::Detach => parse_detach_partition(parser, table),
+        _ => Err(ParseError::UnexpectedToken(format!(
+            "ALTER TABLE not supported for {:?}",
+            parser.current_token()
+        ))),
+    }
+}
+
+fn parse_attach_partition(parser: &mut Parser, table: String) -> Result<Statement> {
+    parser.expect(Token::Attach)?;
+    parser.expect(Token::Partition)?;
+    let partition_name = parser.expect_identifier()?;
+
+    let bound = if parser.current_token() == &Token::For {
+        Some(parse_partition_bound(parser)?)
+    } else {
+        None
+    };
+
+    Ok(Statement::AttachPartition(AttachPartitionStmt {
+        parent_table: table,
+        partition_name,
+        bound: bound.unwrap_or(PartitionBoundSpec::Default),
+    }))
+}
+
+fn parse_detach_partition(parser: &mut Parser, table: String) -> Result<Statement> {
+    parser.expect(Token::Detach)?;
+    parser.expect(Token::Partition)?;
+    let partition_name = parser.expect_identifier()?;
+
+    Ok(Statement::DetachPartition(DetachPartitionStmt { parent_table: table, partition_name }))
 }
 
 fn parse_alter_type(parser: &mut Parser) -> Result<Statement> {

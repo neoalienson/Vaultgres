@@ -1,9 +1,10 @@
 use crate::catalog::Value;
 use crate::catalog::{Catalog, TableSchema};
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
+use crate::executor::operators::seq_scan::SeqScanExecutor as OperatorSeqScanExecutor;
 use crate::executor::volcano::{
     CTEExecutor, DistinctExecutor, FilterExecutor, HashAggExecutor, JoinExecutor, JoinType,
-    LimitExecutor, ProjectExecutor, SeqScanExecutor, SortExecutor, SubqueryScanExecutor,
+    LimitExecutor, ProjectExecutor, SortExecutor, SubqueryScanExecutor, UnionExecutor, UnionType,
     VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState, WindowExecutor,
 };
 use crate::parser::ast::{
@@ -92,12 +93,64 @@ impl Planner {
                         ))
                     })?
                     .clone();
-                Box::new(SeqScanExecutor::new(
-                    from_table_name.to_string(),
-                    current_schema.clone(),
-                    Arc::clone(&cat.data),
-                    Arc::clone(&cat.txn_mgr),
-                ))
+
+                if cat.is_partitioned_table(from_table_name) {
+                    let partitions = cat.get_partitions(from_table_name);
+                    if partitions.is_empty() {
+                        return Err(ExecutorError::InternalError(format!(
+                            "Partitioned table '{}' has no partitions",
+                            from_table_name
+                        )));
+                    }
+
+                    let first_partition = &partitions[0];
+                    let first_schema = cat
+                        .get_table(first_partition)
+                        .ok_or_else(|| {
+                            ExecutorError::InternalError(format!(
+                                "Partition '{}' not found",
+                                first_partition
+                            ))
+                        })?
+                        .clone();
+
+                    let mut plan: Box<dyn Executor> = Box::new(OperatorSeqScanExecutor::new(
+                        first_partition.clone(),
+                        first_schema,
+                        Arc::clone(&cat.data),
+                        Arc::clone(&cat.txn_mgr),
+                    ));
+
+                    for partition in partitions.iter().skip(1) {
+                        let partition_schema = cat
+                            .get_table(partition)
+                            .ok_or_else(|| {
+                                ExecutorError::InternalError(format!(
+                                    "Partition '{}' not found",
+                                    partition
+                                ))
+                            })?
+                            .clone();
+
+                        let partition_scan = OperatorSeqScanExecutor::new(
+                            partition.clone(),
+                            partition_schema,
+                            Arc::clone(&cat.data),
+                            Arc::clone(&cat.txn_mgr),
+                        );
+
+                        plan = Box::new(UnionExecutor::all(plan, Box::new(partition_scan)));
+                    }
+
+                    plan
+                } else {
+                    Box::new(OperatorSeqScanExecutor::new(
+                        from_table_name.to_string(),
+                        current_schema.clone(),
+                        Arc::clone(&cat.data),
+                        Arc::clone(&cat.txn_mgr),
+                    ))
+                }
             }
         } else {
             return Err(ExecutorError::InternalError("Catalog required for planning".to_string()));
@@ -154,7 +207,7 @@ impl Planner {
                         })?
                         .clone();
 
-                    let right_plan: Box<dyn Executor> = Box::new(SeqScanExecutor::new(
+                    let right_plan: Box<dyn Executor> = Box::new(OperatorSeqScanExecutor::new(
                         join.table.clone(),
                         right_schema.clone(),
                         Arc::clone(&cat.data),
@@ -219,7 +272,7 @@ impl Planner {
         let mut agg_exprs = Vec::new();
 
         for col_expr in &stmt.columns {
-            if Self::contains_aggregate(col_expr) {
+            if Self::contains_aggregate(col_expr, catalog.as_ref().map(|v| v.as_ref())) {
                 has_aggregates = true;
                 agg_exprs.push(col_expr.clone());
             }
@@ -234,11 +287,12 @@ impl Planner {
             let agg_output_schema =
                 Self::derive_agg_output_schema(&current_schema, &group_by_exprs, &agg_exprs)?;
 
-            plan = Box::new(HashAggExecutor::new(
+            plan = Box::new(HashAggExecutor::new_with_catalog(
                 plan,
                 group_by_exprs,
                 agg_exprs.clone(),
                 agg_output_schema.clone(),
+                self.catalog.clone(),
             )?);
             current_schema = agg_output_schema;
         }
@@ -343,12 +397,18 @@ impl Planner {
         Ok(plan)
     }
 
-    /// Helper to determine if an Expr is an aggregate function call
-    fn contains_aggregate(expr: &Expr) -> bool {
+    fn contains_aggregate(expr: &Expr, catalog: Option<&Catalog>) -> bool {
         match expr {
             Expr::Aggregate { .. } => true,
-            Expr::FunctionCall { args, .. } => args.iter().any(Self::contains_aggregate),
-            Expr::Alias { expr, .. } => Self::contains_aggregate(expr),
+            Expr::FunctionCall { name, args } => {
+                if let Some(cat) = catalog {
+                    if cat.get_aggregate(name).is_some() {
+                        return true;
+                    }
+                }
+                args.iter().any(|a| Self::contains_aggregate(a, catalog))
+            }
+            Expr::Alias { expr, .. } => Self::contains_aggregate(expr, catalog),
             _ => false,
         }
     }
@@ -423,15 +483,92 @@ impl Planner {
 
         // Add aggregate columns
         for agg_expr in agg_exprs {
-            // Handle both direct aggregates and aliases wrapping aggregates
-            let (func, arg, agg_col_name) = match agg_expr {
+            // Handle both direct aggregates, custom aggregates (FunctionCall), and aliases wrapping aggregates
+            let (agg_col_name, agg_data_type) = match agg_expr {
                 Expr::Aggregate { func, arg } => {
                     let agg_col_name = Self::get_aggregate_name(agg_expr);
-                    (func, arg.as_ref(), agg_col_name)
+                    let agg_data_type = match func {
+                        AggregateFunc::Count => DataType::Int,
+                        AggregateFunc::Sum => DataType::Int,
+                        AggregateFunc::Avg => DataType::Int,
+                        AggregateFunc::Min | AggregateFunc::Max => {
+                            if let Expr::Column(col_name) = arg.as_ref() {
+                                if let Some(col_def) =
+                                    input_schema.columns.iter().find(|c| &c.name == col_name)
+                                {
+                                    col_def.data_type.clone()
+                                } else {
+                                    DataType::Text
+                                }
+                            } else if let Expr::Star = arg.as_ref() {
+                                DataType::Int
+                            } else {
+                                DataType::Text
+                            }
+                        }
+                    };
+                    (agg_col_name, agg_data_type)
+                }
+                Expr::FunctionCall { name, args } => {
+                    let agg_col_name = Self::get_aggregate_name(agg_expr);
+                    let agg_data_type = if !args.is_empty() {
+                        if let Expr::Column(col_name) = &args[0] {
+                            if let Some(col_def) =
+                                input_schema.columns.iter().find(|c| &c.name == col_name)
+                            {
+                                col_def.data_type.clone()
+                            } else {
+                                DataType::Text
+                            }
+                        } else {
+                            DataType::Text
+                        }
+                    } else {
+                        DataType::Text
+                    };
+                    (agg_col_name, agg_data_type)
                 }
                 Expr::Alias { alias, expr } => {
                     if let Expr::Aggregate { func, arg } = expr.as_ref() {
-                        (func, arg.as_ref(), alias.clone())
+                        let agg_data_type = match func {
+                            AggregateFunc::Count => DataType::Int,
+                            AggregateFunc::Sum => DataType::Int,
+                            AggregateFunc::Avg => DataType::Int,
+                            AggregateFunc::Min | AggregateFunc::Max => {
+                                if let Expr::Column(col_name) = arg.as_ref() {
+                                    if let Some(col_def) =
+                                        input_schema.columns.iter().find(|c| &c.name == col_name)
+                                    {
+                                        col_def.data_type.clone()
+                                    } else {
+                                        DataType::Text
+                                    }
+                                } else if let Expr::Star = arg.as_ref() {
+                                    DataType::Int
+                                } else {
+                                    DataType::Text
+                                }
+                            }
+                        };
+                        (alias.clone(), agg_data_type)
+                    } else if let Expr::FunctionCall { name, args } = expr.as_ref() {
+                        let agg_col_name = alias.clone();
+                        let agg_data_type = if !args.is_empty() {
+                            if let Expr::Column(col_name) = &args[0] {
+                                if let Some(col_def) =
+                                    input_schema.columns.iter().find(|c| &c.name == col_name)
+                                {
+                                    col_def.data_type.clone()
+                                } else {
+                                    DataType::Text
+                                }
+                            } else {
+                                DataType::Text
+                            }
+                        } else {
+                            DataType::Text
+                        };
+                        (agg_col_name, agg_data_type)
                     } else {
                         return Err(ExecutorError::InternalError(
                             "Non-aggregate expression passed as aggregate".to_string(),
@@ -442,28 +579,6 @@ impl Planner {
                     return Err(ExecutorError::InternalError(
                         "Non-aggregate expression passed as aggregate".to_string(),
                     ));
-                }
-            };
-
-            // Determine the data type for the aggregate column
-            let agg_data_type = match func {
-                AggregateFunc::Count => DataType::Int,
-                AggregateFunc::Sum => DataType::Int,
-                AggregateFunc::Avg => DataType::Int,
-                AggregateFunc::Min | AggregateFunc::Max => {
-                    if let Expr::Column(col_name) = arg {
-                        if let Some(col_def) =
-                            input_schema.columns.iter().find(|c| &c.name == col_name)
-                        {
-                            col_def.data_type.clone()
-                        } else {
-                            DataType::Text
-                        }
-                    } else if let Expr::Star = arg {
-                        DataType::Int // COUNT(*) returns Int
-                    } else {
-                        DataType::Text
-                    }
                 }
             };
 
@@ -672,6 +787,18 @@ impl Planner {
                     _ => "expr".to_string(),
                 };
                 format!("{:?}({})", func, col_name).to_lowercase()
+            }
+            Expr::FunctionCall { name, args } => {
+                let arg_name = if !args.is_empty() {
+                    match &args[0] {
+                        Expr::Column(col_name) => col_name.clone(),
+                        Expr::QualifiedColumn { column, .. } => column.clone(),
+                        _ => "expr".to_string(),
+                    }
+                } else {
+                    "expr".to_string()
+                };
+                format!("{}({})", name, arg_name)
             }
             Expr::Alias { alias, .. } => alias.clone(),
             _ => format!("{:?}", expr),

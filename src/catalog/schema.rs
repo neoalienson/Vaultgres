@@ -1,4 +1,7 @@
-use crate::parser::ast::{CheckConstraint, ColumnDef, ForeignKeyDef, UniqueConstraint};
+use crate::parser::ast::{
+    CheckConstraint, ColumnDef, ForeignKeyDef, PartitionBoundSpec, PartitionKey, PartitionMethod,
+    UniqueConstraint,
+};
 
 /// Table schema definition
 #[derive(Debug, Clone)]
@@ -9,6 +12,11 @@ pub struct TableSchema {
     pub foreign_keys: Vec<ForeignKeyDef>,
     pub check_constraints: Vec<CheckConstraint>,
     pub unique_constraints: Vec<UniqueConstraint>,
+    pub partition_method: Option<PartitionMethod>,
+    pub partition_keys: Vec<PartitionKey>,
+    pub is_partition: bool,
+    pub parent_table: Option<String>,
+    pub partition_bound: Option<PartitionBoundSpec>,
 }
 
 impl TableSchema {
@@ -20,6 +28,11 @@ impl TableSchema {
             foreign_keys: Vec::new(),
             check_constraints: Vec::new(),
             unique_constraints: Vec::new(),
+            partition_method: None,
+            partition_keys: Vec::new(),
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         }
     }
 
@@ -36,6 +49,11 @@ impl TableSchema {
             foreign_keys,
             check_constraints: Vec::new(),
             unique_constraints: Vec::new(),
+            partition_method: None,
+            partition_keys: Vec::new(),
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
         }
     }
 
@@ -47,7 +65,56 @@ impl TableSchema {
         check_constraints: Vec<CheckConstraint>,
         unique_constraints: Vec<UniqueConstraint>,
     ) -> Self {
-        Self { name, columns, primary_key, foreign_keys, check_constraints, unique_constraints }
+        Self {
+            name,
+            columns,
+            primary_key,
+            foreign_keys,
+            check_constraints,
+            unique_constraints,
+            partition_method: None,
+            partition_keys: Vec::new(),
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
+        }
+    }
+
+    pub fn with_partition(
+        name: String,
+        columns: Vec<ColumnDef>,
+        partition_method: PartitionMethod,
+        partition_keys: Vec<PartitionKey>,
+    ) -> Self {
+        Self {
+            name,
+            columns,
+            primary_key: None,
+            foreign_keys: Vec::new(),
+            check_constraints: Vec::new(),
+            unique_constraints: Vec::new(),
+            partition_method: Some(partition_method),
+            partition_keys,
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
+        }
+    }
+
+    pub fn as_partition(name: String, parent_table: String, bound: PartitionBoundSpec) -> Self {
+        Self {
+            name,
+            columns: Vec::new(),
+            primary_key: None,
+            foreign_keys: Vec::new(),
+            check_constraints: Vec::new(),
+            unique_constraints: Vec::new(),
+            partition_method: None,
+            partition_keys: Vec::new(),
+            is_partition: true,
+            parent_table: Some(parent_table),
+            partition_bound: Some(bound),
+        }
     }
 }
 

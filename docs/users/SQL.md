@@ -39,6 +39,28 @@ CREATE TABLE measurements (
 
 CREATE TABLE measurements_2024_01 PARTITION OF measurements
     FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+-- List partitioned table
+CREATE TABLE cities (
+    city_id SERIAL PRIMARY KEY,
+    city_name TEXT NOT NULL
+) PARTITION BY LIST (city_name);
+
+CREATE TABLE cities_a_m PARTITION OF cities FOR VALUES IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M');
+
+-- Hash partitioned table
+CREATE TABLE customers (
+    customer_id SERIAL PRIMARY KEY,
+    name TEXT
+) PARTITION BY HASH (customer_id);
+
+CREATE TABLE customers_0 PARTITION OF customers FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+CREATE TABLE customers_1 PARTITION OF customers FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+CREATE TABLE customers_2 PARTITION OF customers FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+CREATE TABLE customers_3 PARTITION OF customers FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+
+-- Default partition
+CREATE TABLE orders_default PARTITION OF orders DEFAULT;
 ```
 
 ### CREATE INDEX
@@ -93,6 +115,24 @@ ALTER TABLE users DROP CONSTRAINT check_age;
 -- Add foreign key
 ALTER TABLE orders ADD CONSTRAINT fk_user 
     FOREIGN KEY (user_id) REFERENCES users(id);
+
+-- Attach partition
+ALTER TABLE orders ATTACH PARTITION orders_2024_01 
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+-- Attach list partition
+ALTER TABLE cities ATTACH PARTITION cities_a_m 
+    FOR VALUES IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M');
+
+-- Attach hash partition
+ALTER TABLE customers ATTACH PARTITION customers_0 
+    FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+
+-- Attach default partition
+ALTER TABLE orders ATTACH PARTITION orders_default DEFAULT;
+
+-- Detach partition
+ALTER TABLE orders DETACH PARTITION orders_2024_01;
 ```
 
 ### DROP

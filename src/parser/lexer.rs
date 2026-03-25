@@ -160,6 +160,14 @@ pub enum Token {
     SType,
     FinalFunc,
     InitCond,
+    Range,
+    List,
+    Hash,
+    Modulus,
+    Remainder,
+    Attach,
+    Detach,
+    Of,
 
     // Identifiers and literals
     Identifier(String),
@@ -559,6 +567,16 @@ impl Lexer {
             "STYPE" => Token::SType,
             "FINALFUNC" => Token::FinalFunc,
             "INITCOND" => Token::InitCond,
+            "RANGE" => Token::Range,
+            "LIST" => Token::List,
+            "HASH" => Token::Hash,
+            "MODULUS" => Token::Modulus,
+            "REMAINDER" => Token::Remainder,
+            "ATTACH" => Token::Attach,
+            "DETACH" => Token::Detach,
+            "PARTITION" => Token::Partition,
+            "VALUES" => Token::Values,
+            "OF" => Token::Of,
             _ => Token::Identifier(ident),
         };
 

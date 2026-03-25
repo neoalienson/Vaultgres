@@ -191,7 +191,14 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ Views (CREATE VIEW, DROP VIEW)
 - ✅ Materialized views with REFRESH
 - ✅ User-defined functions (SQL functions) - supports scalar and set-returning functions with parameter binding
-- ⚠️ Aggregate functions (custom aggregates) - CREATE AGGREGATE and DROP AGGREGATE parser, catalog storage, and protocol handling implemented; executor integration pending
+- ✅ Aggregate functions (custom aggregates) - CREATE AGGREGATE and DROP AGGREGATE parser, catalog storage, protocol handling, and executor integration (sfunc/finalfunc) implemented
+- ✅ Table partitioning (RANGE, LIST, HASH)
+  - ✅ `CREATE TABLE ... PARTITION BY {RANGE|LIST|HASH} (columns)`
+  - ✅ `CREATE TABLE name PARTITION OF parent FOR VALUES ...`
+  - ✅ `ALTER TABLE ... ATTACH PARTITION ...`
+  - ✅ `ALTER TABLE ... DETACH PARTITION ...`
+  - ✅ Partition bound specifications (FROM/TO, IN, WITH (MODULUS/REMAINDER))
+  - ✅ Default partition support
 - ✅ String functions (CONCAT, SUBSTRING, UPPER, LOWER)
 - ✅ Date/time functions (NOW, DATE_TRUNC, EXTRACT)
 - ✅ Subquery with AVG aggregate function
@@ -235,8 +242,17 @@ VaultGres development roadmap with planned features and milestones.
 ## Version 0.6.0 (Beta)
 
 **Storage Enhancements**
-- Table partitioning (range, hash, list)
-- Partition pruning in query optimizer
+- ✅ Table partitioning (range, hash, list)
+  - ✅ Parser support for `CREATE TABLE ... PARTITION BY {RANGE|LIST|HASH}`
+  - ✅ Parser support for `CREATE TABLE ... PARTITION OF parent`
+  - ✅ Parser support for `ALTER TABLE ... ATTACH/DETACH PARTITION`
+  - ✅ AST types: `PartitionMethod`, `PartitionKey`, `PartitionBoundSpec`, `PartitionDef`
+  - ✅ Lexer tokens: `RANGE`, `LIST`, `HASH`, `MODULUS`, `REMAINDER`, `ATTACH`, `DETACH`
+  - ✅ Catalog methods: `create_partitioned_table`, `create_partition`, `attach_partition`, `detach_partition`
+  - ✅ Persistence layer: `save_partitions` and `load_partitions` (JSON-based)
+  - ✅ Unit tests (12 parser tests)
+  - ✅ Integration tests (15 catalog tests)
+- 🚧 Partition pruning in query optimizer
 - Compression (LZ4, Zstd) for tables and indexes
 - TOAST (The Oversized-Attribute Storage Technique)
 - Vacuum improvements (parallel vacuum)

@@ -221,6 +221,9 @@ impl Eval {
             Expr::Window { .. } => Err(ExecutorError::UnsupportedExpression(
                 "Window functions not supported in this context".to_string(),
             )),
+            Expr::CustomAggregate { .. } => Err(ExecutorError::UnsupportedExpression(
+                "Custom aggregates must be executed via HashAggExecutor".to_string(),
+            )),
         }
     }
 
