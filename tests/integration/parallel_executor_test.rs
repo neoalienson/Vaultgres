@@ -184,6 +184,8 @@ fn test_parallel_aggregation_integration() {
 
 #[test]
 fn test_parallel_sort_integration() {
+    use vaultgres::parser::ast::OrderByExpr;
+
     let catalog = Arc::new(Catalog::new());
     catalog
         .create_table(
@@ -197,7 +199,8 @@ fn test_parallel_sort_integration() {
     }
 
     let scan = Arc::new(ParallelSeqScan::new("sort_test".to_string(), catalog));
-    let sort = ParallelSort::new(scan, true);
+    let sort =
+        ParallelSort::new(scan, vec![OrderByExpr { column: "id".to_string(), ascending: true }]);
 
     let morsel_gen = Arc::new(MorselGenerator::new(200, 50));
     let mut sorted_runs = Vec::new();
@@ -209,11 +212,11 @@ fn test_parallel_sort_integration() {
             end_offset: range.end,
             partition_id: 0,
         };
-        let sorted = sort.local_sort(morsel).unwrap();
-        sorted_runs.push(sorted);
+        let sorted = sort.process_morsel(morsel).unwrap();
+        sorted_runs.push(sorted.tuples);
     }
 
-    let final_result = sort.merge_sorted_runs(sorted_runs);
+    let final_result = ParallelSort::multi_phase_merge(sorted_runs, &sort.sort_keys).unwrap();
     assert_eq!(final_result.len(), 200);
 
     // Tuples are sorted, verify ordering by checking first value

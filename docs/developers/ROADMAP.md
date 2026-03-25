@@ -175,7 +175,7 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ Parallel sequential scan with worker threads
 - ✅ Parallel hash join (all join types supported)
 - ✅ Parallel aggregation (all aggregate functions supported)
-- ⚠️ Parallel sort with merge (infrastructure complete, needs full implementation)
+- ✅ Parallel sort with merge (heap-based k-way merge, multi-phase cascading merge, LIMIT optimization)
 - ✅ Work-stealing scheduler
 - ✅ Configurable parallelism (max_parallel_workers)
 
