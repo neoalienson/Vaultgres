@@ -22,6 +22,7 @@ mod nested_loop_join;
 mod project;
 mod seq_scan;
 mod sort;
+mod sql_function;
 mod subquery;
 mod subquery_scan;
 mod union;
@@ -48,6 +49,7 @@ pub use project::ProjectExecutor;
 // Re-export SeqScanExecutor from operators for compatibility with planner
 pub use crate::executor::operators::seq_scan::SeqScanExecutor;
 pub use sort::SortExecutor;
+pub use sql_function::SqlFunctionExecutor;
 pub use subquery::SubqueryExecutor;
 pub use subquery_scan::SubqueryScanExecutor;
 pub use union::{UnionExecutor, UnionType};

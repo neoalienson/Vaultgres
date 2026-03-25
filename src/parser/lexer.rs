@@ -155,6 +155,11 @@ pub enum Token {
     Cascade,
     Restrict,
     Add,
+    Aggregate,
+    SFunc,
+    SType,
+    FinalFunc,
+    InitCond,
 
     // Identifiers and literals
     Identifier(String),
@@ -549,6 +554,11 @@ impl Lexer {
             "ADD" => Token::Add,
             "CASCADE" => Token::Cascade,
             "RESTRICT" => Token::Restrict,
+            "AGGREGATE" => Token::Aggregate,
+            "SFUNC" => Token::SFunc,
+            "STYPE" => Token::SType,
+            "FINALFUNC" => Token::FinalFunc,
+            "INITCOND" => Token::InitCond,
             _ => Token::Identifier(ident),
         };
 

@@ -34,6 +34,18 @@ pub enum FunctionVolatility {
     Volatile,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Aggregate {
+    pub name: String,
+    pub input_type: String,
+    pub sfunc: String,
+    pub stype: String,
+    pub finalfunc: Option<String>,
+    pub initcond: Option<String>,
+    pub volatility: FunctionVolatility,
+    pub cost: f64,
+}
+
 pub struct FunctionRegistry {
     functions: HashMap<String, Vec<Function>>,
 }

@@ -23,6 +23,8 @@ pub enum Statement {
     With(WithStmt),
     CreateFunction(CreateFunctionStmt),
     DropFunction(DropFunctionStmt),
+    CreateAggregate(CreateAggregateStmt),
+    DropAggregate(DropAggregateStmt),
     CreateType(CreateTypeStmt),
     DropType(DropTypeStmt),
     AlterType(AlterTypeStmt),
@@ -256,6 +258,26 @@ pub enum FunctionReturnType {
 /// DROP FUNCTION statement
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DropFunctionStmt {
+    pub name: String,
+    pub if_exists: bool,
+}
+
+/// CREATE AGGREGATE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CreateAggregateStmt {
+    pub name: String,
+    pub input_type: String,
+    pub sfunc: String,
+    pub stype: String,
+    pub finalfunc: Option<String>,
+    pub initcond: Option<String>,
+    pub volatility: Option<FunctionVolatility>,
+    pub cost: Option<f64>,
+}
+
+/// DROP AGGREGATE statement
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DropAggregateStmt {
     pub name: String,
     pub if_exists: bool,
 }

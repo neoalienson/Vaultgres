@@ -1,13 +1,13 @@
 use super::Parser;
 use super::select;
 use crate::parser::ast::{
-    AlterTypeStmt, CloseCursorStmt, ColumnDef, CreateFunctionStmt, CreateIndexStmt,
-    CreateMaterializedViewStmt, CreateTableStmt, CreateTriggerStmt, CreateTypeStmt, CreateViewStmt,
-    DataType, DeclareCursorStmt, DescribeStmt, DropFunctionStmt, DropIndexStmt,
-    DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt, DropTypeStmt, DropViewStmt, Expr,
-    FetchCursorStmt, FetchDirection, ForeignKeyAction, ForeignKeyDef, ForeignKeyRef,
-    FunctionParameter, FunctionReturnType, FunctionVolatility, ParameterMode, Statement,
-    TriggerEvent, TriggerFor, TriggerTiming, TypeKind,
+    AlterTypeStmt, CloseCursorStmt, ColumnDef, CreateAggregateStmt, CreateFunctionStmt,
+    CreateIndexStmt, CreateMaterializedViewStmt, CreateTableStmt, CreateTriggerStmt,
+    CreateTypeStmt, CreateViewStmt, DataType, DeclareCursorStmt, DescribeStmt, DropAggregateStmt,
+    DropFunctionStmt, DropIndexStmt, DropMaterializedViewStmt, DropTableStmt, DropTriggerStmt,
+    DropTypeStmt, DropViewStmt, Expr, FetchCursorStmt, FetchDirection, ForeignKeyAction,
+    ForeignKeyDef, ForeignKeyRef, FunctionParameter, FunctionReturnType, FunctionVolatility,
+    ParameterMode, Statement, TriggerEvent, TriggerFor, TriggerTiming, TypeKind,
 };
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
@@ -41,6 +41,7 @@ pub fn parse_create(parser: &mut Parser) -> Result<Statement> {
         Token::Index => parse_create_index(parser, unique),
         Token::Type => parse_create_type(parser),
         Token::Function | Token::Procedure => parse_create_function(parser),
+        Token::Aggregate => parse_create_aggregate(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -282,6 +283,7 @@ pub fn parse_drop(parser: &mut Parser) -> Result<Statement> {
         Token::Index => parse_drop_index(parser),
         Token::Type => parse_drop_type(parser),
         Token::Function | Token::Procedure => parse_drop_function(parser),
+        Token::Aggregate => parse_drop_aggregate(parser),
         _ => Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     }
 }
@@ -679,6 +681,144 @@ fn parse_drop_function(parser: &mut Parser) -> Result<Statement> {
     let if_exists = parse_if_exists(parser)?;
     let name = parser.expect_identifier()?;
     Ok(Statement::DropFunction(DropFunctionStmt { name, if_exists }))
+}
+
+fn parse_create_aggregate(parser: &mut Parser) -> Result<Statement> {
+    parser.advance(); // AGGREGATE
+    let name = parser.expect_identifier()?;
+    parser.expect(Token::LeftParen)?;
+    let input_type = parse_type_name(parser)?;
+    parser.expect(Token::RightParen)?;
+    parser.expect(Token::LeftParen)?;
+
+    let mut sfunc = None;
+    let mut stype = None;
+    let mut finalfunc = None;
+    let mut initcond = None;
+
+    while parser.current_token() != &Token::RightParen {
+        match parser.current_token() {
+            Token::SFunc => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                sfunc = Some(parser.expect_identifier()?);
+            }
+            Token::SType => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                stype = Some(parse_type_name(parser)?);
+            }
+            Token::FinalFunc => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                finalfunc = Some(parser.expect_identifier()?);
+            }
+            Token::InitCond => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                initcond = Some(match parser.current_token() {
+                    Token::String(s) => {
+                        let val = s.clone();
+                        parser.advance();
+                        val
+                    }
+                    Token::Number(n) => {
+                        let val = n.to_string();
+                        parser.advance();
+                        val
+                    }
+                    _ => {
+                        return Err(ParseError::UnexpectedToken(format!(
+                            "Expected string or number for INITCOND, got {:?}",
+                            parser.current_token()
+                        )));
+                    }
+                });
+            }
+            Token::Cost => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                if let Token::Number(n) = parser.current_token() {
+                    parser.advance();
+                }
+            }
+            Token::Rows => {
+                parser.advance();
+                parser.expect(Token::Equals)?;
+                if let Token::Number(n) = parser.current_token() {
+                    parser.advance();
+                }
+            }
+            Token::Identifier(_) => {
+                parser.advance();
+            }
+            _ => {
+                return Err(ParseError::UnexpectedToken(format!(
+                    "Unexpected token in aggregate definition: {:?}",
+                    parser.current_token()
+                )));
+            }
+        }
+        if parser.current_token() == &Token::Comma {
+            parser.advance();
+        }
+    }
+
+    parser.expect(Token::RightParen)?;
+
+    let sfunc = sfunc.ok_or_else(|| {
+        ParseError::UnexpectedToken("SFUNC is required for CREATE AGGREGATE".to_string())
+    })?;
+    let stype = stype.ok_or_else(|| {
+        ParseError::UnexpectedToken("STYPE is required for CREATE AGGREGATE".to_string())
+    })?;
+
+    let volatility = match parser.current_token() {
+        Token::Immutable => {
+            parser.advance();
+            Some(FunctionVolatility::Immutable)
+        }
+        Token::Stable => {
+            parser.advance();
+            Some(FunctionVolatility::Stable)
+        }
+        Token::Volatile => {
+            parser.advance();
+            Some(FunctionVolatility::Volatile)
+        }
+        _ => None,
+    };
+
+    let cost = if parser.current_token() == &Token::Cost {
+        parser.advance();
+        if let Token::Number(n) = parser.current_token() {
+            let c = *n as f64;
+            parser.advance();
+            Some(c)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    Ok(Statement::CreateAggregate(CreateAggregateStmt {
+        name,
+        input_type,
+        sfunc,
+        stype,
+        finalfunc,
+        initcond,
+        volatility,
+        cost,
+    }))
+}
+
+fn parse_drop_aggregate(parser: &mut Parser) -> Result<Statement> {
+    parser.advance(); // AGGREGATE
+    let if_exists = parse_if_exists(parser)?;
+    let name = parser.expect_identifier()?;
+    Ok(Statement::DropAggregate(DropAggregateStmt { name, if_exists }))
 }
 
 pub fn parse_declare_cursor(parser: &mut Parser) -> Result<Statement> {

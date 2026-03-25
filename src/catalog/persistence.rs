@@ -1,4 +1,4 @@
-use super::{CompositeValue, EnumValue, Function, TableSchema, Tuple, Value};
+use super::{Aggregate, CompositeValue, EnumValue, Function, TableSchema, Tuple, Value};
 use crate::parser::ast::{ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, SelectStmt};
 use crate::transaction::{TransactionManager, TupleHeader};
 use std::collections::HashMap;
@@ -158,6 +158,28 @@ impl Persistence {
         let json = std::fs::read_to_string(&path)
             .map_err(|e| format!("Failed to read functions: {}", e))?;
         serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize functions: {}", e))
+    }
+
+    pub fn save_aggregates(
+        data_dir: &str,
+        aggregates: &HashMap<String, Aggregate>,
+    ) -> Result<(), String> {
+        let path = format!("{}/aggregates.json", data_dir);
+        let json = serde_json::to_string(aggregates)
+            .map_err(|e| format!("Failed to serialize aggregates: {}", e))?;
+        std::fs::write(&path, json).map_err(|e| format!("Failed to write aggregates: {}", e))?;
+        log::info!("💾 Saved {} aggregates", aggregates.len());
+        Ok(())
+    }
+
+    pub fn load_aggregates(data_dir: &str) -> Result<HashMap<String, Aggregate>, String> {
+        let path = format!("{}/aggregates.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read aggregates: {}", e))?;
+        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize aggregates: {}", e))
     }
 
     pub fn load(

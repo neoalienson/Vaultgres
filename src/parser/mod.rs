@@ -41,6 +41,9 @@ mod index_tests;
 #[cfg(test)]
 mod index_edge_tests;
 
+#[cfg(test)]
+mod aggregate_tests;
+
 pub use ast::*;
 pub use error::{ParseError, Result};
 pub use lexer::{Lexer, Token};

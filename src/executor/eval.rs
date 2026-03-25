@@ -153,7 +153,7 @@ impl Eval {
                 for arg in args {
                     evaluated_args.push(Self::eval_expr_with_catalog(arg, tuple, catalog)?);
                 }
-                Self::eval_function(name, evaluated_args)
+                Self::eval_function_call(name, evaluated_args, catalog)
             }
 
             // Aggregates - these should be handled by HashAggExecutor, not here
@@ -1129,7 +1129,222 @@ impl Eval {
         }
     }
 
-    /// Evaluate a function call
+    /// Evaluate a function call (builtin or user-defined SQL function)
+    pub fn eval_function_call(
+        name: &str,
+        args: Vec<Value>,
+        catalog: Option<&Catalog>,
+    ) -> Result<Value, ExecutorError> {
+        // First check if it's a builtin function
+        if let Some(result) = Self::try_eval_builtin(name, &args) {
+            return result;
+        }
+
+        // Then check catalog for user-defined SQL function
+        if let Some(catalog) = catalog {
+            if let Some(func) =
+                catalog.get_function(name, &args.iter().map(|v| v.type_name()).collect::<Vec<_>>())
+            {
+                if func.language == crate::catalog::FunctionLanguage::Sql {
+                    return Self::eval_sql_function(&func, args, catalog);
+                }
+            }
+        }
+
+        Err(ExecutorError::FunctionNotFound(format!("Function '{}' not found", name)))
+    }
+
+    /// Try to evaluate as a builtin function
+    fn try_eval_builtin(name: &str, args: &[Value]) -> Option<Result<Value, ExecutorError>> {
+        match name.to_uppercase().as_str() {
+            "UPPER" => {
+                if args.len() != 1 {
+                    return Some(Err(ExecutorError::TypeMismatch(
+                        "UPPER takes one argument".to_string(),
+                    )));
+                }
+                Some(
+                    string_functions::StringFunctions::upper(args[0].clone())
+                        .map_err(ExecutorError::TypeMismatch),
+                )
+            }
+            "LOWER" => {
+                if args.len() != 1 {
+                    return Some(Err(ExecutorError::TypeMismatch(
+                        "LOWER takes one argument".to_string(),
+                    )));
+                }
+                Some(
+                    string_functions::StringFunctions::lower(args[0].clone())
+                        .map_err(ExecutorError::TypeMismatch),
+                )
+            }
+            "LENGTH" => {
+                if args.len() != 1 {
+                    return Some(Err(ExecutorError::TypeMismatch(
+                        "LENGTH takes one argument".to_string(),
+                    )));
+                }
+                Some(
+                    string_functions::StringFunctions::length(args[0].clone())
+                        .map_err(ExecutorError::TypeMismatch),
+                )
+            }
+            "COALESCE" => {
+                for arg in args {
+                    if !matches!(arg, Value::Null) {
+                        return Some(Ok(arg.clone()));
+                    }
+                }
+                Some(Ok(Value::Null))
+            }
+            "NULLIF" => {
+                if args.len() != 2 {
+                    return Some(Err(ExecutorError::TypeMismatch(
+                        "NULLIF takes two arguments".to_string(),
+                    )));
+                }
+                Some(Ok(if args[0] == args[1] { Value::Null } else { args[0].clone() }))
+            }
+            "CONCAT" => {
+                let mut result = String::new();
+                for arg in args {
+                    match arg {
+                        Value::Text(s) => result.push_str(&s),
+                        Value::Int(i) => result.push_str(&i.to_string()),
+                        Value::Float(f) => result.push_str(&f.to_string()),
+                        Value::Null => continue,
+                        _ => {
+                            return Some(Err(ExecutorError::TypeMismatch(
+                                "CONCAT requires text or numeric values".to_string(),
+                            )));
+                        }
+                    }
+                }
+                Some(Ok(Value::Text(result)))
+            }
+            "SUBSTRING" => {
+                if args.len() < 2 || args.len() > 3 {
+                    return Some(Err(ExecutorError::TypeMismatch(
+                        "SUBSTRING takes 2 or 3 arguments".to_string(),
+                    )));
+                }
+                let length = if args.len() == 3 { Some(args[2].clone()) } else { None };
+                Some(
+                    string_functions::StringFunctions::substring(
+                        args[0].clone(),
+                        args[1].clone(),
+                        length,
+                    )
+                    .map_err(ExecutorError::TypeMismatch),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    /// Evaluate a user-defined SQL function
+    fn eval_sql_function(
+        func: &crate::catalog::Function,
+        args: Vec<Value>,
+        catalog: &Catalog,
+    ) -> Result<Value, ExecutorError> {
+        use std::sync::Arc;
+
+        let substituted_body = Self::substitute_params_in_body(&func.body, &args);
+
+        let mut parser = crate::parser::Parser::new(&substituted_body)
+            .map_err(|e| ExecutorError::InternalError(format!("Failed to create parser: {}", e)))?;
+
+        let stmt = parser.parse().map_err(|e| {
+            ExecutorError::InternalError(format!("Failed to parse function body: {}", e))
+        })?;
+
+        match stmt {
+            crate::parser::ast::Statement::Select(select) => {
+                let catalog_arc = Arc::new(catalog.clone());
+                let planner =
+                    crate::planner::planner::Planner::new_with_catalog(catalog_arc.clone());
+                let mut plan = planner.plan(&select).map_err(|e| {
+                    ExecutorError::InternalError(format!("Failed to plan function body: {}", e))
+                })?;
+
+                let mut tuples = Vec::new();
+                while let Some(tuple) = plan.next()? {
+                    tuples.push(tuple);
+                }
+
+                if tuples.is_empty() {
+                    return Ok(Value::Null);
+                }
+
+                let first_tuple = &tuples[0];
+                if first_tuple.is_empty() {
+                    return Ok(Value::Null);
+                }
+
+                Ok(first_tuple.values().next().cloned().unwrap_or(Value::Null))
+            }
+            _ => Err(ExecutorError::InternalError(format!(
+                "SQL function body must be a SELECT statement"
+            ))),
+        }
+    }
+
+    /// Substitute parameters ($1, $2, etc.) in function body with actual values
+    fn substitute_params_in_body(body: &str, params: &[Value]) -> String {
+        let mut result = body.to_string();
+
+        for (i, param) in params.iter().enumerate() {
+            let placeholder = format!("${}", i + 1);
+            let value_str = Self::value_to_sql_string(param);
+            result = result.replace(&placeholder, &value_str);
+        }
+
+        result
+    }
+
+    /// Convert a Value to its SQL string representation
+    fn value_to_sql_string(value: &Value) -> String {
+        match value {
+            Value::Int(n) => n.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::Text(s) => format!("'{}'", s.replace('\'', "''")),
+            Value::Bool(b) => {
+                if *b {
+                    "TRUE".to_string()
+                } else {
+                    "FALSE".to_string()
+                }
+            }
+            Value::Null => "NULL".to_string(),
+            Value::Array(arr) => {
+                let items: Vec<String> = arr.iter().map(|v| Self::value_to_sql_string(v)).collect();
+                format!("ARRAY[{}]", items.join(", "))
+            }
+            Value::Json(j) => format!("'{}'", j.replace('\'', "''")),
+            Value::Date(d) => format!("DATE '{}'", d),
+            Value::Time(t) => format!("TIME '{}'", t),
+            Value::Timestamp(ts) => format!("TIMESTAMP '{}'", ts),
+            Value::Decimal(v, _) => v.to_string(),
+            Value::Bytea(b) => {
+                let hex_str: String = b.iter().map(|byte| format!("{:02x}", byte)).collect();
+                format!("'\\x{}'", hex_str)
+            }
+            Value::Enum(e) => format!("'{}[{}]'", e.type_name, e.index),
+            Value::Composite(c) => format!(
+                "ROW({})",
+                c.fields
+                    .iter()
+                    .map(|(_, v)| Self::value_to_sql_string(v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Range(r) => r.to_string(),
+        }
+    }
+
+    /// Evaluate a function call (legacy method for backward compatibility)
     pub fn eval_function(name: &str, args: Vec<Value>) -> Result<Value, ExecutorError> {
         match name.to_uppercase().as_str() {
             "UPPER" => {

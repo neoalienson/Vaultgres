@@ -196,6 +196,26 @@ impl Value {
             _ => Err(format!("Cannot convert {:?} to f64", self)),
         }
     }
+
+    pub fn type_name(&self) -> String {
+        match self {
+            Value::Int(_) => "INT".to_string(),
+            Value::Float(_) => "FLOAT".to_string(),
+            Value::Bool(_) => "BOOL".to_string(),
+            Value::Text(_) => "TEXT".to_string(),
+            Value::Array(_) => "ARRAY".to_string(),
+            Value::Json(_) => "JSON".to_string(),
+            Value::Date(_) => "DATE".to_string(),
+            Value::Time(_) => "TIME".to_string(),
+            Value::Timestamp(_) => "TIMESTAMP".to_string(),
+            Value::Decimal(_, _) => "DECIMAL".to_string(),
+            Value::Bytea(_) => "BYTEA".to_string(),
+            Value::Enum(e) => e.type_name.clone(),
+            Value::Composite(c) => c.type_name.clone(),
+            Value::Range(_) => "RANGE".to_string(),
+            Value::Null => "NULL".to_string(),
+        }
+    }
 }
 
 impl Eq for Value {}

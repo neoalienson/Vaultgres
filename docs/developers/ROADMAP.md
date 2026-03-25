@@ -190,8 +190,8 @@ VaultGres development roadmap with planned features and milestones.
 **SQL Features**
 - ✅ Views (CREATE VIEW, DROP VIEW)
 - ✅ Materialized views with REFRESH
-- ⚠️ User-defined functions (SQL functions) (parser support exists, execution needs implementation)
-- ⚠️ Aggregate functions (custom aggregates) (parser support exists, execution needs implementation)
+- ✅ User-defined functions (SQL functions) - supports scalar and set-returning functions with parameter binding
+- ⚠️ Aggregate functions (custom aggregates) - CREATE AGGREGATE and DROP AGGREGATE parser, catalog storage, and protocol handling implemented; executor integration pending
 - ✅ String functions (CONCAT, SUBSTRING, UPPER, LOWER)
 - ✅ Date/time functions (NOW, DATE_TRUNC, EXTRACT)
 - ✅ Subquery with AVG aggregate function

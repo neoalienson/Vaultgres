@@ -61,6 +61,7 @@ mod recursive_cte_test;
 mod rules_test;
 mod savepoint_test;
 mod serial_test;
+mod sql_function_test;
 mod statistics_test;
 mod storage_test;
 mod transaction_test;

@@ -2,7 +2,7 @@ use super::crud_helper::CrudHelper;
 use super::insert_validator::InsertValidator;
 use super::persistence::Persistence;
 use super::update_delete_executor::UpdateDeleteExecutor;
-use super::{Function, TableSchema, Value};
+use super::{Aggregate, Function, TableSchema, Value};
 use crate::parser::ast::{
     ColumnDef, CompositeTypeDef, CreateIndexStmt, CreateTriggerStmt, DataType, EnumTypeDef, Expr,
     ForeignKeyAction, ForeignKeyDef, OrderByExpr, SelectStmt,
@@ -23,6 +23,7 @@ pub struct Catalog {
     pub(crate) triggers: Arc<RwLock<HashMap<String, CreateTriggerStmt>>>,
     pub(crate) indexes: Arc<RwLock<HashMap<String, CreateIndexStmt>>>,
     pub(crate) functions: Arc<RwLock<HashMap<String, Vec<Function>>>>,
+    pub(crate) aggregates: Arc<RwLock<HashMap<String, Aggregate>>>,
     pub(crate) enum_types: Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     pub(crate) composite_types: Arc<RwLock<HashMap<String, CompositeTypeDef>>>,
     pub(crate) data: Arc<RwLock<HashMap<String, Vec<crate::catalog::tuple::Tuple>>>>,
@@ -43,6 +44,7 @@ impl Catalog {
             triggers: Arc::new(RwLock::new(HashMap::new())),
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
+            aggregates: Arc::new(RwLock::new(HashMap::new())),
             enum_types: Arc::new(RwLock::new(HashMap::new())),
             composite_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
@@ -65,6 +67,7 @@ impl Catalog {
             triggers: Arc::new(RwLock::new(HashMap::new())),
             indexes: Arc::new(RwLock::new(HashMap::new())),
             functions: Arc::new(RwLock::new(HashMap::new())),
+            aggregates: Arc::new(RwLock::new(HashMap::new())),
             enum_types: Arc::new(RwLock::new(HashMap::new())),
             composite_types: Arc::new(RwLock::new(HashMap::new())),
             data: Arc::new(RwLock::new(HashMap::new())),
@@ -82,6 +85,7 @@ impl Catalog {
         let triggers = Arc::clone(&catalog.triggers);
         let indexes = Arc::clone(&catalog.indexes);
         let functions = Arc::clone(&catalog.functions);
+        let aggregates = Arc::clone(&catalog.aggregates);
         let data = Arc::clone(&catalog.data);
         let dir = data_dir.to_string();
 
@@ -131,6 +135,11 @@ impl Catalog {
                 let functions_clone = functions.read().unwrap().clone();
                 if let Err(e) = Persistence::save_functions(&dir, &functions_clone) {
                     log::error!("Async functions save failed: {}", e);
+                }
+
+                let aggregates_clone = aggregates.read().unwrap().clone();
+                if let Err(e) = Persistence::save_aggregates(&dir, &aggregates_clone) {
+                    log::error!("Async aggregates save failed: {}", e);
                 }
 
                 last_save = std::time::Instant::now();
@@ -185,6 +194,10 @@ impl Catalog {
 
         if let Ok(functions) = Persistence::load_functions(data_dir) {
             *catalog.functions.write().unwrap() = functions;
+        }
+
+        if let Ok(aggregates) = Persistence::load_aggregates(data_dir) {
+            *catalog.aggregates.write().unwrap() = aggregates;
         }
 
         catalog
@@ -652,6 +665,19 @@ impl Catalog {
         Ok(())
     }
 
+    pub fn drop_function(&self, name: &str, if_exists: bool) -> Result<(), String> {
+        let mut functions = self.functions.write().unwrap();
+        if let Some(funcs) = functions.get_mut(name) {
+            funcs.retain(|_| true); // Keep all for now - could implement signature-based removal later
+            functions.remove(name);
+            drop(functions);
+            self.auto_save();
+            Ok(())
+        } else {
+            if if_exists { Ok(()) } else { Err(format!("Function '{}' does not exist", name)) }
+        }
+    }
+
     pub fn get_function(&self, name: &str, arg_types: &[String]) -> Option<Function> {
         let functions = self.functions.read().unwrap();
         functions
@@ -662,6 +688,30 @@ impl Catalog {
                     && f.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)
             })
             .cloned()
+    }
+
+    pub fn create_aggregate(&self, agg: Aggregate) -> Result<(), String> {
+        let mut aggregates = self.aggregates.write().unwrap();
+        aggregates.insert(agg.name.clone(), agg);
+        drop(aggregates);
+        self.auto_save();
+        Ok(())
+    }
+
+    pub fn drop_aggregate(&self, name: &str, if_exists: bool) -> Result<(), String> {
+        let mut aggregates = self.aggregates.write().unwrap();
+        if aggregates.remove(name).is_some() {
+            drop(aggregates);
+            self.auto_save();
+            Ok(())
+        } else {
+            if if_exists { Ok(()) } else { Err(format!("Aggregate '{}' does not exist", name)) }
+        }
+    }
+
+    pub fn get_aggregate(&self, name: &str) -> Option<Aggregate> {
+        let aggregates = self.aggregates.read().unwrap();
+        aggregates.get(name).cloned()
     }
 
     pub fn insert(&self, table: &str, columns: &[String], values: Vec<Expr>) -> Result<(), String> {

@@ -1,9 +1,12 @@
 use super::message::{Message, ProtocolError, Response};
 use super::result_set::{ColumnMetadata, ResultSet, Row};
 use super::type_mapping::{serialize_value, value_to_pg_type};
-use crate::catalog::{Catalog, Value};
-use crate::parser::Expr;
-use crate::parser::{Parser, Statement};
+use crate::catalog::{Aggregate, Catalog, Function, FunctionLanguage, Parameter, Value};
+use crate::parser::ast::{
+    FunctionParameter as AstFunctionParameter, FunctionReturnType, FunctionVolatility,
+    ParameterMode, Statement,
+};
+use crate::parser::{Expr, Parser};
 use crate::planner::planner::Planner;
 use std::io::{Read, Write};
 use std::sync::Arc;
@@ -213,6 +216,105 @@ impl<S: Read + Write> Connection<S> {
             Statement::DropIndex(drop) => {
                 self.catalog.drop_index(&drop.name, drop.if_exists)?;
                 Ok(ExecutionResult::CommandComplete("DROP INDEX".to_string()))
+            }
+            Statement::CreateFunction(create) => {
+                let return_type_str = match &create.return_type {
+                    crate::parser::ast::FunctionReturnType::Type(s) => s.clone(),
+                    crate::parser::ast::FunctionReturnType::Setof(s) => format!("SETOF {}", s),
+                    crate::parser::ast::FunctionReturnType::Table(cols) => {
+                        let cols_str = cols
+                            .iter()
+                            .map(|(n, t)| format!("{} {}", n, t))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        format!("TABLE({})", cols_str)
+                    }
+                };
+
+                let is_variadic = create
+                    .parameters
+                    .iter()
+                    .any(|p| matches!(p.mode, crate::parser::ast::ParameterMode::Variadic));
+
+                let volatility = match create.volatility {
+                    Some(crate::parser::ast::FunctionVolatility::Immutable) => {
+                        crate::catalog::FunctionVolatility::Immutable
+                    }
+                    Some(crate::parser::ast::FunctionVolatility::Stable) => {
+                        crate::catalog::FunctionVolatility::Stable
+                    }
+                    Some(crate::parser::ast::FunctionVolatility::Volatile) => {
+                        crate::catalog::FunctionVolatility::Volatile
+                    }
+                    None => crate::catalog::FunctionVolatility::Volatile,
+                };
+
+                let language = match create.language.to_uppercase().as_str() {
+                    "SQL" => FunctionLanguage::Sql,
+                    "PLPGSQL" | "PL/PGSQL" => FunctionLanguage::PlPgSql,
+                    _ => {
+                        return Err(format!("Unsupported language: {}", create.language));
+                    }
+                };
+
+                let func = Function {
+                    name: create.name,
+                    parameters: create
+                        .parameters
+                        .into_iter()
+                        .map(|p| Parameter {
+                            name: p.name,
+                            data_type: p.data_type,
+                            default: p.default,
+                        })
+                        .collect(),
+                    return_type: return_type_str,
+                    language,
+                    body: create.body,
+                    is_variadic,
+                    volatility,
+                    cost: create.cost.unwrap_or(100.0),
+                    rows: create.rows.unwrap_or(1),
+                };
+
+                self.catalog.create_function(func)?;
+                Ok(ExecutionResult::CommandComplete("CREATE FUNCTION".to_string()))
+            }
+            Statement::DropFunction(drop) => {
+                self.catalog.drop_function(&drop.name, drop.if_exists)?;
+                Ok(ExecutionResult::CommandComplete("DROP FUNCTION".to_string()))
+            }
+            Statement::CreateAggregate(create) => {
+                let volatility = match create.volatility {
+                    Some(crate::parser::ast::FunctionVolatility::Immutable) => {
+                        crate::catalog::FunctionVolatility::Immutable
+                    }
+                    Some(crate::parser::ast::FunctionVolatility::Stable) => {
+                        crate::catalog::FunctionVolatility::Stable
+                    }
+                    Some(crate::parser::ast::FunctionVolatility::Volatile) => {
+                        crate::catalog::FunctionVolatility::Volatile
+                    }
+                    None => crate::catalog::FunctionVolatility::Volatile,
+                };
+
+                let agg = Aggregate {
+                    name: create.name,
+                    input_type: create.input_type,
+                    sfunc: create.sfunc,
+                    stype: create.stype,
+                    finalfunc: create.finalfunc,
+                    initcond: create.initcond,
+                    volatility,
+                    cost: create.cost.unwrap_or(100.0),
+                };
+
+                self.catalog.create_aggregate(agg)?;
+                Ok(ExecutionResult::CommandComplete("CREATE AGGREGATE".to_string()))
+            }
+            Statement::DropAggregate(drop) => {
+                self.catalog.drop_aggregate(&drop.name, drop.if_exists)?;
+                Ok(ExecutionResult::CommandComplete("DROP AGGREGATE".to_string()))
             }
             Statement::Describe(desc) => {
                 if let Some(schema) = self.catalog.get_table(&desc.table) {
