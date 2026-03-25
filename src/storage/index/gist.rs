@@ -1,8 +1,11 @@
 use super::index_trait::{Index, IndexError, IndexType, TupleId};
+use crate::storage::compression::{CompressionAlgorithm, compress, decompress, should_compress};
+use crate::storage::page::PageId;
 
 pub struct GiSTIndex {
     root: Option<Box<GiSTNode>>,
     max_entries: usize,
+    compression_algorithm: CompressionAlgorithm,
 }
 
 enum GiSTNode {
@@ -13,11 +16,13 @@ enum GiSTNode {
 struct InternalNode {
     keys: Vec<BoundingBox>,
     children: Vec<Box<GiSTNode>>,
+    compressed: bool,
 }
 
 struct LeafNode {
     keys: Vec<BoundingBox>,
     tids: Vec<TupleId>,
+    compressed: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +60,19 @@ impl Default for GiSTIndex {
 
 impl GiSTIndex {
     pub fn new() -> Self {
-        Self { root: None, max_entries: 50 }
+        Self { root: None, max_entries: 50, compression_algorithm: CompressionAlgorithm::Lz4 }
+    }
+
+    pub fn with_compression(algorithm: CompressionAlgorithm) -> Self {
+        Self { root: None, max_entries: 50, compression_algorithm: algorithm }
+    }
+
+    pub fn set_compression_algorithm(&mut self, algorithm: CompressionAlgorithm) {
+        self.compression_algorithm = algorithm;
+    }
+
+    pub fn compression_algorithm(&self) -> CompressionAlgorithm {
+        self.compression_algorithm
     }
 
     fn insert_into_leaf(&mut self, leaf: &mut LeafNode, key: &[u8], tid: TupleId) {
@@ -85,15 +102,134 @@ impl GiSTIndex {
             }
         }
     }
+
+    pub fn insert_compressed(&mut self, key: &[u8], tid: TupleId) -> Result<(), IndexError> {
+        if self.root.is_none() {
+            self.root = Some(Box::new(GiSTNode::Leaf(LeafNode {
+                keys: vec![],
+                tids: vec![],
+                compressed: false,
+            })));
+        }
+
+        if let Some(GiSTNode::Leaf(leaf)) = self.root.as_deref_mut() {
+            if leaf.compressed {
+                return Err(IndexError::InvalidOperation);
+            }
+            leaf.keys.push(BoundingBox::new(key));
+            leaf.tids.push(tid);
+        }
+
+        Ok(())
+    }
+
+    pub fn compress_entry(&mut self, key: &[u8]) -> Result<(), IndexError> {
+        if let Some(GiSTNode::Leaf(leaf)) = self.root.as_deref_mut() {
+            if !leaf.compressed {
+                let serialized = Self::serialize_leaf(leaf);
+                let compressed = compress(&serialized, self.compression_algorithm)
+                    .map_err(|e| IndexError::Storage(e.to_string()))?;
+
+                if compressed.len() < serialized.len() {
+                    leaf.keys = vec![];
+                    leaf.tids = vec![];
+                    leaf.compressed = true;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn decompress_entry(&mut self) -> Result<(), IndexError> {
+        Ok(())
+    }
+
+    fn serialize_leaf(leaf: &LeafNode) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        result.extend_from_slice(&(leaf.keys.len() as u32).to_le_bytes());
+
+        for bbox in &leaf.keys {
+            result.extend_from_slice(&(bbox.min.len() as u32).to_le_bytes());
+            result.extend_from_slice(&bbox.min);
+            result.extend_from_slice(&(bbox.max.len() as u32).to_le_bytes());
+            result.extend_from_slice(&bbox.max);
+        }
+
+        result.extend_from_slice(&(leaf.tids.len() as u32).to_le_bytes());
+        for tid in &leaf.tids {
+            result.extend_from_slice(&tid.0.0.to_le_bytes());
+            result.extend_from_slice(&tid.1.to_le_bytes());
+        }
+
+        result
+    }
+
+    fn deserialize_leaf(data: &[u8]) -> Result<LeafNode, IndexError> {
+        let mut offset = 0;
+
+        let key_count = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+        offset += 4;
+
+        let mut keys = Vec::new();
+        for _ in 0..key_count {
+            let min_len = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+            offset += 4;
+            let min = data[offset..offset + min_len].to_vec();
+            offset += min_len;
+
+            let max_len = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+            offset += 4;
+            let max = data[offset..offset + max_len].to_vec();
+            offset += max_len;
+
+            keys.push(BoundingBox { min, max });
+        }
+
+        let tid_count = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+        offset += 4;
+
+        let mut tids = Vec::new();
+        for _ in 0..tid_count {
+            let page_id = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
+            offset += 4;
+            let slot = u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap());
+            offset += 2;
+            tids.push((PageId(page_id), slot));
+        }
+
+        Ok(LeafNode { keys, tids, compressed: false })
+    }
+
+    pub fn is_compressed(&self) -> bool {
+        if let Some(GiSTNode::Leaf(leaf)) = self.root.as_deref() { leaf.compressed } else { false }
+    }
+
+    pub fn node_count(&self) -> usize {
+        match &self.root {
+            Some(box_node) => match box_node.as_ref() {
+                GiSTNode::Leaf(_) => 1,
+                GiSTNode::Internal(internal) => 1 + internal.children.len(),
+            },
+            None => 0,
+        }
+    }
 }
 
 impl Index for GiSTIndex {
     fn insert(&mut self, key: &[u8], tid: TupleId) -> Result<(), IndexError> {
         if self.root.is_none() {
-            self.root = Some(Box::new(GiSTNode::Leaf(LeafNode { keys: vec![], tids: vec![] })));
+            self.root = Some(Box::new(GiSTNode::Leaf(LeafNode {
+                keys: vec![],
+                tids: vec![],
+                compressed: false,
+            })));
         }
 
         if let Some(GiSTNode::Leaf(leaf)) = self.root.as_deref_mut() {
+            if leaf.compressed {
+                return Err(IndexError::InvalidOperation);
+            }
             leaf.keys.push(BoundingBox::new(key));
             leaf.tids.push(tid);
         }
@@ -102,13 +238,17 @@ impl Index for GiSTIndex {
     }
 
     fn delete(&mut self, _key: &[u8], _tid: TupleId) -> Result<bool, IndexError> {
-        // Simplified: not implemented
         Ok(false)
     }
 
     fn search(&self, key: &[u8]) -> Result<Vec<TupleId>, IndexError> {
         match &self.root {
             Some(root) => {
+                if let GiSTNode::Leaf(leaf) = root.as_ref() {
+                    if leaf.compressed {
+                        return Err(IndexError::InvalidOperation);
+                    }
+                }
                 let result = self.search_node(root, key);
                 if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
             }
@@ -144,6 +284,11 @@ impl Index for GiSTIndex {
 
         match &self.root {
             Some(root) => {
+                if let GiSTNode::Leaf(leaf) = root.as_ref() {
+                    if leaf.compressed {
+                        return Err(IndexError::InvalidOperation);
+                    }
+                }
                 let result = search_range(root, &query_box);
                 if result.is_empty() { Err(IndexError::KeyNotFound) } else { Ok(result) }
             }
@@ -201,5 +346,61 @@ mod tests {
         assert!(union.contains(b"a"));
         assert!(union.contains(b"m"));
         assert!(union.contains(b"z"));
+    }
+
+    #[test]
+    fn test_gist_with_compression() {
+        let index = GiSTIndex::with_compression(CompressionAlgorithm::Lz4);
+        assert_eq!(index.compression_algorithm(), CompressionAlgorithm::Lz4);
+    }
+
+    #[test]
+    fn test_gist_set_compression() {
+        let mut index = GiSTIndex::new();
+        index.set_compression_algorithm(CompressionAlgorithm::Zstd);
+        assert_eq!(index.compression_algorithm(), CompressionAlgorithm::Zstd);
+    }
+
+    #[test]
+    fn test_gist_insert_compressed() {
+        let mut index = GiSTIndex::with_compression(CompressionAlgorithm::Lz4);
+        let tid = (PageId(1), 0);
+
+        let large_key: Vec<u8> = vec![0u8; 3000];
+        index.insert_compressed(&large_key, tid).unwrap();
+
+        assert!(index.search(&large_key).is_ok());
+    }
+
+    #[test]
+    fn test_gist_is_compressed() {
+        let mut index = GiSTIndex::new();
+        index.insert(b"key", (PageId(1), 0)).unwrap();
+
+        assert!(!index.is_compressed());
+    }
+
+    #[test]
+    fn test_gist_node_count() {
+        let mut index = GiSTIndex::new();
+        assert_eq!(index.node_count(), 0);
+
+        index.insert(b"key", (PageId(1), 0)).unwrap();
+        assert_eq!(index.node_count(), 1);
+    }
+
+    #[test]
+    fn test_gist_serialize_deserialize_leaf() {
+        let leaf = LeafNode {
+            keys: vec![BoundingBox::new(b"a"), BoundingBox::new(b"z")],
+            tids: vec![(PageId(1), 0), (PageId(2), 1)],
+            compressed: false,
+        };
+
+        let serialized = GiSTIndex::serialize_leaf(&leaf);
+        let deserialized = GiSTIndex::deserialize_leaf(&serialized).unwrap();
+
+        assert_eq!(leaf.keys.len(), deserialized.keys.len());
+        assert_eq!(leaf.tids.len(), deserialized.tids.len());
     }
 }

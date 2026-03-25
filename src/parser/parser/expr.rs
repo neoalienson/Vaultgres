@@ -1,5 +1,7 @@
 use super::Parser;
-use crate::parser::ast::{BinaryOperator, Expr};
+use crate::parser::ast::{
+    BinaryOperator, Expr, OrderByExpr, WindowFrame, WindowFrameBound, WindowFrameMode, WindowFunc,
+};
 use crate::parser::error::{ParseError, Result};
 use crate::parser::lexer::Token;
 
@@ -352,25 +354,37 @@ fn parse_aggregate(parser: &mut Parser) -> Result<Expr> {
 }
 
 fn parse_window(parser: &mut Parser) -> Result<Expr> {
-    use crate::parser::ast::{OrderByExpr, WindowFunc};
-
     let func = match parser.current_token() {
         Token::RowNumber => WindowFunc::RowNumber,
         Token::Rank => WindowFunc::Rank,
         Token::DenseRank => WindowFunc::DenseRank,
         Token::Lag => WindowFunc::Lag,
         Token::Lead => WindowFunc::Lead,
+        Token::FirstValue => WindowFunc::FirstValue,
+        Token::LastValue => WindowFunc::LastValue,
+        Token::NthValue => WindowFunc::NthValue,
+        Token::Ntile => WindowFunc::Ntile,
+        Token::PercentRank => WindowFunc::PercentRank,
+        Token::CumeDist => WindowFunc::CumeDist,
         _ => return Err(ParseError::UnexpectedToken(format!("{:?}", parser.current_token()))),
     };
 
     parser.advance();
     parser.expect(Token::LeftParen)?;
 
-    let arg = if parser.current_token() == &Token::RightParen {
+    let mut arg = if parser.current_token() == &Token::RightParen {
         Box::new(Expr::Star)
     } else {
         Box::new(parse_expr(parser)?)
     };
+
+    if matches!(func, WindowFunc::NthValue | WindowFunc::Lag | WindowFunc::Lead) {
+        if parser.current_token() == &Token::Comma {
+            parser.advance();
+            let second_arg = parse_expr(parser)?;
+            arg = Box::new(Expr::Tuple(vec![arg.as_ref().clone(), second_arg]));
+        }
+    }
 
     parser.expect(Token::RightParen)?;
     parser.expect(Token::Over)?;
@@ -414,9 +428,95 @@ fn parse_window(parser: &mut Parser) -> Result<Expr> {
         }
     }
 
+    let window_frame = if parser.current_token() != &Token::RightParen {
+        Some(parse_frame_spec(parser)?)
+    } else {
+        None
+    };
+
     parser.expect(Token::RightParen)?;
 
-    Ok(Expr::Window { func, arg, partition_by, order_by, window_frame: None })
+    Ok(Expr::Window { func, arg, partition_by, order_by, window_frame })
+}
+
+fn parse_frame_spec(parser: &mut Parser) -> Result<WindowFrame> {
+    let mode = match parser.current_token() {
+        Token::Rows => {
+            parser.advance();
+            WindowFrameMode::Rows
+        }
+        Token::Range => {
+            parser.advance();
+            WindowFrameMode::Range
+        }
+        Token::Groups => {
+            parser.advance();
+            WindowFrameMode::Groups
+        }
+        _ => WindowFrameMode::Range,
+    };
+
+    let start = if parser.current_token() == &Token::Between {
+        parser.advance();
+        parse_frame_bound(parser)?
+    } else {
+        parse_frame_bound(parser)?
+    };
+
+    let end = if parser.current_token() == &Token::And {
+        parser.advance();
+        Some(parse_frame_bound(parser)?)
+    } else {
+        None
+    };
+
+    Ok(WindowFrame { mode, start, end })
+}
+
+fn parse_frame_bound(parser: &mut Parser) -> Result<WindowFrameBound> {
+    match parser.current_token() {
+        Token::Unbounded => {
+            parser.advance();
+            match parser.current_token() {
+                Token::Preceding => {
+                    parser.advance();
+                    Ok(WindowFrameBound::UnboundedPreceding)
+                }
+                Token::Following => {
+                    parser.advance();
+                    Ok(WindowFrameBound::UnboundedFollowing)
+                }
+                _ => Err(ParseError::UnexpectedToken(
+                    "UNBOUNDED must be followed by PRECEDING or FOLLOWING".to_string(),
+                )),
+            }
+        }
+        Token::CurrentRow => {
+            parser.advance();
+            Ok(WindowFrameBound::CurrentRow)
+        }
+        Token::Number(n) => {
+            let n = *n;
+            parser.advance();
+            match parser.current_token() {
+                Token::Preceding => {
+                    parser.advance();
+                    Ok(WindowFrameBound::Preceding(n))
+                }
+                Token::Following => {
+                    parser.advance();
+                    Ok(WindowFrameBound::Following(n))
+                }
+                _ => Err(ParseError::UnexpectedToken(
+                    "Number must be followed by PRECEDING or FOLLOWING".to_string(),
+                )),
+            }
+        }
+        _ => Err(ParseError::UnexpectedToken(format!(
+            "Invalid frame bound: {:?}",
+            parser.current_token()
+        ))),
+    }
 }
 
 fn parse_case(parser: &mut Parser) -> Result<Expr> {

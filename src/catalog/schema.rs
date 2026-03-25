@@ -2,8 +2,25 @@ use crate::parser::ast::{
     CheckConstraint, ColumnDef, ForeignKeyDef, PartitionBoundSpec, PartitionKey, PartitionMethod,
     UniqueConstraint,
 };
+use crate::storage::compression::CompressionAlgorithm;
 
-/// Table schema definition
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableStorageOptions {
+    pub compression_algorithm: CompressionAlgorithm,
+}
+
+impl Default for TableStorageOptions {
+    fn default() -> Self {
+        Self { compression_algorithm: CompressionAlgorithm::Lz4 }
+    }
+}
+
+impl TableStorageOptions {
+    pub fn new(algorithm: CompressionAlgorithm) -> Self {
+        Self { compression_algorithm: algorithm }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TableSchema {
     pub name: String,
@@ -17,6 +34,7 @@ pub struct TableSchema {
     pub is_partition: bool,
     pub parent_table: Option<String>,
     pub partition_bound: Option<PartitionBoundSpec>,
+    pub storage_options: TableStorageOptions,
 }
 
 impl TableSchema {
@@ -33,6 +51,7 @@ impl TableSchema {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         }
     }
 
@@ -54,6 +73,7 @@ impl TableSchema {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         }
     }
 
@@ -77,6 +97,7 @@ impl TableSchema {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         }
     }
 
@@ -98,6 +119,7 @@ impl TableSchema {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         }
     }
 
@@ -114,7 +136,37 @@ impl TableSchema {
             is_partition: true,
             parent_table: Some(parent_table),
             partition_bound: Some(bound),
+            storage_options: TableStorageOptions::default(),
         }
+    }
+
+    pub fn with_storage_options(
+        name: String,
+        columns: Vec<ColumnDef>,
+        storage_options: TableStorageOptions,
+    ) -> Self {
+        Self {
+            name,
+            columns,
+            primary_key: None,
+            foreign_keys: Vec::new(),
+            check_constraints: Vec::new(),
+            unique_constraints: Vec::new(),
+            partition_method: None,
+            partition_keys: Vec::new(),
+            is_partition: false,
+            parent_table: None,
+            partition_bound: None,
+            storage_options,
+        }
+    }
+
+    pub fn compression_algorithm(&self) -> CompressionAlgorithm {
+        self.storage_options.compression_algorithm
+    }
+
+    pub fn set_compression_algorithm(&mut self, algorithm: CompressionAlgorithm) {
+        self.storage_options.compression_algorithm = algorithm;
     }
 }
 
@@ -125,7 +177,6 @@ mod tests {
         BinaryOperator, CheckConstraint, ColumnDef, DataType, Expr, ForeignKeyAction, ForeignKeyDef,
     };
 
-    // Helper to create a simple ColumnDef
     fn create_col_def(name: &str, data_type: DataType) -> ColumnDef {
         ColumnDef {
             name: name.to_string(),
@@ -239,5 +290,55 @@ mod tests {
         assert!(schema.foreign_keys.is_empty());
         assert!(schema.check_constraints.is_empty());
         assert!(schema.unique_constraints.is_empty());
+    }
+
+    #[test]
+    fn test_table_storage_options_default() {
+        let opts = TableStorageOptions::default();
+        assert_eq!(opts.compression_algorithm, CompressionAlgorithm::Lz4);
+    }
+
+    #[test]
+    fn test_table_storage_options_with_zstd() {
+        let opts = TableStorageOptions::new(CompressionAlgorithm::Zstd);
+        assert_eq!(opts.compression_algorithm, CompressionAlgorithm::Zstd);
+    }
+
+    #[test]
+    fn test_table_schema_default_compression() {
+        let cols = vec![create_col_def("id", DataType::Int)];
+        let schema = TableSchema::new("users".to_string(), cols);
+
+        assert_eq!(schema.compression_algorithm(), CompressionAlgorithm::Lz4);
+    }
+
+    #[test]
+    fn test_table_schema_with_storage_options() {
+        let cols = vec![create_col_def("id", DataType::Int)];
+        let opts = TableStorageOptions::new(CompressionAlgorithm::Zstd);
+        let schema = TableSchema::with_storage_options("compressed_table".to_string(), cols, opts);
+
+        assert_eq!(schema.compression_algorithm(), CompressionAlgorithm::Zstd);
+    }
+
+    #[test]
+    fn test_table_schema_set_compression() {
+        let cols = vec![create_col_def("id", DataType::Int)];
+        let mut schema = TableSchema::new("users".to_string(), cols);
+
+        assert_eq!(schema.compression_algorithm(), CompressionAlgorithm::Lz4);
+
+        schema.set_compression_algorithm(CompressionAlgorithm::Zstd);
+        assert_eq!(schema.compression_algorithm(), CompressionAlgorithm::Zstd);
+    }
+
+    #[test]
+    fn test_table_schema_compression_none() {
+        let cols = vec![create_col_def("id", DataType::Int)];
+        let opts = TableStorageOptions::new(CompressionAlgorithm::None);
+        let schema =
+            TableSchema::with_storage_options("uncompressed_table".to_string(), cols, opts);
+
+        assert_eq!(schema.compression_algorithm(), CompressionAlgorithm::None);
     }
 }

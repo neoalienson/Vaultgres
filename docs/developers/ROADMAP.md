@@ -108,13 +108,14 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ IntersectExecutor (volcano module)
 - ✅ ExceptExecutor (volcano module)
 
-**Phase 5: Advanced Executors** ⚠️ PARTIALLY COMPLETED
+**Phase 5: Advanced Executors** ✅ COMPLETED
 - ✅ AggregateExecutor (volcano module)
 - ✅ SubqueryExecutor (volcano module)
 - ✅ CaseExecutor (volcano module)
 - ✅ GroupByExecutor (volcano module - sort-based grouping, alternative to HashAggExecutor)
 - ✅ CTEExecutor with WITH/WITH RECURSIVE support (volcano module, planner integration)
 - ✅ WindowExecutor (volcano module - supports ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, NTH_VALUE, PERCENT_RANK, CUME_DIST)
+- ✅ Window frames (ROWS, RANGE, GROUPS modes with UNBOUNDED PRECEDING/FOLLOWING, CURRENT ROW, offset PRECEDING/FOLLOWING)
 
 **Phase 6: Parallel Execution Infrastructure** ✅ COMPLETED
 - ✅ Work-stealing scheduler migrated to Tuple format
@@ -148,6 +149,16 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ Table aliases and column aliases
 - ✅ Prepared statements
 - ✅ Bind parameter support
+- 🚧 Compression (LZ4, Zstd) for tables and indexes
+  - ✅ LZ4 and Zstd compression algorithms
+  - ✅ Tuple-level compression (PostgreSQL TOAST-like, 2KB threshold)
+  - ✅ Per-table compression via STORAGE options
+  - ✅ BTree, Hash, BRIN, GIN, GiST index compression
+  - ✅ Page-level compression support
+  - ✅ Buffer pool compression-aware caching
+  - ✅ ALTER TABLE SET (compression_algorithm = ...) support
+  - ✅ Unit tests, integration tests, and E2E tests (written, not run)
+  - ⚠️ Page item layout has issues - some page tests fail due to header/data overlap
 
 
 ## Version 0.3.0 (Beta)
@@ -202,6 +213,12 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ String functions (CONCAT, SUBSTRING, UPPER, LOWER)
 - ✅ Date/time functions (NOW, DATE_TRUNC, EXTRACT)
 - ✅ Subquery with AVG aggregate function
+- ✅ Window frames (ROWS, RANGE, GROUPS modes)
+  - ✅ `frame_mode: ROWS | RANGE | GROUPS`
+  - ✅ `frame_bound: UNBOUNDED PRECEDING | UNBOUNDED FOLLOWING | CURRENT ROW | offset PRECEDING | offset FOLLOWING`
+  - ✅ `frame_spec: [frame_mode] [BETWEEN start_bound AND end_bound] | [frame_mode] start_bound [end_bound]`
+  - ✅ Support for FIRST_VALUE, LAST_VALUE, NTH_VALUE, LAG, LEAD with explicit frame specifications
+  - ✅ Unit tests, integration tests, and E2E tests implemented
 
 
 **Data Types**
@@ -252,8 +269,8 @@ VaultGres development roadmap with planned features and milestones.
   - ✅ Persistence layer: `save_partitions` and `load_partitions` (JSON-based)
   - ✅ Unit tests (12 parser tests)
   - ✅ Integration tests (15 catalog tests)
-- 🚧 Partition pruning in query optimizer
-- Compression (LZ4, Zstd) for tables and indexes
+- ✅ Partition pruning in query optimizer
+- 🚧 Compression (LZ4, Zstd) for tables and indexes (page layout issues)
 - TOAST (The Oversized-Attribute Storage Technique)
 - Vacuum improvements (parallel vacuum)
 - Autovacuum with configurable thresholds

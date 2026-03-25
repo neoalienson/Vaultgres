@@ -438,6 +438,79 @@ impl Catalog {
             .collect()
     }
 
+    pub fn get_partitions_for_predicate(
+        &self,
+        parent_table: &str,
+        where_clause: &Option<Expr>,
+    ) -> Vec<String> {
+        let tables = self.tables.read().unwrap();
+
+        let parent = match tables.get(parent_table) {
+            Some(t) if t.partition_method.is_some() => t,
+            _ => return Vec::new(),
+        };
+
+        let partition_method = parent.partition_method.as_ref().unwrap();
+        let partition_keys = &parent.partition_keys;
+
+        let partitions: Vec<(String, PartitionBoundSpec)> = tables
+            .values()
+            .filter(|s| {
+                s.is_partition && s.parent_table.as_ref() == Some(&parent_table.to_string())
+            })
+            .filter_map(|s| s.partition_bound.as_ref().map(|bound| (s.name.clone(), bound.clone())))
+            .collect();
+
+        use super::partition_pruning::PartitionPruner;
+
+        let predicates = PartitionPruner::extract_predicates(where_clause, partition_keys);
+
+        match partition_method {
+            crate::parser::ast::PartitionMethod::Range => {
+                let range_partitions: Vec<(String, crate::parser::ast::PartitionRangeBound)> =
+                    partitions
+                        .into_iter()
+                        .filter_map(|(name, bound)| {
+                            if let PartitionBoundSpec::Range(rb) = bound {
+                                Some((name, rb))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                PartitionPruner::prune_partitions_range(&range_partitions, &predicates)
+            }
+            crate::parser::ast::PartitionMethod::List => {
+                let list_partitions: Vec<(String, crate::parser::ast::PartitionListBound)> =
+                    partitions
+                        .into_iter()
+                        .filter_map(|(name, bound)| {
+                            if let PartitionBoundSpec::List(lb) = bound {
+                                Some((name, lb))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                PartitionPruner::prune_partitions_list(&list_partitions, &predicates)
+            }
+            crate::parser::ast::PartitionMethod::Hash => {
+                let hash_partitions: Vec<(String, crate::parser::ast::PartitionHashBound)> =
+                    partitions
+                        .into_iter()
+                        .filter_map(|(name, bound)| {
+                            if let PartitionBoundSpec::Hash(hb) = bound {
+                                Some((name, hb))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                PartitionPruner::prune_partitions_hash(&hash_partitions, &predicates)
+            }
+        }
+    }
+
     pub fn is_partitioned_table(&self, name: &str) -> bool {
         let tables = self.tables.read().unwrap();
         if let Some(schema) = tables.get(name) { schema.partition_method.is_some() } else { false }

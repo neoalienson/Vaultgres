@@ -19,11 +19,15 @@ num_cpus = "1.16"
 regex = "1.10"
 chrono = "0.4.38"
 signal-hook = "0.3"
+lz4 = "1.24"
+zstd = "0.13"
+rand = "0.8"
 
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.4"
 tempfile = "3.8"
+rand = "0.8"
 
 [[bench]]
 name = "storage_bench"

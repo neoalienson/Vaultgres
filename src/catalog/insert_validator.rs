@@ -1,4 +1,5 @@
 use super::{CompositeTypeDef, TableSchema, Tuple, UniqueValidator, Value};
+use crate::catalog::schema::TableStorageOptions;
 use crate::parser::ast::{ColumnDef, DataType, EnumTypeDef, Expr};
 use crate::transaction::TransactionManager;
 use std::collections::HashMap;
@@ -456,6 +457,7 @@ mod tests {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         };
         let tuple_data = vec![Value::Int(1), Value::Text("test".to_string())];
         assert!(InsertValidator::validate_not_null(&schema, &tuple_data).is_ok());
@@ -477,6 +479,7 @@ mod tests {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         };
         let tuple_data = vec![Value::Null, Value::Text("test".to_string())];
         let result = InsertValidator::validate_not_null(&schema, &tuple_data);
@@ -500,6 +503,7 @@ mod tests {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         };
         let tuple_data = vec![Value::Null, Value::Text("test".to_string())];
         let result = InsertValidator::validate_not_null(&schema, &tuple_data);
@@ -521,6 +525,7 @@ mod tests {
             is_partition: false,
             parent_table: None,
             partition_bound: None,
+            storage_options: TableStorageOptions::default(),
         };
         let tuple_data = vec![];
         assert!(InsertValidator::validate_not_null(&schema, &tuple_data).is_ok());

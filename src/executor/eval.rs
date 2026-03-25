@@ -67,6 +67,13 @@ impl Eval {
             Expr::Star => Err(ExecutorError::UnsupportedExpression(
                 "* not allowed in this context".to_string(),
             )),
+            Expr::Tuple(exprs) => {
+                if exprs.is_empty() {
+                    Err(ExecutorError::InternalError("Empty tuple".to_string()))
+                } else {
+                    Self::eval_expr_with_catalog(&exprs[0], tuple, catalog)
+                }
+            }
 
             // Binary operations
             Expr::BinaryOp { left, op, right } => {

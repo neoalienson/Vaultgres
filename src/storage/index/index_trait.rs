@@ -27,6 +27,8 @@ pub enum IndexError {
     DuplicateKey,
     #[error("Invalid operation for index type")]
     InvalidOperation,
+    #[error("Invalid index")]
+    InvalidIndex,
     #[error("Storage error: {0}")]
     Storage(String),
 }

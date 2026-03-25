@@ -7,6 +7,7 @@ mod crud_helper;
 mod datetime_functions;
 mod function;
 mod insert_validator;
+mod partition_pruning;
 mod persistence;
 pub(crate) mod predicate;
 mod schema;

@@ -95,7 +95,8 @@ impl Planner {
                     .clone();
 
                 if cat.is_partitioned_table(from_table_name) {
-                    let partitions = cat.get_partitions(from_table_name);
+                    let partitions =
+                        cat.get_partitions_for_predicate(from_table_name, &stmt.where_clause);
                     if partitions.is_empty() {
                         return Err(ExecutorError::InternalError(format!(
                             "Partitioned table '{}' has no partitions",

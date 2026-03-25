@@ -290,3 +290,129 @@ fn test_e2e_window_empty_partition() {
 
     eprintln!("=== E2E Test PASSED ===");
 }
+
+#[test]
+fn test_e2e_window_rows_frame() {
+    eprintln!("\n=== E2E Test: Window with ROWS frame ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE sales (id INT, value INT)").unwrap();
+    db.execute("INSERT INTO sales VALUES (1, 100), (2, 200), (3, 300), (4, 400), (5, 500)")
+        .unwrap();
+
+    let result = db.execute(
+        "SELECT id, value, FIRST_VALUE(value) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as first_val FROM sales ORDER BY id",
+    );
+    assert!(result.is_ok(), "ROWS frame failed: {:?}", result);
+    let output = result.unwrap();
+    assert!(output.contains("100") && output.contains("200") && output.contains("300"));
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_first_value_frame() {
+    eprintln!("\n=== E2E Test: FIRST_VALUE with frame ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE ranked (id INT, score INT)").unwrap();
+    db.execute("INSERT INTO ranked VALUES (1, 100), (2, 200), (3, 150)").unwrap();
+
+    let result = db.execute(
+        "SELECT id, score, FIRST_VALUE(score) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as first_score FROM ranked ORDER BY id",
+    );
+    assert!(result.is_ok(), "FIRST_VALUE with frame failed: {:?}", result);
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_last_value_frame() {
+    eprintln!("\n=== E2E Test: LAST_VALUE with frame ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE sales_rank (id INT, amount INT)").unwrap();
+    db.execute("INSERT INTO sales_rank VALUES (1, 500), (2, 800), (3, 300)").unwrap();
+
+    let result = db.execute(
+        "SELECT id, amount, LAST_VALUE(amount) OVER (ORDER BY id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) as last_amount FROM sales_rank ORDER BY id",
+    );
+    assert!(result.is_ok(), "LAST_VALUE with frame failed: {:?}", result);
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_nth_value() {
+    eprintln!("\n=== E2E Test: NTH_VALUE ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE sequence (pos INT, value INT)").unwrap();
+    db.execute("INSERT INTO sequence VALUES (1, 10), (2, 20), (3, 30), (4, 40)").unwrap();
+
+    let result = db.execute(
+        "SELECT pos, value, NTH_VALUE(value, 2) OVER (ORDER BY pos ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as second_val FROM sequence ORDER BY pos",
+    );
+    assert!(result.is_ok(), "NTH_VALUE failed: {:?}", result);
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_ntile() {
+    eprintln!("\n=== E2E Test: Window NTILE ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE customers (name TEXT, balance INT)").unwrap();
+    db.execute("INSERT INTO customers VALUES ('Alice', 1000), ('Bob', 2000), ('Charlie', 3000), ('David', 4000), ('Eve', 5000)")
+        .unwrap();
+
+    let result = db.execute(
+        "SELECT name, balance, NTILE(2) OVER (ORDER BY balance) as quartile FROM customers ORDER BY balance",
+    );
+    assert!(result.is_ok(), "NTILE failed: {:?}", result);
+    let output = result.unwrap();
+    assert!(output.contains("Alice") && output.contains("Bob") && output.contains("Charlie"));
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_running_sum() {
+    eprintln!("\n=== E2E Test: Running sum with ROWS frame ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE items (id INT, value INT)").unwrap();
+    db.execute("INSERT INTO items VALUES (1, 100), (2, 200), (3, 300)").unwrap();
+
+    let result = db.execute(
+        "SELECT id, value, FIRST_VALUE(value) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as running_first FROM items ORDER BY id",
+    );
+    assert!(result.is_ok(), "Running sum with window frame failed: {:?}", result);
+
+    eprintln!("=== E2E Test PASSED ===");
+}
+
+#[test]
+fn test_e2e_window_moving_avg() {
+    eprintln!("\n=== E2E Test: Moving average with frame ===");
+    let env = TestEnv::new().with_vaultgres().start();
+    let db = env.vaultgres();
+
+    db.execute("CREATE TABLE metrics (period TEXT, value INT)").unwrap();
+    db.execute("INSERT INTO metrics VALUES ('Q1', 1000), ('Q2', 1500), ('Q3', 1200), ('Q4', 1800)")
+        .unwrap();
+
+    let result = db.execute(
+        "SELECT period, value, FIRST_VALUE(value) OVER (ORDER BY period ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) as moving_first FROM metrics ORDER BY period",
+    );
+    assert!(result.is_ok(), "Moving average failed: {:?}", result);
+
+    eprintln!("=== E2E Test PASSED ===");
+}

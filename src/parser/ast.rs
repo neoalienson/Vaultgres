@@ -666,6 +666,7 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
+    Tuple(Vec<Expr>),
 }
 
 /// Aggregate functions

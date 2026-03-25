@@ -19,6 +19,7 @@
 
 pub mod btree;
 pub mod buffer_pool;
+pub mod compression;
 pub mod disk;
 pub mod error;
 pub mod hash_index;
@@ -27,6 +28,10 @@ pub mod index;
 pub mod page;
 
 pub use buffer_pool::BufferPool;
+pub use compression::{
+    CompressionAlgorithm, CompressionContext, CompressionError, CompressionStats, compress,
+    decompress,
+};
 pub use disk::DiskManager;
 pub use error::{Result, StorageError};
 pub use page::{PAGE_SIZE, Page, PageId};
