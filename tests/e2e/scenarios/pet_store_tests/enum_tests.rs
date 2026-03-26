@@ -57,8 +57,9 @@ fn test_enum_insert_and_select(db: &DbConnection) {
 fn test_enum_comparison(db: &DbConnection) {
     eprintln!("[PetStore] Testing ENUM comparison...");
 
-    // Test enum comparison in WHERE clause
-    let result = db.execute("SELECT id, total FROM orders_with_status WHERE status = 'shipped'");
+    // Test enum comparison in WHERE clause - use SELECT * to see the status column
+    let result =
+        db.execute("SELECT id, status, total FROM orders_with_status WHERE status = 'shipped'");
     assert!(result.is_ok(), "Failed to compare enum: {:?}", result);
     let output = result.unwrap();
     assert!(output.contains("shipped"), "Expected 'shipped' in result: {}", output);
@@ -67,6 +68,9 @@ fn test_enum_comparison(db: &DbConnection) {
     // Test enum comparison with !=
     let result = db.execute("SELECT COUNT(*) FROM orders_with_status WHERE status != 'cancelled'");
     assert!(result.is_ok(), "Failed to compare enum with !=: {:?}", result);
+    let output = result.unwrap();
+    // Should return 3 rows (pending, processing, shipped) since we have 3 non-cancelled orders
+    assert!(output.contains("3"), "Expected count of 3 for != 'cancelled': {}", output);
     eprintln!("[PetStore]   Verified enum not-equal comparison works");
 }
 
@@ -79,8 +83,9 @@ fn test_enum_in_expressions(db: &DbConnection) {
     eprintln!("[PetStore]   Verified enum IS NOT NULL works");
 
     // Test enum with IN clause
-    let result =
-        db.execute("SELECT id FROM orders_with_status WHERE status IN ('pending', 'processing')");
+    let result = db.execute(
+        "SELECT id, status FROM orders_with_status WHERE status IN ('pending', 'processing')",
+    );
     assert!(result.is_ok(), "Failed to check enum IN clause: {:?}", result);
     let output = result.unwrap();
     assert!(

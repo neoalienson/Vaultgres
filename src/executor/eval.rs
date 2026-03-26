@@ -1,7 +1,9 @@
 use super::operators::executor::{ExecutorError, Tuple};
-use crate::catalog::{Catalog, Value, string_functions};
+use crate::catalog::{Catalog, EnumTypeDef, Value, string_functions};
 use crate::parser::ast::{BinaryOperator, Expr, SelectStmt, UnaryOperator};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 pub struct Eval;
 
@@ -83,10 +85,17 @@ impl Eval {
                 if *op == BinaryOperator::In {
                     if let Expr::List(values) = right.as_ref() {
                         let mut found = false;
+                        let enum_types = catalog
+                            .map(|c| c.enum_types.clone())
+                            .unwrap_or_else(|| Arc::new(RwLock::new(HashMap::new())));
                         for val_expr in values {
                             if let Ok(val) = Self::eval_expr_with_catalog(val_expr, tuple, catalog)
                             {
-                                if val == left_val {
+                                if Self::values_equal_with_enum_support(
+                                    &left_val,
+                                    &val,
+                                    &enum_types,
+                                )? {
                                     found = true;
                                     break;
                                 }
@@ -135,7 +144,10 @@ impl Eval {
                 }
 
                 let right_val = Self::eval_expr_with_catalog(right, tuple, catalog)?;
-                Self::eval_binary_op(&left_val, op, &right_val)
+                let enum_types = catalog
+                    .map(|c| c.enum_types.clone())
+                    .unwrap_or_else(|| Arc::new(RwLock::new(HashMap::new())));
+                Self::eval_binary_op(&left_val, op, &right_val, &enum_types)
             }
 
             // Unary operations
@@ -277,6 +289,7 @@ impl Eval {
         left: &Value,
         op: &BinaryOperator,
         right: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<Value, ExecutorError> {
         // Handle NULL propagation
         if matches!(left, Value::Null) || matches!(right, Value::Null) {
@@ -307,8 +320,24 @@ impl Eval {
         }
 
         match op {
-            BinaryOperator::Equals => Ok(Value::Bool(left == right)),
-            BinaryOperator::NotEquals => Ok(Value::Bool(left != right)),
+            BinaryOperator::Equals => {
+                if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+                    return Ok(Value::Bool(result));
+                }
+                if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+                    return Ok(Value::Bool(result));
+                }
+                Ok(Value::Bool(left == right))
+            }
+            BinaryOperator::NotEquals => {
+                if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+                    return Ok(Value::Bool(!result));
+                }
+                if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+                    return Ok(Value::Bool(!result));
+                }
+                Ok(Value::Bool(left != right))
+            }
 
             // Comparison operators
             BinaryOperator::LessThan => {
@@ -449,6 +478,43 @@ impl Eval {
             BinaryOperator::RangeRightOf => Self::eval_range_right_of(left, right),
             BinaryOperator::RangeAdjacent => Self::eval_range_adjacent(left, right),
         }
+    }
+
+    /// Compare enum value to text value, returning Some(true/false) if one is Enum and other is Text
+    fn compare_enum_text(
+        enum_val: &Value,
+        text_val: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<Option<bool>, ExecutorError> {
+        match (enum_val, text_val) {
+            (Value::Enum(e), Value::Text(s)) => {
+                let types = enum_types.read().unwrap();
+                if let Some(def) = types.get(&e.type_name) {
+                    if let Some(label) = def.labels.get(e.index as usize) {
+                        return Ok(Some(label == s));
+                    }
+                }
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn values_equal_with_enum_support(
+        left: &Value,
+        right: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<bool, ExecutorError> {
+        if left == right {
+            return Ok(true);
+        }
+        if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+            return Ok(result);
+        }
+        if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+            return Ok(result);
+        }
+        Ok(false)
     }
 
     /// Evaluate JSON extraction operator (-> or ->>)
@@ -1454,6 +1520,10 @@ mod tests {
         .into()
     }
 
+    fn empty_enum_types() -> Arc<RwLock<HashMap<String, EnumTypeDef>>> {
+        Arc::new(RwLock::new(HashMap::new()))
+    }
+
     #[test]
     fn test_eval_literals() {
         let tuple = create_test_tuple();
@@ -1753,7 +1823,13 @@ mod tests {
     fn test_array_contains_true() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let right = Value::Int(2);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        let result = Eval::eval_binary_op(
+            &left,
+            &BinaryOperator::ArrayContains,
+            &right,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1761,7 +1837,13 @@ mod tests {
     fn test_array_contains_false() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let right = Value::Int(5);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        let result = Eval::eval_binary_op(
+            &left,
+            &BinaryOperator::ArrayContains,
+            &right,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1769,7 +1851,13 @@ mod tests {
     fn test_array_contains_empty_array() {
         let left = Value::Array(vec![]);
         let right = Value::Int(1);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayContains, &right).unwrap();
+        let result = Eval::eval_binary_op(
+            &left,
+            &BinaryOperator::ArrayContains,
+            &right,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1779,8 +1867,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(7)), false, Some(Value::Int(10)), false));
-        let result =
-            Eval::eval_binary_op(&range1, &BinaryOperator::RangeAdjacent, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeAdjacent,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1790,8 +1883,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(5)), false, Some(Value::Int(10)), false));
-        let result =
-            Eval::eval_binary_op(&range1, &BinaryOperator::RangeAdjacent, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeAdjacent,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1799,7 +1897,13 @@ mod tests {
     fn test_array_overlaps_true() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
         let right = Value::Array(vec![Value::Int(2), Value::Int(3)]);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayOverlaps, &right).unwrap();
+        let result = Eval::eval_binary_op(
+            &left,
+            &BinaryOperator::ArrayOverlaps,
+            &right,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1807,7 +1911,13 @@ mod tests {
     fn test_array_overlaps_false() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
         let right = Value::Array(vec![Value::Int(3), Value::Int(4)]);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayOverlaps, &right).unwrap();
+        let result = Eval::eval_binary_op(
+            &left,
+            &BinaryOperator::ArrayOverlaps,
+            &right,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1815,7 +1925,9 @@ mod tests {
     fn test_array_concat_two_arrays() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
         let right = Value::Array(vec![Value::Int(3), Value::Int(4)]);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right, &empty_enum_types())
+                .unwrap();
         assert_eq!(
             result,
             Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)])
@@ -1826,7 +1938,9 @@ mod tests {
     fn test_array_concat_array_and_element() {
         let left = Value::Array(vec![Value::Int(1), Value::Int(2)]);
         let right = Value::Int(3);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
     }
 
@@ -1834,7 +1948,9 @@ mod tests {
     fn test_array_concat_element_and_array() {
         let left = Value::Int(1);
         let right = Value::Array(vec![Value::Int(2), Value::Int(3)]);
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
     }
 
@@ -1842,7 +1958,9 @@ mod tests {
     fn test_array_concat_with_strings() {
         let left = Value::Array(vec![Value::Text("a".to_string()), Value::Text("b".to_string())]);
         let right = Value::Text("c".to_string());
-        let result = Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right).unwrap();
+        let result =
+            Eval::eval_binary_op(&left, &BinaryOperator::ArrayConcat, &right, &empty_enum_types())
+                .unwrap();
         assert_eq!(
             result,
             Value::Array(vec![
@@ -1857,7 +1975,9 @@ mod tests {
     fn test_array_element_access_valid_index() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(2);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Int(20));
     }
 
@@ -1865,7 +1985,9 @@ mod tests {
     fn test_array_element_access_first_index() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(1);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Int(10));
     }
 
@@ -1873,7 +1995,9 @@ mod tests {
     fn test_array_element_access_last_index() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(3);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Int(30));
     }
 
@@ -1881,7 +2005,9 @@ mod tests {
     fn test_array_element_access_out_of_bounds() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(5);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Null);
     }
 
@@ -1889,7 +2015,8 @@ mod tests {
     fn test_array_element_access_zero_index() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(0);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx);
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types());
         assert!(result.is_err());
     }
 
@@ -1897,7 +2024,8 @@ mod tests {
     fn test_array_element_access_negative_index() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         let idx = Value::Int(-1);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx);
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types());
         assert!(result.is_err());
     }
 
@@ -1905,7 +2033,9 @@ mod tests {
     fn test_array_element_access_empty_array() {
         let arr = Value::Array(vec![]);
         let idx = Value::Int(1);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Null);
     }
 
@@ -1917,7 +2047,9 @@ mod tests {
             Value::Text("cherry".to_string()),
         ]);
         let idx = Value::Int(2);
-        let result = Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx).unwrap();
+        let result =
+            Eval::eval_binary_op(&arr, &BinaryOperator::ArrayAccess, &idx, &empty_enum_types())
+                .unwrap();
         assert_eq!(result, Value::Text("banana".to_string()));
     }
 
@@ -1926,7 +2058,13 @@ mod tests {
         let range =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
         let elem = Value::Int(5);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1935,7 +2073,13 @@ mod tests {
         let range =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
         let elem = Value::Int(1);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1944,7 +2088,13 @@ mod tests {
         let range =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
         let elem = Value::Int(10);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1953,7 +2103,13 @@ mod tests {
         let range =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
         let elem = Value::Int(15);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1962,8 +2118,13 @@ mod tests {
         let elem = Value::Int(5);
         let range =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(10)), false));
-        let result =
-            Eval::eval_binary_op(&elem, &BinaryOperator::RangeContainedBy, &range).unwrap();
+        let result = Eval::eval_binary_op(
+            &elem,
+            &BinaryOperator::RangeContainedBy,
+            &range,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1973,8 +2134,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(3)), true, Some(Value::Int(10)), false));
-        let result =
-            Eval::eval_binary_op(&range1, &BinaryOperator::RangeOverlaps, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeOverlaps,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -1984,8 +2150,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
-        let result =
-            Eval::eval_binary_op(&range1, &BinaryOperator::RangeOverlaps, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeOverlaps,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -1995,7 +2166,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
-        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeLeftOf, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeLeftOf,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -2005,7 +2182,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(5)), false, Some(Value::Int(10)), false));
-        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeLeftOf, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeLeftOf,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -2015,7 +2198,13 @@ mod tests {
             Value::Range(Range::new(Some(Value::Int(10)), true, Some(Value::Int(15)), false));
         let range2 =
             Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(5)), false));
-        let result = Eval::eval_binary_op(&range1, &BinaryOperator::RangeRightOf, &range2).unwrap();
+        let result = Eval::eval_binary_op(
+            &range1,
+            &BinaryOperator::RangeRightOf,
+            &range2,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -2023,7 +2212,13 @@ mod tests {
     fn test_range_contains_empty() {
         let range = Value::Range(Range::new(Some(Value::Int(1)), true, Some(Value::Int(1)), true));
         let elem = Value::Int(1);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -2031,7 +2226,13 @@ mod tests {
     fn test_unbounded_range_contains() {
         let range = Value::Range(Range::new(Some(Value::Int(1)), true, None, false));
         let elem = Value::Int(100);
-        let result = Eval::eval_binary_op(&range, &BinaryOperator::RangeContains, &elem).unwrap();
+        let result = Eval::eval_binary_op(
+            &range,
+            &BinaryOperator::RangeContains,
+            &elem,
+            &empty_enum_types(),
+        )
+        .unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 }

@@ -95,9 +95,21 @@ impl InsertValidator {
                 }
             }
             (DataType::Composite(type_name), Value::Text(_)) => {
-                let composite_types = composite_types.read().unwrap();
-                if let Some(def) = composite_types.get(type_name) {
+                if let Some(def) = composite_types.read().unwrap().get(type_name) {
                     Self::validate_composite_value(&val, def)
+                } else if let Some(def) = enum_types.read().unwrap().get(type_name) {
+                    if let Value::Text(label) = &val {
+                        if let Some(index) = def.labels.iter().position(|l| l == label) {
+                            Ok(Value::Enum(super::EnumValue {
+                                type_name: type_name.clone(),
+                                index: index as i32,
+                            }))
+                        } else {
+                            Err(format!("invalid enum label '{}' for type '{}'", label, type_name))
+                        }
+                    } else {
+                        Err(format!("Type mismatch for column '{}'", col.name))
+                    }
                 } else {
                     Err(format!("type '{}' does not exist", type_name))
                 }

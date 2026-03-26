@@ -87,6 +87,8 @@ impl Catalog {
         let indexes = Arc::clone(&catalog.indexes);
         let functions = Arc::clone(&catalog.functions);
         let aggregates = Arc::clone(&catalog.aggregates);
+        let enum_types = Arc::clone(&catalog.enum_types);
+        let composite_types = Arc::clone(&catalog.composite_types);
         let data = Arc::clone(&catalog.data);
         let dir = data_dir.to_string();
 
@@ -146,6 +148,16 @@ impl Catalog {
                 let tables_for_partitions = tables.read().unwrap().clone();
                 if let Err(e) = Persistence::save_partitions(&dir, &tables_for_partitions) {
                     log::error!("Async partitions save failed: {}", e);
+                }
+
+                let enum_types_clone = enum_types.read().unwrap().clone();
+                if let Err(e) = Persistence::save_enum_types(&dir, &enum_types_clone) {
+                    log::error!("Async enum types save failed: {}", e);
+                }
+
+                let composite_types_clone = composite_types.read().unwrap().clone();
+                if let Err(e) = Persistence::save_composite_types(&dir, &composite_types_clone) {
+                    log::error!("Async composite types save failed: {}", e);
                 }
 
                 last_save = std::time::Instant::now();
@@ -223,6 +235,24 @@ impl Catalog {
             }
         }
 
+        if let Ok(enum_types) = Persistence::load_enum_types(data_dir) {
+            *catalog.enum_types.write().unwrap() = enum_types;
+            log::info!(
+                "📂 Loaded {} enum types from {}",
+                catalog.enum_types.read().unwrap().len(),
+                data_dir
+            );
+        }
+
+        if let Ok(composite_types) = Persistence::load_composite_types(data_dir) {
+            *catalog.composite_types.write().unwrap() = composite_types;
+            log::info!(
+                "📂 Loaded {} composite types from {}",
+                catalog.composite_types.read().unwrap().len(),
+                data_dir
+            );
+        }
+
         catalog
     }
 
@@ -298,14 +328,21 @@ impl Catalog {
         }
 
         let composite_types = self.composite_types.read().unwrap();
+        let enum_types = self.enum_types.read().unwrap();
         for col in &columns {
             if let DataType::Composite(ref type_name) = col.data_type {
-                if !composite_types.contains_key(type_name) {
+                if !composite_types.contains_key(type_name) && !enum_types.contains_key(type_name) {
+                    return Err(format!("type '{}' does not exist", type_name));
+                }
+            }
+            if let DataType::Enum(ref type_name) = col.data_type {
+                if !enum_types.contains_key(type_name) {
                     return Err(format!("type '{}' does not exist", type_name));
                 }
             }
         }
         drop(composite_types);
+        drop(enum_types);
 
         tables.insert(name.clone(), TableSchema::with_constraints(name.clone(), columns, pk, fks));
         drop(tables);
@@ -321,6 +358,24 @@ impl Catalog {
 
     pub fn create_partitioned_table(&self, schema: TableSchema) -> Result<(), String> {
         let name = schema.name.clone();
+
+        {
+            let enum_types = self.enum_types.read().unwrap();
+            let composite_types = self.composite_types.read().unwrap();
+            for col in &schema.columns {
+                if let DataType::Enum(ref type_name) = col.data_type {
+                    if !enum_types.contains_key(type_name) {
+                        return Err(format!("type '{}' does not exist", type_name));
+                    }
+                }
+                if let DataType::Composite(ref type_name) = col.data_type {
+                    if !composite_types.contains_key(type_name) {
+                        return Err(format!("type '{}' does not exist", type_name));
+                    }
+                }
+            }
+        }
+
         let mut tables = self.tables.write().unwrap();
 
         if tables.contains_key(&name) {
@@ -1369,6 +1424,7 @@ impl Catalog {
             &snapshot,
             &self.txn_mgr,
             txn.xid,
+            self,
         )?;
 
         self.auto_save();

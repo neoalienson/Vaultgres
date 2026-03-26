@@ -1,10 +1,12 @@
-use super::{Catalog, TableSchema, Tuple, Value};
+use super::{Catalog, EnumTypeDef, TableSchema, Tuple, Value};
 use crate::catalog::predicate::PredicateEvaluator;
 use crate::catalog::select_executor::SelectExecutor;
 use crate::executor::expr_evaluator::{eval_binary_op, eval_unary_op};
 use crate::parser::ast::{DataType, Expr};
 use crate::transaction::{Snapshot, TransactionManager};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 pub struct UpdateDeleteExecutor;
 
@@ -25,7 +27,12 @@ impl UpdateDeleteExecutor {
             }
 
             if let Some(predicate) = where_clause {
-                if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
+                if !PredicateEvaluator::evaluate(
+                    predicate,
+                    &tuple.data,
+                    schema,
+                    &catalog.enum_types,
+                )? {
                     continue;
                 }
             }
@@ -53,7 +60,12 @@ impl UpdateDeleteExecutor {
             }
 
             if let Some(predicate) = where_clause {
-                if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
+                if !PredicateEvaluator::evaluate(
+                    predicate,
+                    &tuple.data,
+                    schema,
+                    &catalog.enum_types,
+                )? {
                     continue;
                 }
             }
@@ -434,6 +446,7 @@ impl UpdateDeleteExecutor {
         snapshot: &Snapshot,
         txn_mgr: &Arc<TransactionManager>,
         xid: u64,
+        catalog: &Catalog,
     ) -> Result<usize, String> {
         let mut deleted = 0;
         for tuple in tuples.iter_mut() {
@@ -442,7 +455,12 @@ impl UpdateDeleteExecutor {
             }
 
             if let Some(predicate) = where_clause {
-                if !PredicateEvaluator::evaluate(predicate, &tuple.data, schema)? {
+                if !PredicateEvaluator::evaluate(
+                    predicate,
+                    &tuple.data,
+                    schema,
+                    &catalog.enum_types,
+                )? {
                     continue;
                 }
             }

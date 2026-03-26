@@ -1,10 +1,12 @@
-use super::{Catalog, TableSchema, Tuple, Value};
+use super::{Catalog, EnumTypeDef, TableSchema, Tuple, Value};
 use crate::catalog::aggregation::Aggregator;
 use crate::catalog::predicate::PredicateEvaluator;
 use crate::parser::ast::{Expr, OrderByExpr, SelectStmt};
 use crate::transaction::{Snapshot, TransactionManager};
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 pub struct SelectExecutor;
 
@@ -93,6 +95,7 @@ impl SelectExecutor {
                     schema,
                     &subquery_eval,
                     &in_subquery_eval,
+                    &catalog.enum_types,
                 )? {
                     continue;
                 }
@@ -284,10 +287,17 @@ impl SelectExecutor {
         Ok(false)
     }
 
-    fn matches_predicate(tuple: &Tuple, where_clause: &Option<Expr>, schema: &TableSchema) -> bool {
+    fn matches_predicate(
+        tuple: &Tuple,
+        where_clause: &Option<Expr>,
+        schema: &TableSchema,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> bool {
         where_clause
             .as_ref()
-            .map(|pred| PredicateEvaluator::evaluate(pred, &tuple.data, schema).unwrap_or(false))
+            .map(|pred| {
+                PredicateEvaluator::evaluate(pred, &tuple.data, schema, enum_types).unwrap_or(false)
+            })
             .unwrap_or(true)
     }
 

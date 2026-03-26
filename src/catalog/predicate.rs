@@ -1,14 +1,25 @@
-use super::{TableSchema, Value};
+use super::{EnumTypeDef, TableSchema, Value};
 use crate::parser::ast::{BinaryOperator, Expr, UnaryOperator};
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 pub struct PredicateEvaluator;
 
 impl PredicateEvaluator {
-    pub fn evaluate(expr: &Expr, tuple: &[Value], schema: &TableSchema) -> Result<bool, String> {
-        Self::evaluate_with_subquery(expr, tuple, schema, &|_| {
-            Err("Subquery evaluation not supported in this context".to_string())
-        })
+    pub fn evaluate(
+        expr: &Expr,
+        tuple: &[Value],
+        schema: &TableSchema,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<bool, String> {
+        Self::evaluate_with_subquery(
+            expr,
+            tuple,
+            schema,
+            &|_| Err("Subquery evaluation not supported in this context".to_string()),
+            enum_types,
+        )
     }
 
     pub fn evaluate_with_subquery<F>(
@@ -16,13 +27,19 @@ impl PredicateEvaluator {
         tuple: &[Value],
         schema: &TableSchema,
         subquery_eval: &F,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<bool, String>
     where
         F: Fn(&crate::parser::ast::SelectStmt) -> Result<Value, String>,
     {
-        Self::evaluate_with_in_subquery(expr, tuple, schema, subquery_eval, &|_, _| {
-            Err("IN subquery not supported in this context".to_string())
-        })
+        Self::evaluate_with_in_subquery(
+            expr,
+            tuple,
+            schema,
+            subquery_eval,
+            &|_, _| Err("IN subquery not supported in this context".to_string()),
+            enum_types,
+        )
     }
 
     pub fn evaluate_with_in_subquery<F, G>(
@@ -31,6 +48,7 @@ impl PredicateEvaluator {
         schema: &TableSchema,
         subquery_eval: &F,
         in_subquery_eval: &G,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<bool, String>
     where
         F: Fn(&crate::parser::ast::SelectStmt) -> Result<Value, String>,
@@ -45,6 +63,7 @@ impl PredicateEvaluator {
                 schema,
                 subquery_eval,
                 in_subquery_eval,
+                enum_types,
             ),
             Expr::UnaryOp { op, expr } => Self::evaluate_unary_op_with_in_subquery(
                 op,
@@ -53,6 +72,7 @@ impl PredicateEvaluator {
                 schema,
                 subquery_eval,
                 in_subquery_eval,
+                enum_types,
             ),
             Expr::IsNull(expr) => {
                 let val = Self::evaluate_expr_with_subquery(expr, tuple, schema, subquery_eval)?;
@@ -74,6 +94,7 @@ impl PredicateEvaluator {
         schema: &TableSchema,
         subquery_eval: &F,
         in_subquery_eval: &G,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<bool, String>
     where
         F: Fn(&crate::parser::ast::SelectStmt) -> Result<Value, String>,
@@ -93,7 +114,7 @@ impl PredicateEvaluator {
                                 schema,
                                 subquery_eval,
                             )?;
-                            if left_val == val {
+                            if Self::values_equal_with_enum_support(&left_val, &val, enum_types)? {
                                 return Ok(true);
                             }
                         }
@@ -135,6 +156,7 @@ impl PredicateEvaluator {
                     schema,
                     subquery_eval,
                     in_subquery_eval,
+                    enum_types,
                 )?;
                 let right_result = Self::evaluate_with_in_subquery(
                     right,
@@ -142,6 +164,7 @@ impl PredicateEvaluator {
                     schema,
                     subquery_eval,
                     in_subquery_eval,
+                    enum_types,
                 )?;
                 Ok(left_result && right_result)
             }
@@ -152,6 +175,7 @@ impl PredicateEvaluator {
                     schema,
                     subquery_eval,
                     in_subquery_eval,
+                    enum_types,
                 )?;
                 let right_result = Self::evaluate_with_in_subquery(
                     right,
@@ -159,6 +183,7 @@ impl PredicateEvaluator {
                     schema,
                     subquery_eval,
                     in_subquery_eval,
+                    enum_types,
                 )?;
                 Ok(left_result || right_result)
             }
@@ -177,7 +202,7 @@ impl PredicateEvaluator {
                     Self::evaluate_expr_with_subquery(left, tuple, schema, subquery_eval)?;
                 let right_val =
                     Self::evaluate_expr_with_subquery(right, tuple, schema, subquery_eval)?;
-                Self::compare_values(&left_val, op, &right_val)
+                Self::compare_values(&left_val, op, &right_val, enum_types)
             }
         }
     }
@@ -189,6 +214,7 @@ impl PredicateEvaluator {
         schema: &TableSchema,
         subquery_eval: &F,
         in_subquery_eval: &G,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<bool, String>
     where
         F: Fn(&crate::parser::ast::SelectStmt) -> Result<Value, String>,
@@ -202,6 +228,7 @@ impl PredicateEvaluator {
                     schema,
                     subquery_eval,
                     in_subquery_eval,
+                    enum_types,
                 )?;
                 Ok(!result)
             }
@@ -209,10 +236,35 @@ impl PredicateEvaluator {
         }
     }
 
-    fn compare_values(left: &Value, op: &BinaryOperator, right: &Value) -> Result<bool, String> {
+    fn compare_values(
+        left: &Value,
+        op: &BinaryOperator,
+        right: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<bool, String> {
         match op {
-            BinaryOperator::Equals => Ok(left == right),
-            BinaryOperator::NotEquals => Ok(left != right),
+            BinaryOperator::Equals => {
+                if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+                    return Ok(result);
+                }
+                if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+                    return Ok(result);
+                }
+                Ok(left == right)
+            }
+            BinaryOperator::NotEquals => {
+                log::debug!("compare_values: NotEquals left={}, right={}", left, right);
+                if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+                    log::debug!("compare_values: NotEquals enum compare gave {}", result);
+                    return Ok(!result);
+                }
+                if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+                    log::debug!("compare_values: NotEquals enum compare (rev) gave {}", result);
+                    return Ok(!result);
+                }
+                log::debug!("compare_values: NotEquals falling back to direct comparison");
+                Ok(left != right)
+            }
             BinaryOperator::LessThan => match (left, right) {
                 (Value::Int(l), Value::Int(r)) => Ok(l < r),
                 (Value::Text(l), Value::Text(r)) => Ok(l < r),
@@ -239,6 +291,62 @@ impl PredicateEvaluator {
             },
             _ => Err("Unsupported comparison operator".to_string()),
         }
+    }
+
+    fn compare_enum_text(
+        enum_val: &Value,
+        text_val: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<Option<bool>, String> {
+        match (enum_val, text_val) {
+            (Value::Enum(e), Value::Text(s)) => {
+                let types = enum_types.read().unwrap();
+                log::debug!(
+                    "compare_enum_text: enum_val={}, text_val={}, type_name={}",
+                    enum_val,
+                    s,
+                    e.type_name
+                );
+                if let Some(def) = types.get(&e.type_name) {
+                    log::debug!("compare_enum_text: found def with {} labels", def.labels.len());
+                    if let Some(label) = def.labels.get(e.index as usize) {
+                        log::debug!(
+                            "compare_enum_text: label at index {} = '{}', comparing to '{}'",
+                            e.index,
+                            label,
+                            s
+                        );
+                        return Ok(Some(label == s));
+                    } else {
+                        log::debug!("compare_enum_text: no label at index {}", e.index);
+                    }
+                } else {
+                    log::debug!(
+                        "compare_enum_text: type '{}' not found in enum_types",
+                        e.type_name
+                    );
+                }
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn values_equal_with_enum_support(
+        left: &Value,
+        right: &Value,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+    ) -> Result<bool, String> {
+        if left == right {
+            return Ok(true);
+        }
+        if let Some(result) = Self::compare_enum_text(left, right, enum_types)? {
+            return Ok(result);
+        }
+        if let Some(result) = Self::compare_enum_text(right, left, enum_types)? {
+            return Ok(result);
+        }
+        Ok(false)
     }
 
     fn eval_array_op(left: &Value, op: &BinaryOperator, right: &Value) -> Result<bool, String> {
@@ -366,6 +474,7 @@ impl PredicateEvaluator {
         expr: &Expr,
         tuple_map: &HashMap<String, Value>,
         schema: &TableSchema,
+        enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
     ) -> Result<bool, String> {
         // This is a simplified implementation.
         // It's similar to evaluate_with_subquery but uses a HashMap for tuple access.
@@ -374,11 +483,11 @@ impl PredicateEvaluator {
             Expr::BinaryOp { left, op, right } => {
                 let left_val = Self::evaluate_expr_tuple_map(left, tuple_map, schema)?;
                 let right_val = Self::evaluate_expr_tuple_map(right, tuple_map, schema)?;
-                Self::compare_values(&left_val, op, &right_val)
+                Self::compare_values(&left_val, op, &right_val, enum_types)
             }
             Expr::UnaryOp { op, expr } => match op {
                 UnaryOperator::Not => {
-                    let result = Self::evaluate_tuple_map(expr, tuple_map, schema)?;
+                    let result = Self::evaluate_tuple_map(expr, tuple_map, schema, enum_types)?;
                     Ok(!result)
                 }
                 _ => Err("Unsupported unary operator".to_string()),
@@ -447,6 +556,7 @@ impl PredicateEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::EnumValue;
     use crate::parser::ast::ColumnDef;
     use crate::parser::ast::DataType;
 
@@ -461,6 +571,10 @@ mod tests {
         )
     }
 
+    fn empty_enum_types() -> Arc<RwLock<HashMap<String, EnumTypeDef>>> {
+        Arc::new(RwLock::new(HashMap::new()))
+    }
+
     #[test]
     fn test_evaluate_equals() {
         let schema = create_test_schema();
@@ -472,7 +586,7 @@ mod tests {
             right: Box::new(Expr::Number(1)),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -489,7 +603,7 @@ mod tests {
             }),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -498,7 +612,7 @@ mod tests {
         let tuple = vec![Value::Null, Value::Text("Alice".to_string()), Value::Int(25)];
 
         let expr = Expr::IsNull(Box::new(Expr::Column("id".to_string())));
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -507,7 +621,7 @@ mod tests {
         let tuple = vec![Value::Int(1), Value::Text("Alice".to_string()), Value::Int(25)];
 
         let expr = Expr::IsNotNull(Box::new(Expr::Column("id".to_string())));
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -521,7 +635,7 @@ mod tests {
             right: Box::new(Expr::List(vec![Expr::Number(1), Expr::Number(2), Expr::Number(3)])),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -535,7 +649,7 @@ mod tests {
             right: Box::new(Expr::List(vec![Expr::Number(20), Expr::Number(30)])),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -549,7 +663,7 @@ mod tests {
             right: Box::new(Expr::String("%lic%".to_string())),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -571,7 +685,7 @@ mod tests {
             }),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap());
     }
 
     #[test]
@@ -584,9 +698,9 @@ mod tests {
             right: Box::new(Expr::Number(1)), // Not a list
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).is_err());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).is_err());
         assert_eq!(
-            PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap_err(),
+            PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap_err(),
             "IN requires list or subquery"
         );
     }
@@ -601,9 +715,9 @@ mod tests {
             right: Box::new(Expr::List(vec![Expr::Number(20)])), // Only one value
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).is_err());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).is_err());
         assert_eq!(
-            PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap_err(),
+            PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap_err(),
             "BETWEEN requires two values"
         );
     }
@@ -617,9 +731,9 @@ mod tests {
             expr: Box::new(Expr::Column("id".to_string())),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).is_err());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).is_err());
         assert_eq!(
-            PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap_err(),
+            PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap_err(),
             "Unsupported unary operator"
         );
     }
@@ -634,9 +748,9 @@ mod tests {
             right: Box::new(Expr::String("1".to_string())),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).is_err());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).is_err());
         assert_eq!(
-            PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap_err(),
+            PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap_err(),
             "LIKE requires text values"
         );
     }
@@ -646,7 +760,9 @@ mod tests {
         let schema = create_test_schema();
         let tuple = vec![Value::Int(1)];
         let expr = Expr::IsNull(Box::new(Expr::Column("id".to_string())));
-        assert!(!PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(
+            !PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap()
+        );
     }
 
     #[test]
@@ -654,7 +770,9 @@ mod tests {
         let schema = create_test_schema();
         let tuple = vec![Value::Null];
         let expr = Expr::IsNotNull(Box::new(Expr::Column("id".to_string())));
-        assert!(!PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap());
+        assert!(
+            !PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap()
+        );
     }
 
     #[test]
@@ -679,10 +797,100 @@ mod tests {
             }))),
         };
 
-        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema).is_err());
+        assert!(PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).is_err());
         assert_eq!(
-            PredicateEvaluator::evaluate(&expr, &tuple, &schema).unwrap_err(),
+            PredicateEvaluator::evaluate(&expr, &tuple, &schema, &empty_enum_types()).unwrap_err(),
             "IN subquery not supported in this context"
         );
+    }
+
+    #[test]
+    fn test_evaluate_enum_not_equals() {
+        let enum_types = Arc::new(RwLock::new({
+            let mut m = HashMap::new();
+            m.insert(
+                "order_status".to_string(),
+                EnumTypeDef {
+                    type_name: "order_status".to_string(),
+                    labels: vec![
+                        "pending".to_string(),
+                        "processing".to_string(),
+                        "shipped".to_string(),
+                        "delivered".to_string(),
+                        "cancelled".to_string(),
+                    ],
+                },
+            );
+            m
+        }));
+
+        let schema = TableSchema::new(
+            "orders".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("status".to_string(), DataType::Enum("order_status".to_string())),
+            ],
+        );
+
+        // Test with 'shipped' (index 2), comparing to 'cancelled' (index 4)
+        let tuple = vec![
+            Value::Int(1),
+            Value::Enum(EnumValue { type_name: "order_status".to_string(), index: 2 }),
+        ];
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Column("status".to_string())),
+            op: BinaryOperator::NotEquals,
+            right: Box::new(Expr::String("cancelled".to_string())),
+        };
+
+        let result = PredicateEvaluator::evaluate(&expr, &tuple, &schema, &enum_types);
+        println!("Enum NotEquals result: {:?}", result);
+        assert!(result.is_ok());
+        assert!(result.unwrap(), "Expected status != 'cancelled' to be true for 'shipped'");
+    }
+
+    #[test]
+    fn test_evaluate_enum_equals() {
+        let enum_types = Arc::new(RwLock::new({
+            let mut m = HashMap::new();
+            m.insert(
+                "order_status".to_string(),
+                EnumTypeDef {
+                    type_name: "order_status".to_string(),
+                    labels: vec![
+                        "pending".to_string(),
+                        "processing".to_string(),
+                        "shipped".to_string(),
+                        "delivered".to_string(),
+                        "cancelled".to_string(),
+                    ],
+                },
+            );
+            m
+        }));
+
+        let schema = TableSchema::new(
+            "orders".to_string(),
+            vec![
+                ColumnDef::new("id".to_string(), DataType::Int),
+                ColumnDef::new("status".to_string(), DataType::Enum("order_status".to_string())),
+            ],
+        );
+
+        // Test with 'shipped' (index 2), comparing to 'shipped' (index 2)
+        let tuple = vec![
+            Value::Int(1),
+            Value::Enum(EnumValue { type_name: "order_status".to_string(), index: 2 }),
+        ];
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Column("status".to_string())),
+            op: BinaryOperator::Equals,
+            right: Box::new(Expr::String("shipped".to_string())),
+        };
+
+        let result = PredicateEvaluator::evaluate(&expr, &tuple, &schema, &enum_types);
+        println!("Enum Equals result: {:?}", result);
+        assert!(result.is_ok());
+        assert!(result.unwrap(), "Expected status = 'shipped' to be true for 'shipped'");
     }
 }

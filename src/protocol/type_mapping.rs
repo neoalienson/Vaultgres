@@ -1,5 +1,8 @@
-use crate::catalog::Value;
+use crate::catalog::{EnumTypeDef, Value};
 use chrono::{Duration, NaiveDate, NaiveDateTime, NaiveTime};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 /// PostgreSQL type OIDs
 pub mod pg_types {
@@ -91,6 +94,26 @@ pub fn serialize_value(value: &Value) -> Option<Vec<u8>> {
         }
         Value::Range(r) => Some(format!("{}", r).into_bytes()),
         Value::Null => None,
+    }
+}
+
+/// Serialize value to wire format with enum labels resolved
+pub fn serialize_value_with_enum_types(
+    value: &Value,
+    enum_types: &Arc<RwLock<HashMap<String, EnumTypeDef>>>,
+) -> Option<Vec<u8>> {
+    match value {
+        Value::Enum(e) => {
+            if let Ok(types) = enum_types.read() {
+                if let Some(def) = types.get(&e.type_name) {
+                    if let Some(label) = def.labels.get(e.index as usize) {
+                        return Some(label.as_bytes().to_vec());
+                    }
+                }
+            }
+            Some(format!("{}[{}]", e.type_name, e.index).into_bytes())
+        }
+        _ => serialize_value(value),
     }
 }
 

@@ -1,4 +1,7 @@
-use super::{Aggregate, CompositeValue, EnumValue, Function, TableSchema, Tuple, Value};
+use super::{
+    Aggregate, CompositeTypeDef, CompositeValue, EnumTypeDef, EnumValue, Function, TableSchema,
+    Tuple, Value,
+};
 use crate::parser::ast::{
     ColumnDef, CreateIndexStmt, CreateTriggerStmt, DataType, PartitionBoundSpec, PartitionKey,
     PartitionMethod, SelectStmt,
@@ -192,6 +195,54 @@ impl Persistence {
         let json = std::fs::read_to_string(&path)
             .map_err(|e| format!("Failed to read aggregates: {}", e))?;
         serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize aggregates: {}", e))
+    }
+
+    pub fn save_enum_types(
+        data_dir: &str,
+        enum_types: &HashMap<String, EnumTypeDef>,
+    ) -> Result<(), String> {
+        let path = format!("{}/enum_types.json", data_dir);
+        let json = serde_json::to_string(enum_types)
+            .map_err(|e| format!("Failed to serialize enum types: {}", e))?;
+        std::fs::write(&path, json).map_err(|e| format!("Failed to write enum types: {}", e))?;
+        log::info!("💾 Saved {} enum types", enum_types.len());
+        Ok(())
+    }
+
+    pub fn load_enum_types(data_dir: &str) -> Result<HashMap<String, EnumTypeDef>, String> {
+        let path = format!("{}/enum_types.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read enum types: {}", e))?;
+        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize enum types: {}", e))
+    }
+
+    pub fn save_composite_types(
+        data_dir: &str,
+        composite_types: &HashMap<String, CompositeTypeDef>,
+    ) -> Result<(), String> {
+        let path = format!("{}/composite_types.json", data_dir);
+        let json = serde_json::to_string(composite_types)
+            .map_err(|e| format!("Failed to serialize composite types: {}", e))?;
+        std::fs::write(&path, json)
+            .map_err(|e| format!("Failed to write composite types: {}", e))?;
+        log::info!("💾 Saved {} composite types", composite_types.len());
+        Ok(())
+    }
+
+    pub fn load_composite_types(
+        data_dir: &str,
+    ) -> Result<HashMap<String, CompositeTypeDef>, String> {
+        let path = format!("{}/composite_types.json", data_dir);
+        if !Path::new(&path).exists() {
+            return Ok(HashMap::new());
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read composite types: {}", e))?;
+        serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to deserialize composite types: {}", e))
     }
 
     pub fn save_partitions(

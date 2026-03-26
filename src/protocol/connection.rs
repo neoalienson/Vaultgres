@@ -1,6 +1,6 @@
 use super::message::{Message, ProtocolError, Response};
 use super::result_set::{ColumnMetadata, ResultSet, Row};
-use super::type_mapping::{serialize_value, value_to_pg_type};
+use super::type_mapping::{serialize_value_with_enum_types, value_to_pg_type};
 use crate::catalog::{Aggregate, Catalog, Function, FunctionLanguage, Parameter, Value};
 use crate::parser::ast::{
     FunctionParameter as AstFunctionParameter, FunctionReturnType, FunctionVolatility,
@@ -159,7 +159,10 @@ impl<S: Read + Write> Connection<S> {
 
         // Convert rows
         for row in rows {
-            let fields: Vec<Option<Vec<u8>>> = row.iter().map(serialize_value).collect();
+            let fields: Vec<Option<Vec<u8>>> = row
+                .iter()
+                .map(|v| serialize_value_with_enum_types(v, &self.catalog.enum_types))
+                .collect();
             result_set.add_row(Row::new(fields));
         }
 
@@ -504,6 +507,24 @@ impl<S: Read + Write> Connection<S> {
                 let count = self.catalog.delete(&delete.table, delete.where_clause)?;
                 Ok(ExecutionResult::CommandComplete(format!("DELETE {}", count)))
             }
+            Statement::CreateType(create) => match &create.kind {
+                crate::parser::ast::TypeKind::Enum(labels) => {
+                    self.catalog.create_type(create.type_name.clone(), labels.clone())?;
+                    Ok(ExecutionResult::CommandComplete("CREATE TYPE".to_string()))
+                }
+                crate::parser::ast::TypeKind::Composite(fields) => {
+                    let fields_vec: Vec<(String, crate::parser::ast::DataType)> = fields
+                        .iter()
+                        .map(|col| (col.name.clone(), col.data_type.clone()))
+                        .collect();
+                    self.catalog.create_composite_type(create.type_name.clone(), fields_vec)?;
+                    Ok(ExecutionResult::CommandComplete("CREATE TYPE".to_string()))
+                }
+            },
+            Statement::DropType(drop) => {
+                self.catalog.drop_type(&drop.type_name, drop.if_exists, drop.cascade)?;
+                Ok(ExecutionResult::CommandComplete("DROP TYPE".to_string()))
+            }
             _ => Ok(ExecutionResult::CommandComplete("SELECT 0".to_string())),
         }
     }
@@ -574,7 +595,12 @@ impl<S: Read + Write> Connection<S> {
                     let combined = [current_row.clone(), right_tuple.data.clone()].concat();
                     let combined_schema =
                         self.build_combined_schema(&all_schemas[..=join_idx + 1])?;
-                    if PredicateEvaluator::evaluate(&join.on, &combined, &combined_schema)? {
+                    if PredicateEvaluator::evaluate(
+                        &join.on,
+                        &combined,
+                        &combined_schema,
+                        &self.catalog.enum_types,
+                    )? {
                         current_row.extend_from_slice(&right_tuple.data);
                         join_matched = true;
                         break;
@@ -590,8 +616,12 @@ impl<S: Read + Write> Connection<S> {
             if matched {
                 if let Some(ref where_clause) = select.where_clause {
                     let combined_schema = self.build_combined_schema(&all_schemas)?;
-                    if !PredicateEvaluator::evaluate(where_clause, &current_row, &combined_schema)?
-                    {
+                    if !PredicateEvaluator::evaluate(
+                        where_clause,
+                        &current_row,
+                        &combined_schema,
+                        &self.catalog.enum_types,
+                    )? {
                         continue;
                     }
                 }

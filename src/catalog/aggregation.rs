@@ -46,6 +46,7 @@ impl Aggregator {
                         schema,
                         &subquery_eval,
                         &in_subquery_eval,
+                        &catalog.enum_types,
                     )? {
                         continue;
                     }
