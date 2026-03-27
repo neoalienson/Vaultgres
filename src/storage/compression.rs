@@ -29,7 +29,7 @@ use thiserror::Error;
 
 pub const COMPRESSION_THRESHOLD: usize = 2048;
 pub const TOAST_TUPLE_TARGET: usize = 2048;
-pub const COMPRESSED_HEADER_SIZE: usize = 4;
+pub const COMPRESSED_HEADER_SIZE: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CompressionAlgorithm {

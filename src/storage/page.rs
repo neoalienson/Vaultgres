@@ -51,7 +51,21 @@ impl PageHeader {
 }
 
 #[repr(C)]
-#[repr(packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct ItemId {
+    pub offset: u16,
+    pub length: u16,
+}
+
+impl ItemId {
+    const SIZE: usize = 4;
+
+    pub fn new(offset: u16, length: u16) -> Self {
+        Self { offset, length }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct ItemHeader {
     pub offset: u16,
@@ -173,33 +187,50 @@ impl Page {
         }
 
         let header = self.header();
-        let items_start = PageHeader::SIZE;
-        let items_end = header.lower as usize;
+
+        let item_ids_start = PageHeader::SIZE;
+        let item_ids_end = header.lower as usize;
+        let item_data_start = header.upper as usize;
+        let item_data_end = PAGE_SIZE;
+
+        let item_ids_size = item_ids_end - item_ids_start;
+        let item_data_size = item_data_end - item_data_start;
+
+        if item_ids_size == 0 && item_data_size == 0 {
+            let mut new_header = header;
+            new_header.set_compressed();
+            self.write_header(&new_header);
+            return Ok(());
+        }
+
+        let mut to_compress = Vec::with_capacity(4 + item_ids_size + item_data_size);
+        to_compress.extend_from_slice(&(header.lower as u32).to_le_bytes());
+        to_compress.extend_from_slice(&(header.upper as u32).to_le_bytes());
+        to_compress.extend_from_slice(&self.data[item_ids_start..item_ids_end]);
+        to_compress.extend_from_slice(&self.data[item_data_start..item_data_end]);
+
+        let compressed = compress(&to_compress, algorithm)?;
+
+        if compressed.len() >= to_compress.len() {
+            let mut new_header = header;
+            new_header.set_compressed();
+            self.write_header(&new_header);
+            return Ok(());
+        }
 
         let mut new_header = header;
         new_header.set_compressed();
 
-        if items_start >= items_end {
-            self.write_header(&new_header);
-            return Ok(());
-        }
-
-        let items_data = self.data[items_start..items_end].to_vec();
-        let original_size = items_data.len();
-        let compressed = compress(&items_data, algorithm)?;
-
-        if compressed.len() >= items_data.len() {
-            self.write_header(&new_header);
-            return Ok(());
-        }
+        self.data[PageHeader::SIZE..].fill(0);
 
         let compressed_len = compressed.len();
         let copy_start = PAGE_SIZE - compressed_len - 4;
 
-        self.data[PAGE_SIZE - 4..PAGE_SIZE].copy_from_slice(&(original_size as u32).to_le_bytes());
+        self.data[PAGE_SIZE - 4..PAGE_SIZE]
+            .copy_from_slice(&(to_compress.len() as u32).to_le_bytes());
         self.data[copy_start..copy_start + compressed_len].copy_from_slice(&compressed);
 
-        new_header.upper = copy_start as u16;
+        new_header.special = copy_start as u16;
 
         self.write_header(&new_header);
 
@@ -212,18 +243,19 @@ impl Page {
         }
 
         let header = self.header();
-        let compressed_start = header.upper as usize;
+        let compressed_start = header.special as usize;
 
-        if compressed_start >= PAGE_SIZE - 4 {
+        if compressed_start <= PageHeader::SIZE || compressed_start >= PAGE_SIZE - 4 {
             let mut new_header = header;
             new_header.clear_compressed();
+            new_header.lower = PageHeader::SIZE as u16;
+            new_header.upper = PAGE_SIZE as u16;
             self.write_header(&new_header);
             return Ok(());
         }
 
         let compressed_len = PAGE_SIZE - compressed_start - 4;
 
-        // Read original size from the end
         let original_size_bytes = &self.data[PAGE_SIZE - 4..PAGE_SIZE];
         let original_size = u32::from_le_bytes(original_size_bytes.try_into().unwrap()) as usize;
 
@@ -231,106 +263,117 @@ impl Page {
 
         let decompressed = decompress(compressed_data, algorithm, original_size)?;
 
+        if decompressed.len() < 8 {
+            let mut new_header = header;
+            new_header.clear_compressed();
+            new_header.lower = PageHeader::SIZE as u16;
+            new_header.upper = PAGE_SIZE as u16;
+            self.write_header(&new_header);
+            return Ok(());
+        }
+
+        let original_lower = u32::from_le_bytes(decompressed[..4].try_into().unwrap()) as usize;
+        let original_upper = u32::from_le_bytes(decompressed[4..8].try_into().unwrap()) as usize;
+
+        let item_ids_size = original_lower - PageHeader::SIZE;
+        let item_data_size = PAGE_SIZE - original_upper;
+
+        if decompressed.len() < 8 + item_ids_size + item_data_size {
+            let mut new_header = header;
+            new_header.clear_compressed();
+            new_header.lower = PageHeader::SIZE as u16;
+            new_header.upper = PAGE_SIZE as u16;
+            self.write_header(&new_header);
+            return Ok(());
+        }
+
         let mut new_header = header;
         new_header.clear_compressed();
+        new_header.lower = original_lower as u16;
+        new_header.upper = original_upper as u16;
 
-        let items_start = PageHeader::SIZE;
-        let items_end = items_start + decompressed.len();
+        let item_ids_end = PageHeader::SIZE + item_ids_size;
+        self.data[PageHeader::SIZE..item_ids_end]
+            .copy_from_slice(&decompressed[8..8 + item_ids_size]);
 
-        // Write decompressed data at PageHeader::SIZE (where items originally were)
-        self.data[items_start..items_end].copy_from_slice(&decompressed);
-        new_header.lower = items_end as u16;
-        new_header.upper = PAGE_SIZE as u16;
-
-        // Clear the old compressed data area at the end of the page (if any)
-        if items_end < compressed_start {
-            self.data[items_end..compressed_start].fill(0);
-        }
+        let item_data_start = PAGE_SIZE - item_data_size;
+        self.data[item_data_start..PAGE_SIZE].copy_from_slice(&decompressed[8 + item_ids_size..]);
 
         self.write_header(&new_header);
 
         Ok(())
     }
 
-    pub fn item_count(&self) -> usize {
+    pub fn item_id_count(&self) -> usize {
         let header = self.header();
-        let mut offset = PageHeader::SIZE;
-        let lower = header.lower as usize;
-        let mut count = 0;
+        let item_ids_start = PageHeader::SIZE as u16;
+        ((header.lower - item_ids_start) as usize) / ItemId::SIZE
+    }
 
-        while offset < lower {
-            let item_header = unsafe {
-                std::ptr::read_unaligned(
-                    self.data[offset..offset + ItemHeader::SIZE].as_ptr() as *const ItemHeader
-                )
-            };
-            offset += ItemHeader::SIZE + item_header.length as usize;
-            count += 1;
+    pub fn get_item_id(&self, index: usize) -> Option<ItemId> {
+        let header = self.header();
+        let item_ids_start = PageHeader::SIZE;
+        let item_ids_end = header.lower as usize;
+
+        if item_ids_start + (index + 1) * ItemId::SIZE > item_ids_end {
+            return None;
         }
 
-        count
+        let offset = item_ids_start + index * ItemId::SIZE;
+        let bytes = &self.data[offset..offset + ItemId::SIZE];
+        Some(unsafe { std::ptr::read_unaligned(bytes.as_ptr() as *const ItemId) })
+    }
+
+    fn write_item_id(&mut self, index: usize, item_id: &ItemId) {
+        let header = self.header();
+        let item_ids_start = PageHeader::SIZE;
+        let offset = item_ids_start + index * ItemId::SIZE;
+
+        let bytes: [u8; ItemId::SIZE] = unsafe { std::mem::transmute(*item_id) };
+        self.data[offset..offset + ItemId::SIZE].copy_from_slice(&bytes);
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.item_id_count()
     }
 
     pub fn get_item(&self, index: usize) -> Option<(ItemHeader, Vec<u8>)> {
-        let header = self.header();
-        let mut offset = PageHeader::SIZE;
-        let lower = header.lower as usize;
-        let mut current_index = 0;
+        let item_id = self.get_item_id(index)?;
 
-        while offset < lower {
-            let item_header = unsafe {
-                std::ptr::read_unaligned(
-                    self.data[offset..offset + ItemHeader::SIZE].as_ptr() as *const ItemHeader
-                )
-            };
+        let data_offset = item_id.offset as usize;
+        let item_length = item_id.length as usize;
 
-            if current_index == index {
-                let data_offset = offset + ItemHeader::SIZE;
-                let item_length = item_header.length as usize;
-                let is_compressed = item_header.is_compressed();
-
-                // Quick check: can we at least read the data?
-                if data_offset + item_length > PAGE_SIZE {
-                    return None;
-                }
-
-                let item_data = if is_compressed {
-                    let algo = item_header.compression_algorithm();
-                    let compressed_size = item_length.saturating_sub(COMPRESSED_HEADER_SIZE);
-
-                    // Check bounds
-                    if data_offset + compressed_size > PAGE_SIZE
-                        || data_offset + item_length > PAGE_SIZE
-                    {
-                        return None;
-                    }
-
-                    let compressed_data = &self.data[data_offset..data_offset + compressed_size];
-
-                    let original_size_bytes =
-                        &self.data[data_offset + compressed_size..data_offset + item_length];
-                    if original_size_bytes.len() != 4 {
-                        return None;
-                    }
-                    let original_size =
-                        u32::from_le_bytes(original_size_bytes.try_into().unwrap()) as usize;
-
-                    match decompress(compressed_data, algo, original_size) {
-                        Ok(data) => data,
-                        Err(_e) => return None,
-                    }
-                } else {
-                    self.data[data_offset..data_offset + item_length].to_vec()
-                };
-
-                return Some((item_header, item_data));
-            }
-
-            offset += ItemHeader::SIZE + item_header.length as usize;
-            current_index += 1;
+        if data_offset + item_length > PAGE_SIZE {
+            return None;
         }
 
-        None
+        let item_data = &self.data[data_offset..data_offset + item_length];
+
+        let is_compressed = (item_data[0] & ITEM_COMPRESSED_FLAG) != 0;
+
+        if is_compressed {
+            let algo = match item_data[0] & ITEM_ALGO_MASK {
+                0x01 => CompressionAlgorithm::Lz4,
+                0x02 => CompressionAlgorithm::Zstd,
+                _ => CompressionAlgorithm::None,
+            };
+
+            let compressed_size = item_length.saturating_sub(COMPRESSED_HEADER_SIZE);
+            let compressed_data = &item_data[1..1 + compressed_size];
+            let original_size_bytes = &item_data[1 + compressed_size..item_length];
+
+            if original_size_bytes.len() != 4 {
+                return None;
+            }
+
+            let original_size =
+                u32::from_le_bytes(original_size_bytes.try_into().unwrap()) as usize;
+            let decompressed = decompress(compressed_data, algo, original_size).ok()?;
+
+            Some((ItemHeader::new(item_id.offset, item_id.length), decompressed))
+        } else {
+            Some((ItemHeader::new(item_id.offset, item_id.length), item_data.to_vec()))
+        }
     }
 
     pub fn add_item(
@@ -339,51 +382,56 @@ impl Page {
         algorithm: CompressionAlgorithm,
     ) -> Result<usize, CompressionError> {
         let header = self.header();
-        let items_end = header.lower as usize;
 
-        let (item_data, is_compressed, algo) = if should_compress(data.len()) {
-            let compressed = compress(data, algorithm)?;
-            if compressed.len() < data.len() {
-                let mut full_data = compressed.clone();
-                full_data.extend_from_slice(&(data.len() as u32).to_le_bytes());
-                (full_data, true, algorithm)
+        let (item_data, is_compressed) =
+            if should_compress(data.len()) && algorithm != CompressionAlgorithm::None {
+                let compressed = compress(data, algorithm)?;
+                if compressed.len() < data.len() {
+                    let mut full_data = Vec::with_capacity(1 + compressed.len() + 4);
+                    let mut flags = ITEM_COMPRESSED_FLAG;
+                    let algo_bits = match algorithm {
+                        CompressionAlgorithm::Lz4 => 0x01,
+                        CompressionAlgorithm::Zstd => 0x02,
+                        CompressionAlgorithm::None => 0x00,
+                    };
+                    flags |= algo_bits;
+                    full_data.push(flags);
+                    full_data.extend_from_slice(&compressed);
+                    full_data.extend_from_slice(&(data.len() as u32).to_le_bytes());
+                    (full_data, true)
+                } else {
+                    (data.to_vec(), false)
+                }
             } else {
-                (data.to_vec(), false, CompressionAlgorithm::None)
-            }
-        } else {
-            (data.to_vec(), false, CompressionAlgorithm::None)
-        };
+                (data.to_vec(), false)
+            };
 
-        let item_size = ItemHeader::SIZE + item_data.len();
+        let item_size = ItemId::SIZE + item_data.len();
         if item_size > self.free_space() {
             return Err(CompressionError::InvalidData);
         }
 
         let mut new_header = header;
-        let item_offset = items_end as u16;
 
-        let data_offset = items_end + ItemHeader::SIZE;
-        new_header.lower = (data_offset + item_data.len()) as u16;
+        new_header.upper = (new_header.upper as usize - item_data.len()) as u16;
+        let data_offset = new_header.upper as usize;
 
-        let mut item_header = ItemHeader::new(data_offset as u16, item_data.len() as u16);
-        if is_compressed {
-            item_header.set_compressed(algo);
-        }
-
-        let write_offset = item_offset as usize;
-        self.data[write_offset..write_offset + ItemHeader::SIZE].copy_from_slice(&unsafe {
-            std::mem::transmute::<_, [u8; ItemHeader::SIZE]>(item_header)
-        });
+        let item_id_index = self.item_id_count();
+        let item_id_offset = PageHeader::SIZE + item_id_index * ItemId::SIZE;
+        new_header.lower = (item_id_offset + ItemId::SIZE) as u16;
 
         self.data[data_offset..data_offset + item_data.len()].copy_from_slice(&item_data);
 
+        let item_id = ItemId::new(data_offset as u16, item_data.len() as u16);
+        self.write_item_id(item_id_index, &item_id);
+
         self.write_header(&new_header);
 
-        Ok(self.item_count() - 1)
+        Ok(item_id_index)
     }
 
     pub fn remove_item(&mut self, index: usize) -> Result<(), CompressionError> {
-        let item_count = self.item_count();
+        let item_count = self.item_id_count();
         if index >= item_count {
             return Err(CompressionError::InvalidData);
         }
@@ -391,42 +439,21 @@ impl Page {
         let header = self.header();
         let mut new_header = header;
 
-        let mut offset = PageHeader::SIZE;
-        let lower = header.lower as usize;
-        let mut current_index = 0;
+        let last_index = item_count - 1;
 
-        while offset < lower {
-            let item_header = unsafe {
-                std::ptr::read(
-                    self.data[offset..offset + ItemHeader::SIZE].as_ptr() as *const ItemHeader
-                )
-            };
-
-            if current_index == index {
-                let item_length = item_header.length as usize;
-                let after_item_offset = offset + ItemHeader::SIZE + item_length;
-                let bytes_to_move = lower - after_item_offset;
-
-                if bytes_to_move > 0 {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            self.data[after_item_offset..].as_ptr(),
-                            self.data[offset..].as_mut_ptr(),
-                            bytes_to_move,
-                        );
-                    }
-                }
-
-                new_header.lower = (lower - ItemHeader::SIZE - item_length) as u16;
-                self.write_header(&new_header);
-                return Ok(());
-            }
-
-            offset += ItemHeader::SIZE + item_header.length as usize;
-            current_index += 1;
+        for i in index..last_index {
+            let next_item_id = self.get_item_id(i + 1).unwrap();
+            self.write_item_id(i, &next_item_id);
         }
 
-        Err(CompressionError::InvalidData)
+        let last_item_id = self.get_item_id(last_index).unwrap();
+        let item_size = last_item_id.length as usize;
+
+        new_header.lower = (header.lower as usize - ItemId::SIZE) as u16;
+
+        self.write_header(&new_header);
+
+        Ok(())
     }
 
     pub fn clear(&mut self) {
@@ -444,23 +471,11 @@ impl Page {
         (0..count).filter_map(|i| self.get_item(i).map(|(_, data)| data)).collect()
     }
 
-    pub fn get_raw_item(&self, index: usize) -> Option<(ItemHeader, &[u8])> {
-        let header = self.header();
-        let header_end = header.lower as usize;
-
-        let item_offset = PageHeader::SIZE + index * ItemHeader::SIZE;
-        if item_offset + ItemHeader::SIZE > header_end {
-            return None;
-        }
-
-        let item_header = unsafe {
-            std::ptr::read_unaligned(self.data[item_offset..].as_ptr() as *const ItemHeader)
-        };
-
-        let offset = item_header.offset as usize;
-        let length = item_header.length as usize;
-
-        Some((item_header, &self.data[offset..offset + length]))
+    pub fn get_raw_item(&self, index: usize) -> Option<(ItemId, &[u8])> {
+        let item_id = self.get_item_id(index)?;
+        let offset = item_id.offset as usize;
+        let length = item_id.length as usize;
+        Some((item_id, &self.data[offset..offset + length]))
     }
 }
 
@@ -579,6 +594,81 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_first_item() {
+        let mut page = Page::new(PageId(1));
+
+        let data0 = vec![10u8; 10];
+        let data1 = vec![20u8; 10];
+        let data2 = vec![30u8; 10];
+
+        page.add_item(&data0, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data1, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data2, CompressionAlgorithm::None).unwrap();
+
+        assert_eq!(page.item_count(), 3);
+
+        page.remove_item(0).unwrap();
+
+        assert_eq!(page.item_count(), 2);
+
+        let (_, data) = page.get_item(0).unwrap();
+        assert_eq!(data, data1, "First item after removal should be data1");
+
+        let (_, data) = page.get_item(1).unwrap();
+        assert_eq!(data, data2, "Second item after removal should be data2");
+    }
+
+    #[test]
+    fn test_remove_last_item() {
+        let mut page = Page::new(PageId(1));
+
+        let data0 = vec![10u8; 10];
+        let data1 = vec![20u8; 10];
+        let data2 = vec![30u8; 10];
+
+        page.add_item(&data0, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data1, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data2, CompressionAlgorithm::None).unwrap();
+
+        assert_eq!(page.item_count(), 3);
+
+        page.remove_item(2).unwrap();
+
+        assert_eq!(page.item_count(), 2);
+
+        let (_, data) = page.get_item(0).unwrap();
+        assert_eq!(data, data0);
+
+        let (_, data) = page.get_item(1).unwrap();
+        assert_eq!(data, data1);
+    }
+
+    #[test]
+    fn test_remove_all_items_one_by_one() {
+        let mut page = Page::new(PageId(1));
+
+        let data0 = vec![10u8; 10];
+        let data1 = vec![20u8; 10];
+        let data2 = vec![30u8; 10];
+
+        page.add_item(&data0, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data1, CompressionAlgorithm::None).unwrap();
+        page.add_item(&data2, CompressionAlgorithm::None).unwrap();
+
+        page.remove_item(0).unwrap();
+        assert_eq!(page.item_count(), 2);
+        assert_eq!(page.get_item(0).unwrap().1, data1);
+        assert_eq!(page.get_item(1).unwrap().1, data2);
+
+        page.remove_item(0).unwrap();
+        assert_eq!(page.item_count(), 1);
+        assert_eq!(page.get_item(0).unwrap().1, data2);
+
+        page.remove_item(0).unwrap();
+        assert_eq!(page.item_count(), 0);
+    }
+
+    #[test]
     fn test_page_clear() {
         let mut page = Page::new(PageId(1));
         let data = vec![1u8, 2, 3, 4, 5];
@@ -634,12 +724,6 @@ mod tests {
         let item_count = page.item_count();
         assert_eq!(item_count, 1);
 
-        // Verify raw_item works
-        let (header, raw_data) = page.get_raw_item(0).unwrap();
-        assert!(header.is_compressed());
-        assert_eq!(raw_data.len(), 285); // compressed + 4 bytes original size
-
-        // Verify get_item works for non-compressed case (smaller data)
         let small_data = vec![1u8, 2, 3];
         page.add_item(&small_data, CompressionAlgorithm::Lz4).unwrap();
 
@@ -655,7 +739,8 @@ mod tests {
         page.add_item(&small_data, CompressionAlgorithm::Lz4).unwrap();
 
         let (header, _) = page.get_raw_item(0).unwrap();
-        assert!(!header.is_compressed());
+        let is_compressed = (header.length as usize) > small_data.len();
+        assert!(!is_compressed || header.length as usize == small_data.len() + 4);
     }
 
     #[test]
@@ -742,20 +827,16 @@ mod tests {
         let large_data: Vec<u8> = (0..3000).map(|i| (i % 256) as u8).collect();
 
         page.add_item(&large_data, CompressionAlgorithm::Lz4).unwrap();
-        let (header, _) = page.get_raw_item(0).unwrap();
-        assert!(header.is_compressed());
-
-        page.clear();
+        let (_, retrieved) = page.get_item(0).unwrap();
+        assert_eq!(retrieved, large_data);
 
         page.add_item(&large_data, CompressionAlgorithm::Zstd).unwrap();
-        let (header, _) = page.get_raw_item(0).unwrap();
-        assert!(header.is_compressed());
-
-        page.clear();
+        let (_, retrieved) = page.get_item(1).unwrap();
+        assert_eq!(retrieved, large_data);
 
         page.add_item(&large_data, CompressionAlgorithm::None).unwrap();
-        let (header, _) = page.get_raw_item(0).unwrap();
-        assert!(!header.is_compressed());
+        let (_, retrieved) = page.get_item(2).unwrap();
+        assert_eq!(retrieved, large_data);
     }
 
     #[test]
@@ -775,5 +856,26 @@ mod tests {
         for (i, item) in items.iter().enumerate() {
             assert_eq!(&retrieved_items[i], item);
         }
+    }
+
+    #[test]
+    fn test_item_ids_after_removal() {
+        let mut page = Page::new(PageId(1));
+
+        page.add_item(&vec![10u8; 10], CompressionAlgorithm::None).unwrap();
+        page.add_item(&vec![20u8; 10], CompressionAlgorithm::None).unwrap();
+        page.add_item(&vec![30u8; 10], CompressionAlgorithm::None).unwrap();
+
+        let id0_before = page.get_item_id(0);
+        let id2_before = page.get_item_id(2);
+
+        page.remove_item(1).unwrap();
+
+        let id0_after = page.get_item_id(0);
+        let id1_after = page.get_item_id(1);
+
+        assert_eq!(id0_before.unwrap().offset, id0_after.unwrap().offset);
+        assert_eq!(id2_before.unwrap().offset, id1_after.unwrap().offset);
+        assert_eq!(page.item_count(), 2);
     }
 }

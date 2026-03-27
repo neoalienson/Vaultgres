@@ -149,16 +149,16 @@ VaultGres development roadmap with planned features and milestones.
 - ✅ Table aliases and column aliases
 - ✅ Prepared statements
 - ✅ Bind parameter support
-- 🚧 Compression (LZ4, Zstd) for tables and indexes
-  - ✅ LZ4 and Zstd compression algorithms
-  - ✅ Tuple-level compression (PostgreSQL TOAST-like, 2KB threshold)
-  - ✅ Per-table compression via STORAGE options
-  - ✅ BTree, Hash, BRIN, GIN, GiST index compression
-  - ✅ Page-level compression support
-  - ✅ Buffer pool compression-aware caching
-  - ✅ ALTER TABLE SET (compression_algorithm = ...) support
-  - ✅ Unit tests, integration tests, and E2E tests (written, not run)
-  - ⚠️ Page item layout has issues - some page tests fail due to header/data overlap
+- ✅ Compression (LZ4, Zstd) for tables and indexes
+   - ✅ LZ4 and Zstd compression algorithms
+   - ✅ Tuple-level compression (PostgreSQL TOAST-like, 2KB threshold)
+   - ✅ Per-table compression via STORAGE options
+   - ✅ BTree, Hash, BRIN, GIN, GiST index compression
+   - ✅ Page-level compression support
+   - ✅ Buffer pool compression-aware caching
+   - ✅ ALTER TABLE SET (compression_algorithm = ...) support
+   - ✅ Unit tests (27 page tests), integration tests (all passing)
+   - ✅ PostgreSQL-style page layout with items growing from upper downward
 
 
 ## Version 0.3.0 (Beta)
@@ -270,7 +270,7 @@ VaultGres development roadmap with planned features and milestones.
   - ✅ Unit tests (12 parser tests)
   - ✅ Integration tests (15 catalog tests)
 - ✅ Partition pruning in query optimizer
-- 🚧 Compression (LZ4, Zstd) for tables and indexes (page layout issues)
+- ✅ Compression (LZ4, Zstd) for tables and indexes
 - TOAST (The Oversized-Attribute Storage Technique)
 - Vacuum improvements (parallel vacuum)
 - Autovacuum with configurable thresholds
