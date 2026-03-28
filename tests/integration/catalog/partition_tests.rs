@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use vaultgres::catalog::*;
 use vaultgres::parser::ast::{
-    AttachPartitionStmt, ColumnDef, DataType, DetachPartitionStmt, PartitionBoundSpec,
-    PartitionHashBound, PartitionKey, PartitionMethod, PartitionRangeBound,
+    AttachPartitionStmt, ColumnDef, DataType, DetachPartitionStmt, ForeignKeyAction, ForeignKeyDef,
+    PartitionBoundSpec, PartitionHashBound, PartitionKey, PartitionMethod, PartitionRangeBound,
 };
 
 #[test]
@@ -382,4 +382,108 @@ fn test_create_partition_nonexistent_parent() {
     );
 
     assert!(catalog.create_partition(partition_schema).is_err());
+}
+
+#[test]
+fn test_get_partitions() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+
+    let parent_schema = TableSchema::with_partition(
+        "orders".to_string(),
+        columns.clone(),
+        PartitionMethod::Range,
+        vec![PartitionKey { column: "id".to_string(), opclass: None }],
+    );
+    catalog.create_partitioned_table(parent_schema).unwrap();
+
+    let partition1 = TableSchema::as_partition(
+        "orders_q1".to_string(),
+        "orders".to_string(),
+        PartitionBoundSpec::Range(PartitionRangeBound { from_values: vec![], to_values: vec![] }),
+    );
+    catalog.create_partition(partition1).unwrap();
+
+    let partition2 = TableSchema::as_partition(
+        "orders_q2".to_string(),
+        "orders".to_string(),
+        PartitionBoundSpec::Range(PartitionRangeBound { from_values: vec![], to_values: vec![] }),
+    );
+    catalog.create_partition(partition2).unwrap();
+
+    let partitions = catalog.get_partitions("orders");
+    assert_eq!(partitions.len(), 2);
+    assert!(partitions.contains(&"orders_q1".to_string()));
+    assert!(partitions.contains(&"orders_q2".to_string()));
+}
+
+#[test]
+fn test_get_partitions_nonexistent_parent() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("t".to_string(), columns).unwrap();
+
+    let partitions = catalog.get_partitions("nonexistent");
+    assert!(partitions.is_empty());
+}
+
+#[test]
+fn test_get_partitions_non_partitioned_table() {
+    let catalog = Catalog::new();
+    let columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("regular".to_string(), columns).unwrap();
+
+    let partitions = catalog.get_partitions("regular");
+    assert!(partitions.is_empty());
+}
+
+#[test]
+fn test_create_table_with_foreign_key_nonexistent_ref_table() {
+    let catalog = Catalog::new();
+    let columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("user_id".to_string(), DataType::Int),
+    ];
+
+    let foreign_keys = vec![ForeignKeyDef {
+        columns: vec!["user_id".to_string()],
+        ref_table: "users".to_string(),
+        ref_columns: vec!["id".to_string()],
+        on_delete: ForeignKeyAction::Restrict,
+        on_update: ForeignKeyAction::Restrict,
+    }];
+
+    let result =
+        catalog.create_table_with_constraints("orders".to_string(), columns, None, foreign_keys);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Referenced table"));
+}
+
+#[test]
+fn test_create_table_with_foreign_key_valid() {
+    let catalog = Catalog::new();
+
+    let users_columns = vec![ColumnDef::new("id".to_string(), DataType::Int)];
+    catalog.create_table("users".to_string(), users_columns).unwrap();
+
+    let orders_columns = vec![
+        ColumnDef::new("id".to_string(), DataType::Int),
+        ColumnDef::new("user_id".to_string(), DataType::Int),
+    ];
+
+    let foreign_keys = vec![ForeignKeyDef {
+        columns: vec!["user_id".to_string()],
+        ref_table: "users".to_string(),
+        ref_columns: vec!["id".to_string()],
+        on_delete: ForeignKeyAction::Restrict,
+        on_update: ForeignKeyAction::Restrict,
+    }];
+
+    let result = catalog.create_table_with_constraints(
+        "orders".to_string(),
+        orders_columns,
+        None,
+        foreign_keys,
+    );
+    assert!(result.is_ok());
 }
