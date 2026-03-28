@@ -1,12 +1,11 @@
-use super::{Catalog, EnumTypeDef, TableSchema, Tuple, Value};
+use super::{Catalog, TableSchema, Tuple, Value};
 use crate::catalog::predicate::PredicateEvaluator;
 use crate::catalog::select_executor::SelectExecutor;
-use crate::executor::expr_evaluator::{eval_binary_op, eval_unary_op};
+use crate::executor::Eval;
 use crate::parser::ast::{DataType, Expr};
 use crate::transaction::{Snapshot, TransactionManager};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 pub struct UpdateDeleteExecutor;
 
@@ -140,124 +139,22 @@ impl UpdateDeleteExecutor {
         schema: &TableSchema,
         catalog: &Catalog,
     ) -> Result<Value, String> {
-        match expr {
-            Expr::Number(n) => Ok(Value::Int(*n)),
-            Expr::Float(f) => Ok(Value::Float(*f)),
-            Expr::String(s) => Ok(Value::Text(s.clone())),
-            Expr::Null => Ok(Value::Null),
-            Expr::Column(name) => {
-                let lookup_name =
-                    if let Some(dot_pos) = name.find('.') { &name[dot_pos + 1..] } else { name };
-                let idx = schema
-                    .columns
-                    .iter()
-                    .position(|c| &c.name == lookup_name)
-                    .ok_or_else(|| format!("Column '{}' not found", name))?;
-                Ok(tuple_data[idx].clone())
-            }
-            Expr::QualifiedColumn { table: _, column } => {
-                let idx = schema
-                    .columns
-                    .iter()
-                    .position(|c| &c.name == column)
-                    .ok_or_else(|| format!("Column '{}' not found", column))?;
-                Ok(tuple_data[idx].clone())
-            }
-            Expr::UnaryOp { op, expr } => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
-                eval_unary_op(op, &val)
-            }
-            Expr::BinaryOp { left, op, right } => {
-                let l = Self::evaluate_expr(left, tuple_data, schema, catalog)?;
-                let r = Self::evaluate_expr(right, tuple_data, schema, catalog)?;
-                eval_binary_op(&l, op, &r)
-            }
-            Expr::IsNull(expr) => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
-                Ok(Value::Bool(matches!(val, Value::Null)))
-            }
-            Expr::IsNotNull(expr) => {
-                let val = Self::evaluate_expr(expr, tuple_data, schema, catalog)?;
-                Ok(Value::Bool(!matches!(val, Value::Null)))
-            }
-            Expr::Case { conditions, else_expr } => {
-                for (when_expr, then_expr) in conditions {
-                    let when_val = Self::evaluate_expr(when_expr, tuple_data, schema, catalog)?;
-                    if when_val == Value::Bool(true) {
-                        return Self::evaluate_expr(then_expr, tuple_data, schema, catalog);
-                    }
-                }
-                if let Some(else_e) = else_expr {
-                    Self::evaluate_expr(else_e, tuple_data, schema, catalog)
-                } else {
-                    Ok(Value::Null)
-                }
-            }
-            Expr::Subquery(subquery) => {
-                match SelectExecutor::eval_scalar_subquery(catalog, subquery) {
-                    Ok(value) => Ok(value),
-                    Err(_) => Ok(Value::Null),
-                }
-            }
-            Expr::FunctionCall { name, args } => {
-                let evaluated_args: Result<Vec<Value>, String> = args
-                    .iter()
-                    .map(|arg| Self::evaluate_expr(arg, tuple_data, schema, catalog))
-                    .collect();
-                Self::eval_function(name, evaluated_args?)
-            }
-            Expr::Array(arr) => {
-                let mut values = Vec::new();
-                for elem in arr {
-                    values.push(Self::evaluate_expr(elem, tuple_data, schema, catalog)?);
-                }
-                Ok(Value::Array(values))
-            }
-            _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
-        }
+        let tuple = Self::build_tuple(tuple_data, schema);
+        Eval::eval_expr_with_catalog(expr, &tuple, Some(catalog)).map_err(|e| format!("{}", e))
     }
 
-    fn eval_function(name: &str, args: Vec<Value>) -> Result<Value, String> {
-        use crate::catalog::string_functions;
-        match name.to_uppercase().as_str() {
-            "UPPER" => {
-                if args.len() != 1 {
-                    return Err("UPPER takes one argument".to_string());
-                }
-                string_functions::StringFunctions::upper(args[0].clone())
+    fn build_tuple(tuple_data: &[Value], schema: &TableSchema) -> HashMap<String, Value> {
+        let mut tuple = HashMap::new();
+        for (idx, col) in schema.columns.iter().enumerate() {
+            if idx < tuple_data.len() {
+                tuple.insert(col.name.clone(), tuple_data[idx].clone());
             }
-            "LOWER" => {
-                if args.len() != 1 {
-                    return Err("LOWER takes one argument".to_string());
-                }
-                string_functions::StringFunctions::lower(args[0].clone())
-            }
-            "LENGTH" => {
-                if args.len() != 1 {
-                    return Err("LENGTH takes one argument".to_string());
-                }
-                string_functions::StringFunctions::length(args[0].clone())
-            }
-            "CONCAT" => string_functions::StringFunctions::concat(args),
-            "SUBSTRING" => {
-                if args.len() == 2 {
-                    string_functions::StringFunctions::substring(
-                        args[0].clone(),
-                        args[1].clone(),
-                        None,
-                    )
-                } else if args.len() == 3 {
-                    string_functions::StringFunctions::substring(
-                        args[0].clone(),
-                        args[1].clone(),
-                        Some(args[2].clone()),
-                    )
-                } else {
-                    Err("SUBSTRING takes 2 or 3 arguments".to_string())
-                }
-            }
-            _ => Err(format!("Function '{}' not found", name)),
         }
+        tuple
+    }
+
+    fn eval_function(name: &str, args: Vec<Value>, catalog: &Catalog) -> Result<Value, String> {
+        Eval::eval_function_call(name, args, Some(catalog)).map_err(|e| format!("{}", e))
     }
 
     fn evaluate_expr_with_tuples(
@@ -268,159 +165,20 @@ impl UpdateDeleteExecutor {
         subquery_tuples: &[Tuple],
         snapshot: &Snapshot,
     ) -> Result<Value, String> {
-        match expr {
-            Expr::Number(n) => Ok(Value::Int(*n)),
-            Expr::Float(f) => Ok(Value::Float(*f)),
-            Expr::String(s) => Ok(Value::Text(s.clone())),
-            Expr::Null => Ok(Value::Null),
-            Expr::Column(name) => {
-                let lookup_name =
-                    if let Some(dot_pos) = name.find('.') { &name[dot_pos + 1..] } else { name };
-                let idx = schema
-                    .columns
-                    .iter()
-                    .position(|c| &c.name == lookup_name)
-                    .ok_or_else(|| format!("Column '{}' not found", name))?;
-                Ok(tuple_data[idx].clone())
-            }
-            Expr::QualifiedColumn { table: _, column } => {
-                let idx = schema
-                    .columns
-                    .iter()
-                    .position(|c| &c.name == column)
-                    .ok_or_else(|| format!("Column '{}' not found", column))?;
-                Ok(tuple_data[idx].clone())
-            }
-            Expr::UnaryOp { op, expr } => {
-                let val = Self::evaluate_expr_with_tuples(
-                    expr,
-                    tuple_data,
-                    schema,
-                    catalog,
-                    subquery_tuples,
-                    snapshot,
-                )?;
-                eval_unary_op(op, &val)
-            }
-            Expr::BinaryOp { left, op, right } => {
-                let l = Self::evaluate_expr_with_tuples(
-                    left,
-                    tuple_data,
-                    schema,
-                    catalog,
-                    subquery_tuples,
-                    snapshot,
-                )?;
-                let r = Self::evaluate_expr_with_tuples(
-                    right,
-                    tuple_data,
-                    schema,
-                    catalog,
-                    subquery_tuples,
-                    snapshot,
-                )?;
-                eval_binary_op(&l, op, &r)
-            }
-            Expr::IsNull(expr) => {
-                let val = Self::evaluate_expr_with_tuples(
-                    expr,
-                    tuple_data,
-                    schema,
-                    catalog,
-                    subquery_tuples,
-                    snapshot,
-                )?;
-                Ok(Value::Bool(matches!(val, Value::Null)))
-            }
-            Expr::IsNotNull(expr) => {
-                let val = Self::evaluate_expr_with_tuples(
-                    expr,
-                    tuple_data,
-                    schema,
-                    catalog,
-                    subquery_tuples,
-                    snapshot,
-                )?;
-                Ok(Value::Bool(!matches!(val, Value::Null)))
-            }
-            Expr::Case { conditions, else_expr } => {
-                for (when_expr, then_expr) in conditions {
-                    let when_val = Self::evaluate_expr_with_tuples(
-                        when_expr,
-                        tuple_data,
-                        schema,
-                        catalog,
-                        subquery_tuples,
-                        snapshot,
-                    )?;
-                    if when_val == Value::Bool(true) {
-                        return Self::evaluate_expr_with_tuples(
-                            then_expr,
-                            tuple_data,
-                            schema,
-                            catalog,
-                            subquery_tuples,
-                            snapshot,
-                        );
-                    }
-                }
-                if let Some(else_e) = else_expr {
-                    Self::evaluate_expr_with_tuples(
-                        else_e,
-                        tuple_data,
-                        schema,
-                        catalog,
-                        subquery_tuples,
-                        snapshot,
-                    )
-                } else {
-                    Ok(Value::Null)
-                }
-            }
-            Expr::Subquery(subquery) => {
-                // Use the provided tuples and outer query's snapshot to evaluate the subquery
-                match SelectExecutor::eval_scalar_subquery_with_tuples(
-                    catalog,
-                    subquery,
-                    subquery_tuples,
-                    snapshot,
-                ) {
-                    Ok(value) => Ok(value),
-                    Err(_) => Ok(Value::Null),
-                }
-            }
-            Expr::FunctionCall { name, args } => {
-                let evaluated_args: Result<Vec<Value>, String> = args
-                    .iter()
-                    .map(|arg| {
-                        Self::evaluate_expr_with_tuples(
-                            arg,
-                            tuple_data,
-                            schema,
-                            catalog,
-                            subquery_tuples,
-                            snapshot,
-                        )
-                    })
-                    .collect();
-                Self::eval_function(name, evaluated_args?)
-            }
-            Expr::Array(arr) => {
-                let mut values = Vec::new();
-                for elem in arr {
-                    values.push(Self::evaluate_expr_with_tuples(
-                        elem,
-                        tuple_data,
-                        schema,
-                        catalog,
-                        subquery_tuples,
-                        snapshot,
-                    )?);
-                }
-                Ok(Value::Array(values))
-            }
-            _ => Err(format!("Unsupported expression type in UPDATE SET: {:?}", expr)),
+        if let Expr::Subquery(subquery) = expr {
+            return match SelectExecutor::eval_scalar_subquery_with_tuples(
+                catalog,
+                subquery,
+                subquery_tuples,
+                snapshot,
+            ) {
+                Ok(value) => Ok(value),
+                Err(_) => Ok(Value::Null),
+            };
         }
+
+        let tuple = Self::build_tuple(tuple_data, schema);
+        Eval::eval_expr_with_catalog(expr, &tuple, Some(catalog)).map_err(|e| format!("{}", e))
     }
 
     fn validate_type(data_type: &DataType, value: &Value, col_name: &str) -> Result<(), String> {
@@ -809,7 +567,7 @@ mod tests {
             &Catalog::new(),
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Column 'missing' not found"));
+        assert!(result.unwrap_err().contains("Column not found"));
     }
 
     #[test]

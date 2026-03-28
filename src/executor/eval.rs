@@ -1,4 +1,7 @@
+use super::array_evaluator::ArrayEvaluator;
+use super::json_evaluator::JsonEvaluator;
 use super::operators::executor::{ExecutorError, Tuple};
+use super::range_evaluator::RangeEvaluator;
 use crate::catalog::{Catalog, EnumTypeDef, Value, string_functions};
 use crate::parser::ast::{BinaryOperator, Expr, SelectStmt, UnaryOperator};
 use std::collections::HashMap;
@@ -211,9 +214,13 @@ impl Eval {
             Expr::List(_) => Err(ExecutorError::UnsupportedExpression(
                 "List not supported in this context".to_string(),
             )),
-            Expr::Array(_) => Err(ExecutorError::UnsupportedExpression(
-                "Array expressions not supported in this context".to_string(),
-            )),
+            Expr::Array(arr) => {
+                let mut values = Vec::new();
+                for elem in arr {
+                    values.push(Self::eval_expr_with_catalog(elem, tuple, catalog)?);
+                }
+                Ok(Value::Array(values))
+            }
             Expr::Range { .. } => Err(ExecutorError::UnsupportedExpression(
                 "Range literals not supported in this context".to_string(),
             )),
@@ -367,6 +374,8 @@ impl Eval {
             BinaryOperator::Add => match (left, right) {
                 (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l + *r)),
                 (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l + *r)),
+                (Value::Float(l), Value::Int(r)) => Ok(Value::Float(*l + *r as f64)),
+                (Value::Int(l), Value::Float(r)) => Ok(Value::Float(*l as f64 + *r)),
                 (Value::Text(l), Value::Text(r)) => Ok(Value::Text(format!("{}{}", l, r))),
                 _ => Err(ExecutorError::TypeMismatch(
                     "ADD requires numeric or text operands".to_string(),
@@ -375,6 +384,8 @@ impl Eval {
             BinaryOperator::Subtract => match (left, right) {
                 (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l - *r)),
                 (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l - *r)),
+                (Value::Float(l), Value::Int(r)) => Ok(Value::Float(*l - *r as f64)),
+                (Value::Int(l), Value::Float(r)) => Ok(Value::Float(*l as f64 - *r)),
                 _ => Err(ExecutorError::TypeMismatch(
                     "SUBTRACT requires numeric operands".to_string(),
                 )),
@@ -382,6 +393,8 @@ impl Eval {
             BinaryOperator::Multiply => match (left, right) {
                 (Value::Int(l), Value::Int(r)) => Ok(Value::Int(*l * *r)),
                 (Value::Float(l), Value::Float(r)) => Ok(Value::Float(*l * *r)),
+                (Value::Float(l), Value::Int(r)) => Ok(Value::Float(*l * *r as f64)),
+                (Value::Int(l), Value::Float(r)) => Ok(Value::Float(*l as f64 * *r)),
                 _ => Err(ExecutorError::TypeMismatch(
                     "MULTIPLY requires numeric operands".to_string(),
                 )),
@@ -399,6 +412,20 @@ impl Eval {
                         Err(ExecutorError::DivisionByZero)
                     } else {
                         Ok(Value::Float(*l / *r))
+                    }
+                }
+                (Value::Float(l), Value::Int(r)) => {
+                    if *r == 0 {
+                        Err(ExecutorError::DivisionByZero)
+                    } else {
+                        Ok(Value::Float(*l / *r as f64))
+                    }
+                }
+                (Value::Int(l), Value::Float(r)) => {
+                    if *r == 0.0 {
+                        Err(ExecutorError::DivisionByZero)
+                    } else {
+                        Ok(Value::Float(*l as f64 / *r))
                     }
                 }
                 _ => {
@@ -455,28 +482,32 @@ impl Eval {
             }
 
             // JSON operators
-            BinaryOperator::JsonExtract => Self::eval_json_extract(left, right, false),
-            BinaryOperator::JsonExtractText => Self::eval_json_extract(left, right, true),
-            BinaryOperator::JsonPath => Self::eval_json_path(left, right, false),
-            BinaryOperator::JsonPathText => Self::eval_json_path(left, right, true),
-            BinaryOperator::JsonExists => Self::eval_json_exists(left, right),
-            BinaryOperator::JsonExistsAny => Self::eval_json_exists_any(left, right),
-            BinaryOperator::JsonExistsAll => Self::eval_json_exists_all(left, right),
+            BinaryOperator::JsonExtract => JsonEvaluator::eval_json_extract(left, right, false),
+            BinaryOperator::JsonExtractText => JsonEvaluator::eval_json_extract(left, right, true),
+            BinaryOperator::JsonPath => JsonEvaluator::eval_json_path(left, right, false),
+            BinaryOperator::JsonPathText => JsonEvaluator::eval_json_path(left, right, true),
+            BinaryOperator::JsonExists => JsonEvaluator::eval_json_exists(left, right),
+            BinaryOperator::JsonExistsAny => JsonEvaluator::eval_json_exists_any(left, right),
+            BinaryOperator::JsonExistsAll => JsonEvaluator::eval_json_exists_all(left, right),
 
             // Array operators
-            BinaryOperator::ArrayContains => Self::eval_array_contains(left, right),
-            BinaryOperator::ArrayContainedBy => Self::eval_array_contained_by(left, right),
-            BinaryOperator::ArrayOverlaps => Self::eval_array_overlaps(left, right),
-            BinaryOperator::ArrayConcat => Self::eval_array_concat(left, right),
-            BinaryOperator::ArrayAccess => Self::eval_array_access(left, right),
+            BinaryOperator::ArrayContains => ArrayEvaluator::eval_array_contains(left, right),
+            BinaryOperator::ArrayContainedBy => {
+                ArrayEvaluator::eval_array_contained_by(left, right)
+            }
+            BinaryOperator::ArrayOverlaps => ArrayEvaluator::eval_array_overlaps(left, right),
+            BinaryOperator::ArrayConcat => ArrayEvaluator::eval_array_concat(left, right),
+            BinaryOperator::ArrayAccess => ArrayEvaluator::eval_array_access(left, right),
 
             // Range operators
-            BinaryOperator::RangeContains => Self::eval_range_contains(left, right),
-            BinaryOperator::RangeContainedBy => Self::eval_range_contained_by(left, right),
-            BinaryOperator::RangeOverlaps => Self::eval_range_overlaps(left, right),
-            BinaryOperator::RangeLeftOf => Self::eval_range_left_of(left, right),
-            BinaryOperator::RangeRightOf => Self::eval_range_right_of(left, right),
-            BinaryOperator::RangeAdjacent => Self::eval_range_adjacent(left, right),
+            BinaryOperator::RangeContains => RangeEvaluator::eval_range_contains(left, right),
+            BinaryOperator::RangeContainedBy => {
+                RangeEvaluator::eval_range_contained_by(left, right)
+            }
+            BinaryOperator::RangeOverlaps => RangeEvaluator::eval_range_overlaps(left, right),
+            BinaryOperator::RangeLeftOf => RangeEvaluator::eval_range_left_of(left, right),
+            BinaryOperator::RangeRightOf => RangeEvaluator::eval_range_right_of(left, right),
+            BinaryOperator::RangeAdjacent => RangeEvaluator::eval_range_adjacent(left, right),
         }
     }
 
@@ -515,332 +546,6 @@ impl Eval {
             return Ok(result);
         }
         Ok(false)
-    }
-
-    /// Evaluate JSON extraction operator (-> or ->>)
-    fn eval_json_extract(
-        left: &Value,
-        right: &Value,
-        as_text: bool,
-    ) -> Result<Value, ExecutorError> {
-        let json_str = match left {
-            Value::Json(j) => j.as_str(),
-            Value::Text(j) => j.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON extract requires JSON or text operand".to_string(),
-                ));
-            }
-        };
-
-        let key = match right {
-            Value::Text(k) => k.as_str(),
-            Value::Int(i) => &i.to_string(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON extract key must be text or integer".to_string(),
-                ));
-            }
-        };
-
-        match Self::extract_json_field(json_str, key) {
-            Some(value) => {
-                if as_text {
-                    Ok(Value::Text(value.to_string()))
-                } else {
-                    Ok(Value::Json(value.to_string()))
-                }
-            }
-            None => Ok(Value::Null),
-        }
-    }
-
-    /// Extract a field from JSON string
-    fn extract_json_field(json_str: &str, key: &str) -> Option<String> {
-        let json_str = json_str.trim();
-        if json_str.starts_with('[') {
-            if let Ok(idx) = key.parse::<usize>() {
-                return Self::extract_json_array_element(json_str, idx);
-            }
-            return None;
-        }
-        if json_str.starts_with('{') {
-            return Self::extract_json_object_field(json_str, key);
-        }
-        None
-    }
-
-    /// Extract element from JSON array
-    fn extract_json_array_element(json_str: &str, idx: usize) -> Option<String> {
-        let json_str = json_str.trim();
-        if !json_str.starts_with('[') || !json_str.ends_with(']') {
-            return None;
-        }
-        let content = &json_str[1..json_str.len() - 1];
-        if content.trim().is_empty() {
-            return None;
-        }
-        let elements = Self::split_json_array(content);
-        if idx >= elements.len() {
-            return None;
-        }
-        Some(elements[idx].trim().to_string())
-    }
-
-    /// Split JSON array into elements (simple parser)
-    fn split_json_array(content: &str) -> Vec<&str> {
-        let mut result = Vec::new();
-        let mut depth = 0;
-        let mut start = 0;
-        let mut in_string = false;
-        for (i, c) in content.chars().enumerate() {
-            match c {
-                '"' => in_string = !in_string,
-                '[' | '{' if !in_string => depth += 1,
-                ']' | '}' if !in_string => depth -= 1,
-                ',' if !in_string && depth == 0 => {
-                    result.push(&content[start..i]);
-                    start = i + 1;
-                }
-                _ => {}
-            }
-        }
-        result.push(&content[start..]);
-        result
-    }
-
-    /// Extract field from JSON object
-    fn extract_json_object_field(json_str: &str, key: &str) -> Option<String> {
-        let json_str = json_str.trim();
-        if !json_str.starts_with('{') || !json_str.ends_with('}') {
-            return None;
-        }
-        let content = &json_str[1..json_str.len() - 1];
-        if content.trim().is_empty() {
-            return None;
-        }
-        let pairs = Self::split_json_object(content);
-        for pair in pairs {
-            if let Some((k, v)) = Self::parse_json_pair(pair) {
-                if k == key {
-                    return Some(v);
-                }
-            }
-        }
-        None
-    }
-
-    /// Split JSON object into key-value pairs (simple parser)
-    fn split_json_object(content: &str) -> Vec<&str> {
-        let mut result = Vec::new();
-        let mut depth = 0;
-        let mut start = 0;
-        let mut in_string = false;
-        for (i, c) in content.chars().enumerate() {
-            match c {
-                '"' => in_string = !in_string,
-                '{' | '[' if !in_string => depth += 1,
-                '}' | ']' if !in_string => depth -= 1,
-                ',' if !in_string && depth == 0 => {
-                    result.push(&content[start..i]);
-                    start = i + 1;
-                }
-                _ => {}
-            }
-        }
-        result.push(&content[start..]);
-        result
-    }
-
-    /// Parse a JSON key-value pair
-    fn parse_json_pair(pair: &str) -> Option<(String, String)> {
-        let pair = pair.trim();
-        if !pair.starts_with('"') {
-            return None;
-        }
-        let colon_pos = pair.find(':')?;
-        let closing_quote_pos = pair[..colon_pos].rfind('"')?;
-        let key = pair[1..closing_quote_pos].to_string();
-        let raw_value = pair[colon_pos + 1..].trim();
-        let value = if raw_value.starts_with('"') {
-            let first_quote = raw_value.find('"')? + 1;
-            let second_quote = raw_value[first_quote..].find('"')? + first_quote;
-            raw_value[first_quote..second_quote].to_string()
-        } else {
-            raw_value.to_string()
-        };
-        Some((key, value))
-    }
-
-    /// Evaluate JSON path operator (#> or #>>)
-    fn eval_json_path(left: &Value, right: &Value, as_text: bool) -> Result<Value, ExecutorError> {
-        let json_str = match left {
-            Value::Json(j) => j.as_str(),
-            Value::Text(j) => j.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON path requires JSON or text operand".to_string(),
-                ));
-            }
-        };
-
-        let path = match right {
-            Value::Text(p) => p.as_str(),
-            _ => return Err(ExecutorError::TypeMismatch("JSON path must be text".to_string())),
-        };
-
-        let result = Self::extract_json_path(json_str, path);
-        match result {
-            Some(value) => {
-                if as_text {
-                    Ok(Value::Text(value.to_string()))
-                } else {
-                    Ok(Value::Json(value.to_string()))
-                }
-            }
-            None => Ok(Value::Null),
-        }
-    }
-
-    /// Extract value at JSON path
-    fn extract_json_path(json_str: &str, path: &str) -> Option<String> {
-        let path = path.trim();
-        if !path.starts_with('{') || !path.ends_with('}') {
-            if !path.starts_with('[') || !path.ends_with(']') {
-                return None;
-            }
-            let content = &path[1..path.len() - 1];
-            let keys: Vec<&str> = content.split(',').map(|s| s.trim().trim_matches('"')).collect();
-            let mut current = json_str.to_string();
-            for key in keys {
-                current = Self::extract_json_field(&current, key)?;
-            }
-            return Some(current);
-        }
-        let content = &path[1..path.len() - 1];
-        let keys: Vec<&str> = content.split('.').map(|s| s.trim().trim_matches('"')).collect();
-        let mut current = json_str.to_string();
-        for key in keys {
-            if key.starts_with('[') && key.ends_with(']') {
-                let idx_str = &key[1..key.len() - 1];
-                if let Ok(idx) = idx_str.parse::<usize>() {
-                    current = Self::extract_json_array_element(&current, idx)?;
-                } else {
-                    return None;
-                }
-            } else {
-                current = Self::extract_json_field(&current, key)?;
-            }
-        }
-        Some(current)
-    }
-
-    /// Evaluate JSON existence operator (?)
-    fn eval_json_exists(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        let json_str = match left {
-            Value::Json(j) => j.as_str(),
-            Value::Text(j) => j.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists requires JSON or text operand".to_string(),
-                ));
-            }
-        };
-
-        let key = match right {
-            Value::Text(k) => k.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists key must be text".to_string(),
-                ));
-            }
-        };
-
-        Ok(Value::Bool(Self::extract_json_field(json_str, key).is_some()))
-    }
-
-    /// Evaluate JSON existence for any keys (?|)
-    fn eval_json_exists_any(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        let json_str = match left {
-            Value::Json(j) => j.as_str(),
-            Value::Text(j) => j.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists requires JSON or text operand".to_string(),
-                ));
-            }
-        };
-
-        let keys = match right {
-            Value::Text(k) => k.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists keys must be text".to_string(),
-                ));
-            }
-        };
-
-        let keys = keys.trim();
-        if !keys.starts_with('[') || !keys.ends_with(']') {
-            return Err(ExecutorError::TypeMismatch(
-                "JSON exists keys must be an array".to_string(),
-            ));
-        }
-
-        let content = &keys[1..keys.len() - 1];
-        if content.trim().is_empty() {
-            return Ok(Value::Bool(false));
-        }
-
-        let key_list: Vec<&str> = content.split(',').map(|s| s.trim().trim_matches('"')).collect();
-        for key in key_list {
-            if Self::extract_json_field(json_str, key).is_some() {
-                return Ok(Value::Bool(true));
-            }
-        }
-        Ok(Value::Bool(false))
-    }
-
-    /// Evaluate JSON existence for all keys (?&)
-    fn eval_json_exists_all(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        let json_str = match left {
-            Value::Json(j) => j.as_str(),
-            Value::Text(j) => j.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists requires JSON or text operand".to_string(),
-                ));
-            }
-        };
-
-        let keys = match right {
-            Value::Text(k) => k.as_str(),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "JSON exists keys must be text".to_string(),
-                ));
-            }
-        };
-
-        let keys = keys.trim();
-        if !keys.starts_with('[') || !keys.ends_with(']') {
-            return Err(ExecutorError::TypeMismatch(
-                "JSON exists keys must be an array".to_string(),
-            ));
-        }
-
-        let content = &keys[1..keys.len() - 1];
-        if content.trim().is_empty() {
-            return Ok(Value::Bool(false));
-        }
-
-        let key_list: Vec<&str> = content.split(',').map(|s| s.trim().trim_matches('"')).collect();
-        for key in key_list {
-            if Self::extract_json_field(json_str, key).is_none() {
-                return Ok(Value::Bool(false));
-            }
-        }
-        Ok(Value::Bool(true))
     }
 
     /// Evaluate a unary operation
@@ -913,295 +618,6 @@ impl Eval {
             Value::Bool(b) => b.to_string(),
             Value::Null => String::new(),
             _ => format!("{:?}", val),
-        }
-    }
-
-    /// Evaluate array contains operator (@>)
-    fn eval_array_contains(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Array(left_arr), Value::Array(right_arr)) => {
-                for elem in right_arr {
-                    let mut found = false;
-                    for item in left_arr {
-                        if item == elem {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        return Ok(Value::Bool(false));
-                    }
-                }
-                Ok(Value::Bool(true))
-            }
-            (Value::Array(arr), elem) => {
-                for item in arr {
-                    if item == elem {
-                        return Ok(Value::Bool(true));
-                    }
-                }
-                Ok(Value::Bool(false))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Array contains (@>) requires array on left side".to_string(),
-            )),
-        }
-    }
-
-    /// Evaluate array contained by operator (<@)
-    fn eval_array_contained_by(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Array(left_arr), Value::Array(right_arr)) => {
-                for elem in left_arr {
-                    let mut found = false;
-                    for item in right_arr {
-                        if item == elem {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        return Ok(Value::Bool(false));
-                    }
-                }
-                Ok(Value::Bool(true))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Array contained by (<@) requires arrays on both sides".to_string(),
-            )),
-        }
-    }
-
-    /// Evaluate array overlaps operator (&&)
-    fn eval_array_overlaps(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        let (left_arr, right_arr) = match (left, right) {
-            (Value::Array(l), Value::Array(r)) => (l, r),
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "Array overlaps (&&) requires arrays on both sides".to_string(),
-                ));
-            }
-        };
-
-        for left_item in left_arr {
-            for right_item in right_arr {
-                if left_item == right_item {
-                    return Ok(Value::Bool(true));
-                }
-            }
-        }
-        Ok(Value::Bool(false))
-    }
-
-    /// Evaluate array concat operator (||)
-    fn eval_array_concat(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Array(l), Value::Array(r)) => {
-                let mut result = l.clone();
-                result.extend(r.clone());
-                Ok(Value::Array(result))
-            }
-            (Value::Array(arr), elem) => {
-                let mut result = arr.clone();
-                result.push(elem.clone());
-                Ok(Value::Array(result))
-            }
-            (elem, Value::Array(arr)) => {
-                let mut result = vec![elem.clone()];
-                result.extend(arr.clone());
-                Ok(Value::Array(result))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Array concat (||) requires at least one array operand".to_string(),
-            )),
-        }
-    }
-
-    /// Evaluate array element access (arr[1])
-    fn eval_array_access(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        let arr = match left {
-            Value::Array(arr) => arr,
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "Array element access requires array on left side".to_string(),
-                ));
-            }
-        };
-
-        let idx = match right {
-            Value::Int(idx) => *idx,
-            _ => {
-                return Err(ExecutorError::TypeMismatch(
-                    "Array index must be an integer".to_string(),
-                ));
-            }
-        };
-
-        if idx <= 0 {
-            return Err(ExecutorError::InvalidArrayIndex("Array index must be >= 1".to_string()));
-        }
-
-        let idx = idx as usize;
-        if idx > arr.len() {
-            return Ok(Value::Null);
-        }
-
-        Ok(arr[idx - 1].clone())
-    }
-
-    fn eval_range_contains(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Range(range), Value::Int(elem)) => {
-                if let Some(lower) = range.lower_bound() {
-                    if let Value::Int(lv) = lower {
-                        if !range.lower_inclusive() && *lv >= *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                        if range.lower_inclusive() && *lv > *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                    }
-                }
-                if let Some(upper) = range.upper_bound() {
-                    if let Value::Int(uv) = upper {
-                        if !range.upper_inclusive() && *uv <= *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                        if range.upper_inclusive() && *uv < *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                    }
-                }
-                Ok(Value::Bool(true))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range contains (@>) requires range on left side and element on right side"
-                    .to_string(),
-            )),
-        }
-    }
-
-    fn eval_range_contained_by(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Int(elem), Value::Range(range)) => {
-                if let Some(lower) = range.lower_bound() {
-                    if let Value::Int(lv) = lower {
-                        if !range.lower_inclusive() && *lv >= *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                        if range.lower_inclusive() && *lv > *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                    }
-                }
-                if let Some(upper) = range.upper_bound() {
-                    if let Value::Int(uv) = upper {
-                        if !range.upper_inclusive() && *uv <= *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                        if range.upper_inclusive() && *uv < *elem {
-                            return Ok(Value::Bool(false));
-                        }
-                    }
-                }
-                Ok(Value::Bool(true))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range contained by (<@) requires element on left side and range on right side"
-                    .to_string(),
-            )),
-        }
-    }
-
-    fn eval_range_overlaps(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Range(r1), Value::Range(r2)) => {
-                let r1_lower = r1.lower_bound();
-                let r1_upper = r1.upper_bound();
-                let r2_lower = r2.lower_bound();
-                let r2_upper = r2.upper_bound();
-
-                if let (Some(l1), Some(u1), Some(l2), Some(u2)) =
-                    (r1_lower, r1_upper, r2_lower, r2_upper)
-                {
-                    if let (Value::Int(l1v), Value::Int(u1v), Value::Int(l2v), Value::Int(u2v)) =
-                        (l1, u1, l2, u2)
-                    {
-                        let r1_left_of_r2 =
-                            if r1.upper_inclusive() { *u1v <= *l2v } else { *u1v < *l2v };
-                        let r2_left_of_r1 =
-                            if r2.upper_inclusive() { *u2v <= *l1v } else { *u2v < *l1v };
-                        return Ok(Value::Bool(!(r1_left_of_r2 || r2_left_of_r1)));
-                    }
-                }
-                Err(ExecutorError::TypeMismatch(
-                    "Range overlaps (&&) requires compatible range types".to_string(),
-                ))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range overlaps (&&) requires range operands".to_string(),
-            )),
-        }
-    }
-
-    fn eval_range_left_of(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Range(r1), Value::Range(r2)) => {
-                if let (Some(u1), Some(l2)) = (r1.upper_bound(), r2.lower_bound()) {
-                    if let (Value::Int(u1v), Value::Int(l2v)) = (u1, l2) {
-                        let result = if r1.upper_inclusive() { *u1v <= *l2v } else { *u1v < *l2v };
-                        return Ok(Value::Bool(result));
-                    }
-                }
-                Err(ExecutorError::TypeMismatch(
-                    "Range left of (<<) requires integer range operands".to_string(),
-                ))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range left of (<<) requires range operands".to_string(),
-            )),
-        }
-    }
-
-    fn eval_range_right_of(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Range(r1), Value::Range(r2)) => {
-                if let (Some(l1), Some(u2)) = (r1.lower_bound(), r2.upper_bound()) {
-                    if let (Value::Int(l1v), Value::Int(u2v)) = (l1, u2) {
-                        let result = if r2.upper_inclusive() { *l1v > *u2v } else { *l1v >= *u2v };
-                        return Ok(Value::Bool(result));
-                    }
-                }
-                Err(ExecutorError::TypeMismatch(
-                    "Range right of (>>) requires integer range operands".to_string(),
-                ))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range right of (>>) requires range operands".to_string(),
-            )),
-        }
-    }
-
-    fn eval_range_adjacent(left: &Value, right: &Value) -> Result<Value, ExecutorError> {
-        match (left, right) {
-            (Value::Range(r1), Value::Range(r2)) => {
-                if let (Some(u1), Some(l2)) = (r1.upper_bound(), r2.lower_bound()) {
-                    if let (Value::Int(u1v), Value::Int(l2v)) = (u1, l2) {
-                        let diff = if r1.upper_inclusive() != r2.lower_inclusive() {
-                            (*l2v as i64 - *u1v as i64).abs()
-                        } else {
-                            (*l2v as i64 - *u1v as i64).abs() - 1
-                        };
-                        return Ok(Value::Bool(diff == 1));
-                    }
-                }
-                Err(ExecutorError::TypeMismatch(
-                    "Range adjacent (-|-) requires integer range operands".to_string(),
-                ))
-            }
-            _ => Err(ExecutorError::TypeMismatch(
-                "Range adjacent (-|-) requires range operands".to_string(),
-            )),
         }
     }
 

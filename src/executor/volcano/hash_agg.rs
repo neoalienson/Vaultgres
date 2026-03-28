@@ -3,27 +3,12 @@
 use crate::catalog::{Aggregate, Catalog, TableSchema, Value};
 use crate::executor::eval::Eval;
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
+use crate::executor::volcano::aggregate_state::{AggregateState, CustomAggregateState, hash_value};
 use crate::parser::ast::{AggregateFunc, DataType, Expr};
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-
-#[derive(Debug, Clone)]
-enum AggregateState {
-    Count(i64),
-    Sum(i64),
-    Avg { sum: i64, count: i64 },
-    Min(Value),
-    Max(Value),
-    Custom(CustomAggregateState),
-}
-
-#[derive(Debug, Clone)]
-struct CustomAggregateState {
-    info: Aggregate,
-    state: Value,
-}
 
 pub struct HashAggExecutor {
     buffered_results: Vec<Tuple>,
@@ -301,13 +286,13 @@ impl HashAggExecutor {
             match expr {
                 Expr::Column(name) => {
                     if let Some(val) = tuple.get(name) {
-                        Self::hash_value(val, &mut hasher);
+                        hash_value(val, &mut hasher);
                     }
                 }
                 Expr::QualifiedColumn { table, column } => {
                     let qualified_name = format!("{}.{}", table, column);
                     if let Some(val) = tuple.get(&qualified_name).or_else(|| tuple.get(column)) {
-                        Self::hash_value(val, &mut hasher);
+                        hash_value(val, &mut hasher);
                     }
                 }
                 _ => {
@@ -319,29 +304,6 @@ impl HashAggExecutor {
             }
         }
         Ok(hasher.finish())
-    }
-
-    fn hash_value(value: &Value, hasher: &mut DefaultHasher) {
-        match value {
-            Value::Int(n) => {
-                "int".hash(hasher);
-                n.hash(hasher);
-            }
-            Value::Text(s) => {
-                "text".hash(hasher);
-                s.hash(hasher);
-            }
-            Value::Bool(b) => {
-                "bool".hash(hasher);
-                b.hash(hasher);
-            }
-            Value::Null => {
-                "null".hash(hasher);
-            }
-            _ => {
-                format!("{:?}", value).hash(hasher);
-            }
-        }
     }
 
     fn compare_values(a: &Value, b: &Value) -> Result<std::cmp::Ordering, ExecutorError> {

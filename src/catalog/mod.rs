@@ -1,11 +1,15 @@
 #![allow(clippy::module_inception)]
 
+mod aggregate_manager;
 mod aggregation;
-mod catalog;
+pub mod catalog;
 mod check;
 mod crud_helper;
+mod data_manager;
 mod datetime_functions;
 mod function;
+mod function_manager;
+mod index_manager;
 mod insert_validator;
 mod partition_pruning;
 mod persistence;
@@ -13,10 +17,15 @@ pub(crate) mod predicate;
 mod schema;
 mod select_executor;
 pub mod string_functions;
+mod table_manager;
+mod transaction_manager;
+mod trigger_manager;
 mod tuple;
+mod type_manager;
 mod unique;
 mod update_delete_executor;
 mod value;
+mod view_manager;
 
 #[cfg(test)]
 mod batch_insert_tests;

@@ -5,6 +5,7 @@
 //! in the constructor as needed.
 
 mod aggregate;
+mod aggregate_state;
 mod case;
 mod cte;
 mod distinct;
@@ -13,6 +14,7 @@ mod filter;
 mod group_by;
 mod hash_agg;
 mod hash_join;
+mod hashing;
 mod having;
 mod intersect;
 mod join;
@@ -29,6 +31,7 @@ mod union;
 mod window;
 
 pub use aggregate::{AggregateExecutor, AggregateFunction};
+pub use aggregate_state::{AggregateState, CustomAggregateState, hash_value};
 pub use case::CaseExecutor;
 pub use cte::{
     CTEColumns, CTEExecutor, CTEPlanner, VolcanoRecursiveCTEExecutor, VolcanoRecursiveCTEState,
@@ -39,6 +42,7 @@ pub use filter::FilterExecutor;
 pub use group_by::GroupByExecutor;
 pub use hash_agg::HashAggExecutor;
 pub use hash_join::HashJoinExecutor;
+pub use hashing::compute_group_key;
 pub use having::HavingExecutor;
 pub use intersect::IntersectExecutor;
 pub use join::{JoinExecutor, JoinType};

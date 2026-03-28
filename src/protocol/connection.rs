@@ -2,12 +2,14 @@ use super::message::{Message, ProtocolError, Response};
 use super::result_set::{ColumnMetadata, ResultSet, Row};
 use super::type_mapping::{serialize_value_with_enum_types, value_to_pg_type};
 use crate::catalog::{Aggregate, Catalog, Function, FunctionLanguage, Parameter, Value};
+use crate::executor::Eval;
 use crate::parser::ast::{
     FunctionParameter as AstFunctionParameter, FunctionReturnType, FunctionVolatility,
     ParameterMode, Statement,
 };
 use crate::parser::{Expr, Parser};
 use crate::planner::planner::Planner;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
@@ -662,6 +664,28 @@ impl<S: Read + Write> Connection<S> {
             .collect()
     }
 
+    fn build_tuple(
+        row: &[Value],
+        schemas: &[(String, crate::catalog::TableSchema)],
+    ) -> HashMap<String, Value> {
+        let mut tuple = HashMap::new();
+        let mut offset = 0;
+        for (tbl_alias, schema) in schemas {
+            for col in &schema.columns {
+                let qualified_name = format!("{}.{}", tbl_alias, col.name);
+                let simple_name = &col.name;
+                if row.len() > offset {
+                    tuple.insert(qualified_name.clone(), row[offset].clone());
+                    if qualified_name != *simple_name {
+                        tuple.insert(simple_name.clone(), row[offset].clone());
+                    }
+                }
+                offset += 1;
+            }
+        }
+        tuple
+    }
+
     fn project_columns(
         &self,
         rows: &[Vec<crate::catalog::Value>],
@@ -676,276 +700,23 @@ impl<S: Read + Write> Connection<S> {
         let mut result = Vec::new();
         for row in rows {
             let mut projected = Vec::new();
+            let tuple = Self::build_tuple(row, schemas);
             for expr in exprs {
                 log::debug!("[PROJ] Processing expression: {:?}", expr);
                 match expr {
-                    Expr::QualifiedColumn { table, column } => {
-                        let mut offset = 0;
-                        let mut found = false;
-                        for (tbl_alias, schema) in schemas {
-                            log::debug!(
-                                "[PROJ] Checking alias '{}' for '{}.{}', schema has {} cols",
-                                tbl_alias,
-                                table,
-                                column,
-                                schema.columns.len()
-                            );
-                            if tbl_alias == table {
-                                log::debug!(
-                                    "[PROJ] Alias matched! Looking for column '{}' in {:?}",
-                                    column,
-                                    schema.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
-                                );
-                                if let Some(idx) =
-                                    schema.columns.iter().position(|c| &c.name == column)
-                                {
-                                    log::debug!("[PROJ] Found at offset {} + idx {}", offset, idx);
-                                    projected.push(row[offset + idx].clone());
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            offset += schema.columns.len();
-                        }
-                        if !found {
-                            return Err(format!("Column '{}.{}' not found", table, column));
-                        }
-                    }
-                    Expr::Column(name) => {
-                        // Handle table-prefixed column names (e.g., "o.total" -> "total")
-                        let lookup_name = if let Some(dot_pos) = name.find('.') {
-                            &name[dot_pos + 1..]
-                        } else {
-                            name.as_str()
-                        };
-
-                        let mut offset = 0;
-                        let mut found = false;
-                        for (_, schema) in schemas {
-                            log::debug!(
-                                "[PROJ] Looking for column '{}' (lookup: '{}') in schema with {} cols",
-                                name,
-                                lookup_name,
-                                schema.columns.len()
-                            );
-                            if let Some(idx) =
-                                schema.columns.iter().position(|c| c.name == lookup_name)
-                            {
-                                log::debug!("[PROJ] Found at offset {} + idx {}", offset, idx);
-                                projected.push(row[offset + idx].clone());
-                                found = true;
-                                break;
-                            }
-                            offset += schema.columns.len();
-                        }
-                        if !found {
-                            return Err(format!("Column '{}' not found", name));
-                        }
-                    }
-                    Expr::Alias { expr: inner_expr, alias: _ } => {
-                        // For aliases, evaluate the inner expression
-                        // The alias name is used for column naming, handled separately
-                        let value = self.evaluate_expression(inner_expr, row, schemas)?;
-                        projected.push(value);
-                    }
-                    Expr::BinaryOp { left, op, right } => {
-                        let left_val = self.evaluate_expression(left, row, schemas)?;
-                        let right_val = self.evaluate_expression(right, row, schemas)?;
-                        let result = self.evaluate_binary_op(&left_val, *op, &right_val)?;
-                        projected.push(result);
-                    }
-                    Expr::UnaryOp { op, expr } => {
-                        let val = self.evaluate_expression(expr, row, schemas)?;
-                        let result = self.evaluate_unary_op(&val, *op)?;
-                        projected.push(result);
-                    }
-                    Expr::Number(n) => {
-                        projected.push(crate::catalog::Value::Int(*n));
-                    }
-                    Expr::Float(f) => {
-                        projected.push(crate::catalog::Value::Float(*f));
-                    }
-                    Expr::String(s) => {
-                        projected.push(crate::catalog::Value::Text(s.clone()));
-                    }
-                    Expr::Null => {
-                        projected.push(crate::catalog::Value::Null);
-                    }
                     Expr::Star => {
-                        // Return all columns
                         projected.extend(row.iter().cloned());
                     }
                     _ => {
-                        return Err(format!("Unsupported expression in SELECT: {:?}", expr));
+                        let value = Eval::eval_expr_with_catalog(expr, &tuple, Some(&self.catalog))
+                            .map_err(|e| format!("Evaluation error: {}", e))?;
+                        projected.push(value);
                     }
                 }
             }
             result.push(projected);
         }
         Ok(result)
-    }
-
-    /// Evaluate a single expression against a row
-    fn evaluate_expression(
-        &self,
-        expr: &crate::parser::ast::Expr,
-        row: &[crate::catalog::Value],
-        schemas: &[(String, crate::catalog::TableSchema)],
-    ) -> Result<crate::catalog::Value, String> {
-        match expr {
-            Expr::Column(name) => {
-                let lookup_name = if let Some(dot_pos) = name.find('.') {
-                    &name[dot_pos + 1..]
-                } else {
-                    name.as_str()
-                };
-
-                let mut offset = 0;
-                for (_, schema) in schemas {
-                    if let Some(idx) = schema.columns.iter().position(|c| c.name == lookup_name) {
-                        return Ok(row[offset + idx].clone());
-                    }
-                    offset += schema.columns.len();
-                }
-                Err(format!("Column '{}' not found", name))
-            }
-            Expr::QualifiedColumn { table, column } => {
-                let mut offset = 0;
-                for (tbl_alias, schema) in schemas {
-                    if tbl_alias == table {
-                        if let Some(idx) = schema.columns.iter().position(|c| &c.name == column) {
-                            return Ok(row[offset + idx].clone());
-                        }
-                    }
-                    offset += schema.columns.len();
-                }
-                Err(format!("Column '{}.{}' not found", table, column))
-            }
-            Expr::Alias { expr: inner_expr, .. } => {
-                self.evaluate_expression(inner_expr, row, schemas)
-            }
-            Expr::BinaryOp { left, op, right } => {
-                let left_val = self.evaluate_expression(left, row, schemas)?;
-                let right_val = self.evaluate_expression(right, row, schemas)?;
-                self.evaluate_binary_op(&left_val, *op, &right_val)
-            }
-            Expr::UnaryOp { op, expr } => {
-                let val = self.evaluate_expression(expr, row, schemas)?;
-                self.evaluate_unary_op(&val, *op)
-            }
-            Expr::Number(n) => Ok(crate::catalog::Value::Int(*n)),
-            Expr::Float(f) => Ok(crate::catalog::Value::Float(*f)),
-            Expr::String(s) => Ok(crate::catalog::Value::Text(s.clone())),
-            Expr::Null => Ok(crate::catalog::Value::Null),
-            Expr::Star => Err("Cannot evaluate STAR expression".to_string()),
-            _ => Err(format!("Unsupported expression: {:?}", expr)),
-        }
-    }
-
-    /// Evaluate binary operations
-    fn evaluate_binary_op(
-        &self,
-        left: &crate::catalog::Value,
-        op: crate::parser::ast::BinaryOperator,
-        right: &crate::catalog::Value,
-    ) -> Result<crate::catalog::Value, String> {
-        use crate::catalog::Value;
-        use crate::parser::ast::BinaryOperator;
-
-        match op {
-            BinaryOperator::Equals => Ok(Value::Bool(left == right)),
-            BinaryOperator::NotEquals => Ok(Value::Bool(left != right)),
-            BinaryOperator::LessThan => {
-                self.compare_values(left, right, |cmp| cmp == std::cmp::Ordering::Less)
-            }
-            BinaryOperator::LessThanOrEqual => {
-                self.compare_values(left, right, |cmp| cmp != std::cmp::Ordering::Greater)
-            }
-            BinaryOperator::GreaterThan => {
-                self.compare_values(left, right, |cmp| cmp == std::cmp::Ordering::Greater)
-            }
-            BinaryOperator::GreaterThanOrEqual => {
-                self.compare_values(left, right, |cmp| cmp != std::cmp::Ordering::Less)
-            }
-            BinaryOperator::And => match (left, right) {
-                (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(*l && *r)),
-                _ => Err("AND requires boolean operands".to_string()),
-            },
-            BinaryOperator::Or => match (left, right) {
-                (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(*l || *r)),
-                _ => Err("OR requires boolean operands".to_string()),
-            },
-            BinaryOperator::Add => self.arithmetic_op(left, right, |l, r| l + r),
-            BinaryOperator::Subtract => self.arithmetic_op(left, right, |l, r| l - r),
-            BinaryOperator::Multiply => self.arithmetic_op(left, right, |l, r| l * r),
-            BinaryOperator::Divide => self.arithmetic_op(left, right, |l, r| l / r),
-            BinaryOperator::Modulo => self.arithmetic_op(left, right, |l, r| l % r),
-            _ => Err(format!("Unsupported binary operator: {:?}", op)),
-        }
-    }
-
-    /// Evaluate unary operations
-    fn evaluate_unary_op(
-        &self,
-        val: &crate::catalog::Value,
-        op: crate::parser::ast::UnaryOperator,
-    ) -> Result<crate::catalog::Value, String> {
-        use crate::catalog::Value;
-        use crate::parser::ast::UnaryOperator;
-
-        match op {
-            UnaryOperator::Minus => match val {
-                Value::Int(n) => Ok(Value::Int(-n)),
-                Value::Float(f) => Ok(Value::Float(-f)),
-                _ => Err("Unary minus requires numeric operand".to_string()),
-            },
-            UnaryOperator::Not => match val {
-                Value::Bool(b) => Ok(Value::Bool(!b)),
-                _ => Err("NOT requires boolean operand".to_string()),
-            },
-        }
-    }
-
-    /// Helper for comparison operations
-    fn compare_values<F>(
-        &self,
-        left: &crate::catalog::Value,
-        right: &crate::catalog::Value,
-        cmp_fn: F,
-    ) -> Result<crate::catalog::Value, String>
-    where
-        F: Fn(std::cmp::Ordering) -> bool,
-    {
-        use crate::catalog::Value;
-
-        match (left, right) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Bool(cmp_fn(l.cmp(r)))),
-            (Value::Float(l), Value::Float(r)) => {
-                Ok(Value::Bool(l.partial_cmp(r).is_some_and(cmp_fn)))
-            }
-            (Value::Text(l), Value::Text(r)) => Ok(Value::Bool(cmp_fn(l.cmp(r)))),
-            (Value::Null, _) | (_, Value::Null) => Ok(Value::Bool(false)),
-            _ => Err("Comparison requires compatible types".to_string()),
-        }
-    }
-
-    /// Helper for arithmetic operations
-    fn arithmetic_op<F>(
-        &self,
-        left: &crate::catalog::Value,
-        right: &crate::catalog::Value,
-        op_fn: F,
-    ) -> Result<crate::catalog::Value, String>
-    where
-        F: Fn(i64, i64) -> i64,
-    {
-        use crate::catalog::Value;
-
-        match (left, right) {
-            (Value::Int(l), Value::Int(r)) => Ok(Value::Int(op_fn(*l, *r))),
-            (Value::Null, _) | (_, Value::Null) => Ok(Value::Null),
-            _ => Err("Arithmetic requires integer operands".to_string()),
-        }
     }
 
     pub fn run(&mut self) -> Result<(), ProtocolError> {
@@ -1521,7 +1292,7 @@ mod tests {
 
         let result = conn.project_columns(&rows, &exprs, &schemas);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Column 'nonexistent' not found"));
+        assert!(result.unwrap_err().contains("Column not found"));
     }
 
     #[test]
@@ -1649,357 +1420,6 @@ mod expression_tests {
 
     fn create_test_row() -> Vec<Value> {
         vec![Value::Int(1), Value::Text("Laptop".to_string()), Value::Int(1000), Value::Int(5)]
-    }
-
-    #[test]
-    fn test_evaluate_column() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let result =
-            conn.evaluate_expression(&Expr::Column("id".to_string()), &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(1));
-
-        let result =
-            conn.evaluate_expression(&Expr::Column("name".to_string()), &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Text("Laptop".to_string()));
-    }
-
-    #[test]
-    fn test_evaluate_qualified_column() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let result = conn.evaluate_expression(
-            &Expr::QualifiedColumn { table: "test".to_string(), column: "price".to_string() },
-            &row,
-            &[schema.clone()],
-        );
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(1000));
-    }
-
-    #[test]
-    fn test_evaluate_column_not_found() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let result = conn.evaluate_expression(
-            &Expr::Column("nonexistent".to_string()),
-            &row,
-            &[schema.clone()],
-        );
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not found"));
-    }
-
-    #[test]
-    fn test_evaluate_alias() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let alias_expr = Expr::Alias {
-            expr: Box::new(Expr::Column("price".to_string())),
-            alias: "item_price".to_string(),
-        };
-
-        let result = conn.evaluate_expression(&alias_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(1000));
-    }
-
-    #[test]
-    fn test_evaluate_binary_arithmetic() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Test addition
-        let add_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::Add,
-            right: Box::new(Expr::Number(100)),
-        };
-        let result = conn.evaluate_expression(&add_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(1100));
-
-        // Test subtraction
-        let sub_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::Subtract,
-            right: Box::new(Expr::Number(200)),
-        };
-        let result = conn.evaluate_expression(&sub_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(800));
-
-        // Test multiplication
-        let mul_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::Multiply,
-            right: Box::new(Expr::Number(2)),
-        };
-        let result = conn.evaluate_expression(&mul_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(2000));
-
-        // Test division
-        let div_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::Divide,
-            right: Box::new(Expr::Number(10)),
-        };
-        let result = conn.evaluate_expression(&div_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(100));
-
-        // Test modulo
-        let mod_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::Modulo,
-            right: Box::new(Expr::Number(3)),
-        };
-        let result = conn.evaluate_expression(&mod_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(1));
-    }
-
-    #[test]
-    fn test_evaluate_binary_comparison() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Test equals
-        let eq_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("id".to_string())),
-            op: BinaryOperator::Equals,
-            right: Box::new(Expr::Number(1)),
-        };
-        let result = conn.evaluate_expression(&eq_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true));
-
-        // Test greater than
-        let gt_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::GreaterThan,
-            right: Box::new(Expr::Number(500)),
-        };
-        let result = conn.evaluate_expression(&gt_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true));
-
-        // Test less than
-        let lt_expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("price".to_string())),
-            op: BinaryOperator::LessThan,
-            right: Box::new(Expr::Number(500)),
-        };
-        let result = conn.evaluate_expression(&lt_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(false));
-    }
-
-    #[test]
-    fn test_evaluate_binary_logical() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Test AND
-        let and_expr = Expr::BinaryOp {
-            left: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("id".to_string())),
-                op: BinaryOperator::Equals,
-                right: Box::new(Expr::Number(1)),
-            }),
-            op: BinaryOperator::And,
-            right: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("price".to_string())),
-                op: BinaryOperator::GreaterThan,
-                right: Box::new(Expr::Number(500)),
-            }),
-        };
-        let result = conn.evaluate_expression(&and_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true));
-
-        // Test OR
-        let or_expr = Expr::BinaryOp {
-            left: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("id".to_string())),
-                op: BinaryOperator::Equals,
-                right: Box::new(Expr::Number(2)),
-            }),
-            op: BinaryOperator::Or,
-            right: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("price".to_string())),
-                op: BinaryOperator::GreaterThan,
-                right: Box::new(Expr::Number(500)),
-            }),
-        };
-        let result = conn.evaluate_expression(&or_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true));
-    }
-
-    #[test]
-    fn test_evaluate_unary_minus() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let neg_expr = Expr::UnaryOp {
-            op: UnaryOperator::Minus,
-            expr: Box::new(Expr::Column("price".to_string())),
-        };
-        let result = conn.evaluate_expression(&neg_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(-1000));
-    }
-
-    #[test]
-    fn test_evaluate_unary_not() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let not_expr = Expr::UnaryOp {
-            op: UnaryOperator::Not,
-            expr: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("id".to_string())),
-                op: BinaryOperator::Equals,
-                right: Box::new(Expr::Number(2)),
-            }),
-        };
-        let result = conn.evaluate_expression(&not_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true));
-    }
-
-    #[test]
-    fn test_evaluate_literals() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Test number
-        let result = conn.evaluate_expression(&Expr::Number(42), &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(42));
-
-        // Test float
-        let result = conn.evaluate_expression(&Expr::Float(3.14), &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Float(3.14));
-
-        // Test string
-        let result =
-            conn.evaluate_expression(&Expr::String("hello".to_string()), &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Text("hello".to_string()));
-
-        // Test null
-        let result = conn.evaluate_expression(&Expr::Null, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Null);
-    }
-
-    #[test]
-    fn test_evaluate_star_error() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let result = conn.evaluate_expression(&Expr::Star, &row, &[schema.clone()]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_evaluate_binary_op_type_mismatch() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Adding text and int should fail
-        let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("name".to_string())),
-            op: BinaryOperator::Add,
-            right: Box::new(Expr::Number(100)),
-        };
-        let result = conn.evaluate_expression(&expr, &row, &[schema.clone()]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_evaluate_binary_op_null_handling() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // Any arithmetic with null should return null
-        let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Null),
-            op: BinaryOperator::Add,
-            right: Box::new(Expr::Number(100)),
-        };
-        let result = conn.evaluate_expression(&expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Null);
-    }
-
-    #[test]
-    fn test_compare_values_text() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("name".to_string())),
-            op: BinaryOperator::LessThan,
-            right: Box::new(Expr::String("Mouse".to_string())),
-        };
-        let result = conn.evaluate_expression(&expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(true)); // "Laptop" < "Mouse" is true (L < M)
-
-        let expr = Expr::BinaryOp {
-            left: Box::new(Expr::Column("name".to_string())),
-            op: BinaryOperator::LessThan,
-            right: Box::new(Expr::String("Apple".to_string())),
-        };
-        let result = conn.evaluate_expression(&expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Bool(false)); // "Laptop" < "Apple" is false (L > A)
-    }
-
-    #[test]
-    fn test_nested_expressions() {
-        let conn: Connection<std::io::Cursor<Vec<u8>>> = Connection::dummy();
-        let schema = create_test_schema();
-        let row = create_test_row();
-
-        // (price + 100) * 2
-        let nested_expr = Expr::BinaryOp {
-            left: Box::new(Expr::BinaryOp {
-                left: Box::new(Expr::Column("price".to_string())),
-                op: BinaryOperator::Add,
-                right: Box::new(Expr::Number(100)),
-            }),
-            op: BinaryOperator::Multiply,
-            right: Box::new(Expr::Number(2)),
-        };
-        let result = conn.evaluate_expression(&nested_expr, &row, &[schema.clone()]);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Value::Int(2200));
     }
 
     #[test]

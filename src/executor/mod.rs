@@ -1,5 +1,6 @@
 #![allow(clippy::module_inception)]
 
+mod array_evaluator;
 mod array_subquery;
 mod builtin;
 mod correlated;
@@ -9,10 +10,12 @@ mod eval;
 pub mod expr_evaluator;
 mod function_cache;
 mod index_only_scan;
+mod json_evaluator;
 mod lateral;
 mod multiple_cte;
 pub mod operators;
 mod plpgsql;
+mod range_evaluator;
 mod recursive_cte;
 pub mod table_function;
 mod unnest;
@@ -86,6 +89,7 @@ pub use volcano::{
 // Other Executors and Utilities
 // ============================================================================
 
+pub use array_evaluator::ArrayEvaluator;
 pub use array_subquery::ArraySubqueryExecutor;
 pub use builtin::BuiltinFunctions;
 pub use correlated::{CorrelatedExecutor, SubqueryKind};
@@ -95,9 +99,11 @@ pub use eval::Eval;
 pub use expr_evaluator::{ExprEvaluator, eval_binary_op, eval_unary_op};
 pub use function_cache::FunctionCache;
 pub use index_only_scan::IndexOnlyScan;
+pub use json_evaluator::JsonEvaluator;
 pub use lateral::LateralSubqueryExecutor;
 pub use multiple_cte::MultipleCTEExecutor;
 pub use plpgsql::PlPgSqlInterpreter;
+pub use range_evaluator::RangeEvaluator;
 pub use recursive_cte::RecursiveCTEExecutor as LegacyRecursiveCTEExecutor;
 pub use table_function::TableFunctionExecutor;
 pub use unnest::UnnestExecutor;

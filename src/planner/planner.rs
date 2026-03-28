@@ -1,3 +1,6 @@
+use super::schema_derivation::{
+    derive_agg_output_schema, derive_projection_schema, validate_projection_schema,
+};
 use crate::catalog::Value;
 use crate::catalog::{Catalog, TableSchema};
 use crate::executor::operators::executor::{Executor, ExecutorError, Tuple};
@@ -80,8 +83,7 @@ impl Planner {
                     }
                 }
                 // Project the schema based on view's SELECT columns
-                current_schema =
-                    Self::derive_projection_schema(&combined_schema, &view_stmt.columns)?;
+                current_schema = derive_projection_schema(&combined_schema, &view_stmt.columns)?;
                 Box::new(SubqueryScanExecutor::new(sub_plan))
             } else {
                 current_schema = cat
@@ -286,7 +288,7 @@ impl Planner {
             // Derive the output schema for aggregation
             let group_by_exprs = stmt.group_by.as_ref().cloned().unwrap_or_default();
             let agg_output_schema =
-                Self::derive_agg_output_schema(&current_schema, &group_by_exprs, &agg_exprs)?;
+                derive_agg_output_schema(&current_schema, &group_by_exprs, &agg_exprs)?;
 
             plan = Box::new(HashAggExecutor::new_with_catalog(
                 plan,
@@ -375,12 +377,11 @@ impl Planner {
         }
 
         // Update the schema to reflect the projection
-        let projected_schema =
-            Self::derive_projection_schema(&current_schema, &final_projection_exprs)?;
+        let projected_schema = derive_projection_schema(&current_schema, &final_projection_exprs)?;
         current_schema = projected_schema;
 
         // Validate projection before creating executor (catches bugs early)
-        Self::validate_projection_schema(&final_projection_exprs, &current_schema)?;
+        validate_projection_schema(&final_projection_exprs, &current_schema)?;
 
         plan = Box::new(ProjectExecutor::new(plan, final_projection_exprs));
 

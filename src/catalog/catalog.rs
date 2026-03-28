@@ -1,7 +1,16 @@
+use super::aggregate_manager::AggregateManager;
 use super::crud_helper::CrudHelper;
+use super::data_manager::DataManager;
+use super::function_manager::FunctionManager;
+use super::index_manager::IndexManager;
 use super::insert_validator::InsertValidator;
 use super::persistence::Persistence;
+use super::table_manager::TableManager;
+use super::transaction_manager::TransactionManager2;
+use super::trigger_manager::TriggerManager;
+use super::type_manager::TypeManager;
 use super::update_delete_executor::UpdateDeleteExecutor;
+use super::view_manager::ViewManager;
 use super::{Aggregate, Function, TableSchema, Value};
 use crate::parser::ast::{
     AttachPartitionStmt, ColumnDef, CompositeTypeDef, CreateIndexStmt, CreateTriggerStmt, DataType,
@@ -256,7 +265,7 @@ impl Catalog {
         catalog
     }
 
-    fn auto_save(&self) {
+    pub(crate) fn auto_save(&self) {
         if let Some(ref tx) = self.save_tx {
             log::debug!("auto_save: sending save signal, data_dir={:?}", self.data_dir);
             let _ = tx.send(());
@@ -290,207 +299,76 @@ impl Catalog {
         primary_key: Option<Vec<String>>,
         foreign_keys: Vec<ForeignKeyDef>,
     ) -> Result<(), String> {
-        let mut tables = self.tables.write().unwrap();
-
-        if tables.contains_key(&name) {
-            return Err(format!("Table '{}' already exists", name));
-        }
-
-        // Collect primary key from column-level constraints
-        let mut pk = primary_key;
-        if pk.is_none() {
-            let pk_cols: Vec<String> =
-                columns.iter().filter(|c| c.is_primary_key).map(|c| c.name.clone()).collect();
-            if !pk_cols.is_empty() {
-                pk = Some(pk_cols);
-            }
-        }
-
-        // Collect foreign keys from column-level constraints
-        let mut fks = foreign_keys;
-        for col in &columns {
-            if let Some(ref fk_ref) = col.foreign_key {
-                fks.push(ForeignKeyDef {
-                    columns: vec![col.name.clone()],
-                    ref_table: fk_ref.table.clone(),
-                    ref_columns: vec![fk_ref.column.clone()],
-                    on_delete: ForeignKeyAction::Restrict,
-                    on_update: ForeignKeyAction::Restrict,
-                });
-            }
-        }
-
-        // Validate foreign key references
-        for fk in &fks {
-            if !tables.contains_key(&fk.ref_table) {
-                return Err(format!("Referenced table '{}' does not exist", fk.ref_table));
-            }
-        }
-
-        let composite_types = self.composite_types.read().unwrap();
-        let enum_types = self.enum_types.read().unwrap();
-        for col in &columns {
-            if let DataType::Composite(ref type_name) = col.data_type {
-                if !composite_types.contains_key(type_name) && !enum_types.contains_key(type_name) {
-                    return Err(format!("type '{}' does not exist", type_name));
-                }
-            }
-            if let DataType::Enum(ref type_name) = col.data_type {
-                if !enum_types.contains_key(type_name) {
-                    return Err(format!("type '{}' does not exist", type_name));
-                }
-            }
-        }
-        drop(composite_types);
-        drop(enum_types);
-
-        tables.insert(name.clone(), TableSchema::with_constraints(name.clone(), columns, pk, fks));
-        drop(tables);
-
-        let mut data = self.data.write().unwrap();
-        data.insert(name.clone(), Vec::new());
-        drop(data);
-
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.create_table_with_constraints(name.clone(), columns, primary_key, foreign_keys)?;
         log::debug!("create_table: created table '{}', triggering synchronous save", name);
         self.force_save()?;
         Ok(())
     }
 
     pub fn create_partitioned_table(&self, schema: TableSchema) -> Result<(), String> {
-        let name = schema.name.clone();
-
-        {
-            let enum_types = self.enum_types.read().unwrap();
-            let composite_types = self.composite_types.read().unwrap();
-            for col in &schema.columns {
-                if let DataType::Enum(ref type_name) = col.data_type {
-                    if !enum_types.contains_key(type_name) {
-                        return Err(format!("type '{}' does not exist", type_name));
-                    }
-                }
-                if let DataType::Composite(ref type_name) = col.data_type {
-                    if !composite_types.contains_key(type_name) {
-                        return Err(format!("type '{}' does not exist", type_name));
-                    }
-                }
-            }
-        }
-
-        let mut tables = self.tables.write().unwrap();
-
-        if tables.contains_key(&name) {
-            return Err(format!("Table '{}' already exists", name));
-        }
-
-        tables.insert(name.clone(), schema);
-        drop(tables);
-
-        let mut data = self.data.write().unwrap();
-        data.insert(name.clone(), Vec::new());
-        drop(data);
-
-        log::debug!("create_partitioned_table: created partitioned table '{}'", name);
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.create_partitioned_table(schema.clone())?;
+        log::debug!("create_partitioned_table: created partitioned table '{}'", schema.name);
         self.auto_save();
         Ok(())
     }
 
     pub fn create_partition(&self, schema: TableSchema) -> Result<(), String> {
-        let name = schema.name.clone();
-        let parent_table = schema.parent_table.clone();
-
-        {
-            let tables = self.tables.read().unwrap();
-            if !parent_table.as_ref().map(|p| tables.contains_key(p)).unwrap_or(false) {
-                return Err(format!(
-                    "Parent table '{}' does not exist",
-                    parent_table.as_ref().unwrap()
-                ));
-            }
-        }
-
-        let mut tables = self.tables.write().unwrap();
-        tables.insert(name.clone(), schema);
-        drop(tables);
-
-        let mut data = self.data.write().unwrap();
-        data.insert(name.clone(), Vec::new());
-        drop(data);
-
-        log::debug!("create_partition: created partition '{}'", name);
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.create_partition(schema.clone())?;
+        log::debug!("create_partition: created partition '{}'", schema.name);
         self.auto_save();
         Ok(())
     }
 
     pub fn attach_partition(&self, stmt: &AttachPartitionStmt) -> Result<(), String> {
-        let mut tables = self.tables.write().unwrap();
-
-        let parent_exists = tables.contains_key(&stmt.parent_table);
-        if !parent_exists {
-            return Err(format!("Parent table '{}' does not exist", stmt.parent_table));
-        }
-
-        let partition_exists = tables.contains_key(&stmt.partition_name);
-        if !partition_exists {
-            return Err(format!("Partition '{}' does not exist", stmt.partition_name));
-        }
-
-        let partition_schema = tables.get_mut(&stmt.partition_name).unwrap();
-        partition_schema.is_partition = true;
-        partition_schema.parent_table = Some(stmt.parent_table.clone());
-        partition_schema.partition_bound = Some(stmt.bound.clone());
-
-        log::debug!(
-            "attach_partition: attached partition '{}' to '{}'",
-            stmt.partition_name,
-            stmt.parent_table
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
         );
-        drop(tables);
+        manager.attach_partition(stmt)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn detach_partition(&self, stmt: &DetachPartitionStmt) -> Result<(), String> {
-        let mut tables = self.tables.write().unwrap();
-
-        let partition_exists = tables.contains_key(&stmt.partition_name);
-        if !partition_exists {
-            return Err(format!("Partition '{}' does not exist", stmt.partition_name));
-        }
-
-        let partition_schema = tables.get_mut(&stmt.partition_name).unwrap();
-        if !partition_schema.is_partition {
-            return Err(format!("Table '{}' is not a partition", stmt.partition_name));
-        }
-        if partition_schema.parent_table.as_ref() != Some(&stmt.parent_table) {
-            return Err(format!(
-                "Partition '{}' is not attached to '{}'",
-                stmt.partition_name, stmt.parent_table
-            ));
-        }
-
-        partition_schema.is_partition = false;
-        partition_schema.parent_table = None;
-        partition_schema.partition_bound = None;
-
-        log::debug!(
-            "detach_partition: detached partition '{}' from '{}'",
-            stmt.partition_name,
-            stmt.parent_table
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
         );
-        drop(tables);
+        manager.detach_partition(stmt)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_partitions(&self, parent_table: &str) -> Vec<String> {
-        let tables = self.tables.read().unwrap();
-        tables
-            .values()
-            .filter(|s| {
-                s.is_partition && s.parent_table.as_ref() == Some(&parent_table.to_string())
-            })
-            .map(|s| s.name.clone())
-            .collect()
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.get_partitions(parent_table)
     }
 
     pub fn get_partitions_for_predicate(
@@ -498,108 +376,53 @@ impl Catalog {
         parent_table: &str,
         where_clause: &Option<Expr>,
     ) -> Vec<String> {
-        let tables = self.tables.read().unwrap();
-
-        let parent = match tables.get(parent_table) {
-            Some(t) if t.partition_method.is_some() => t,
-            _ => return Vec::new(),
-        };
-
-        let partition_method = parent.partition_method.as_ref().unwrap();
-        let partition_keys = &parent.partition_keys;
-
-        let partitions: Vec<(String, PartitionBoundSpec)> = tables
-            .values()
-            .filter(|s| {
-                s.is_partition && s.parent_table.as_ref() == Some(&parent_table.to_string())
-            })
-            .filter_map(|s| s.partition_bound.as_ref().map(|bound| (s.name.clone(), bound.clone())))
-            .collect();
-
-        use super::partition_pruning::PartitionPruner;
-
-        let predicates = PartitionPruner::extract_predicates(where_clause, partition_keys);
-
-        match partition_method {
-            crate::parser::ast::PartitionMethod::Range => {
-                let range_partitions: Vec<(String, crate::parser::ast::PartitionRangeBound)> =
-                    partitions
-                        .into_iter()
-                        .filter_map(|(name, bound)| {
-                            if let PartitionBoundSpec::Range(rb) = bound {
-                                Some((name, rb))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                PartitionPruner::prune_partitions_range(&range_partitions, &predicates)
-            }
-            crate::parser::ast::PartitionMethod::List => {
-                let list_partitions: Vec<(String, crate::parser::ast::PartitionListBound)> =
-                    partitions
-                        .into_iter()
-                        .filter_map(|(name, bound)| {
-                            if let PartitionBoundSpec::List(lb) = bound {
-                                Some((name, lb))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                PartitionPruner::prune_partitions_list(&list_partitions, &predicates)
-            }
-            crate::parser::ast::PartitionMethod::Hash => {
-                let hash_partitions: Vec<(String, crate::parser::ast::PartitionHashBound)> =
-                    partitions
-                        .into_iter()
-                        .filter_map(|(name, bound)| {
-                            if let PartitionBoundSpec::Hash(hb) = bound {
-                                Some((name, hb))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                PartitionPruner::prune_partitions_hash(&hash_partitions, &predicates)
-            }
-        }
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.get_partitions_for_predicate(parent_table, where_clause)
     }
 
     pub fn is_partitioned_table(&self, name: &str) -> bool {
-        let tables = self.tables.read().unwrap();
-        if let Some(schema) = tables.get(name) { schema.partition_method.is_some() } else { false }
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.is_partitioned_table(name)
     }
 
     pub fn is_partition(&self, name: &str) -> bool {
-        let tables = self.tables.read().unwrap();
-        if let Some(schema) = tables.get(name) { schema.is_partition } else { false }
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.is_partition(name)
     }
 
     pub fn get_parent_table(&self, partition: &str) -> Option<String> {
-        let tables = self.tables.read().unwrap();
-        tables.get(partition).and_then(|s| s.parent_table.clone())
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.get_parent_table(partition)
     }
 
     pub fn create_type(&self, type_name: String, labels: Vec<String>) -> Result<(), String> {
-        if labels.is_empty() {
-            return Err(format!("Enum type '{}' must have at least one label", type_name));
-        }
-
-        let mut enum_types = self.enum_types.write().unwrap();
-
-        if enum_types.contains_key(&type_name) {
-            return Err(format!("Type '{}' already exists", type_name));
-        }
-
-        if self.composite_types.read().unwrap().contains_key(&type_name) {
-            return Err(format!("Type '{}' already exists as composite type", type_name));
-        }
-
-        let def = EnumTypeDef { type_name: type_name.clone(), labels };
-        enum_types.insert(type_name, def);
-
-        drop(enum_types);
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.create_type(type_name, labels)?;
         self.auto_save();
         Ok(())
     }
@@ -609,96 +432,35 @@ impl Catalog {
         type_name: String,
         fields: Vec<(String, DataType)>,
     ) -> Result<(), String> {
-        if fields.is_empty() {
-            return Err(format!("Composite type '{}' must have at least one field", type_name));
-        }
-
-        let mut composite_types = self.composite_types.write().unwrap();
-
-        if composite_types.contains_key(&type_name) {
-            return Err(format!("Type '{}' already exists", type_name));
-        }
-
-        if self.enum_types.read().unwrap().contains_key(&type_name) {
-            return Err(format!("Type '{}' already exists as enum type", type_name));
-        }
-
-        let mut seen_names: std::collections::HashSet<&String> = std::collections::HashSet::new();
-        for (name, _) in &fields {
-            if !seen_names.insert(name) {
-                return Err(format!(
-                    "Composite type '{}' cannot have duplicate field names",
-                    type_name
-                ));
-            }
-        }
-
-        let def = CompositeTypeDef { type_name: type_name.clone(), fields };
-        composite_types.insert(type_name, def);
-
-        drop(composite_types);
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.create_composite_type(type_name, fields)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_composite_type(&self, type_name: &str) -> Option<CompositeTypeDef> {
-        self.composite_types.read().unwrap().get(type_name).cloned()
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.get_composite_type(type_name)
     }
 
     pub fn drop_type(&self, type_name: &str, if_exists: bool, cascade: bool) -> Result<(), String> {
-        {
-            let enum_types = self.enum_types.read().unwrap();
-            let composite_types = self.composite_types.read().unwrap();
-            if !enum_types.contains_key(type_name) && !composite_types.contains_key(type_name) {
-                if if_exists {
-                    return Ok(());
-                }
-                return Err(format!("Type '{}' does not exist", type_name));
-            }
-        }
-
-        let dependent_tables: Vec<String> = {
-            let tables = self.tables.read().unwrap();
-            let mut deps = Vec::new();
-            for (table_name, schema) in tables.iter() {
-                for col in &schema.columns {
-                    match col.data_type {
-                        DataType::Enum(ref t) if t == type_name => {
-                            deps.push(table_name.clone());
-                            break;
-                        }
-                        DataType::Composite(ref t) if t == type_name => {
-                            deps.push(table_name.clone());
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            deps
-        };
-
-        if !dependent_tables.is_empty() && !cascade {
-            return Err(format!(
-                "cannot drop type '{}' because it is used by table column",
-                type_name
-            ));
-        }
-
-        if cascade {
-            for table_name in dependent_tables {
-                self.drop_table(&table_name, false)?;
-            }
-        }
-
-        {
-            let mut enum_types = self.enum_types.write().unwrap();
-            enum_types.remove(type_name);
-        }
-        {
-            let mut composite_types = self.composite_types.write().unwrap();
-            composite_types.remove(type_name);
-        }
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.drop_type(type_name, if_exists, cascade)?;
         self.auto_save();
         Ok(())
     }
@@ -709,86 +471,90 @@ impl Catalog {
         new_label: String,
         after_label: Option<String>,
     ) -> Result<(), String> {
-        let mut enum_types = self.enum_types.write().unwrap();
-
-        let def = enum_types
-            .get_mut(type_name)
-            .ok_or_else(|| format!("Type '{}' does not exist", type_name))?;
-
-        if def.labels.contains(&new_label) {
-            return Err(format!(
-                "Enum label '{}' already exists in type '{}'",
-                new_label, type_name
-            ));
-        }
-
-        match after_label {
-            Some(after) => {
-                let pos = def.labels.iter().position(|l| l == &after).ok_or_else(|| {
-                    format!("Label '{}' does not exist in enum '{}'", after, type_name)
-                })?;
-                def.labels.insert(pos + 1, new_label);
-            }
-            None => {
-                def.labels.push(new_label);
-            }
-        }
-
-        drop(enum_types);
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.alter_type_add_value(type_name, new_label, after_label)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_enum_type(&self, type_name: &str) -> Option<EnumTypeDef> {
-        self.enum_types.read().unwrap().get(type_name).cloned()
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.get_enum_type(type_name)
     }
 
     pub fn get_enum_label_index(&self, type_name: &str, label: &str) -> Option<i32> {
-        self.enum_types
-            .read()
-            .unwrap()
-            .get(type_name)
-            .and_then(|def| def.labels.iter().position(|l| l == label))
-            .map(|pos| pos as i32)
+        let manager = TypeManager::with_types(
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.tables),
+            Arc::new(self.clone()),
+        );
+        manager.get_enum_label_index(type_name, label)
     }
 
     pub fn drop_table(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        let mut tables = self.tables.write().unwrap();
-
-        if tables.remove(name).is_none() && !if_exists {
-            return Err(format!("Table '{}' does not exist", name));
-        }
-        drop(tables);
-
-        let mut data = self.data.write().unwrap();
-        data.remove(name);
-        drop(data);
-
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.drop_table(name, if_exists)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_table(&self, name: &str) -> Option<TableSchema> {
-        let tables = self.tables.read().unwrap();
-        tables.get(name).cloned()
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.get_table(name)
     }
 
     pub fn create_view(&self, name: String, query: SelectStmt) -> Result<(), String> {
-        CrudHelper::create(&self.views, name.clone(), query, "View")?;
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.create_view(name.clone(), query)?;
         log::debug!("create_view: created view '{}', triggering synchronous save", name);
         self.force_save()?;
         Ok(())
     }
 
     pub fn drop_view(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        CrudHelper::drop(&self.views, name, if_exists, "View")?;
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.drop_view(name, if_exists)?;
         log::debug!("drop_view: dropped view '{}', triggering synchronous save", name);
         self.force_save()?;
         Ok(())
     }
 
     pub fn get_view(&self, name: &str) -> Option<SelectStmt> {
-        self.views.read().unwrap().get(name).cloned()
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.get_view(name)
     }
 
     pub fn create_materialized_view(
@@ -903,107 +669,105 @@ impl Catalog {
     }
 
     pub fn create_trigger(&self, trigger: CreateTriggerStmt) -> Result<(), String> {
-        CrudHelper::create(&self.triggers, trigger.name.clone(), trigger, "Trigger")?;
+        let manager = TriggerManager::with_triggers(Arc::clone(&self.triggers));
+        manager.create_trigger(trigger)?;
         self.auto_save();
         self.flush_saves();
         Ok(())
     }
 
     pub fn drop_trigger(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        CrudHelper::drop(&self.triggers, name, if_exists, "Trigger")?;
+        let manager = TriggerManager::with_triggers(Arc::clone(&self.triggers));
+        manager.drop_trigger(name, if_exists)?;
         self.auto_save();
         self.flush_saves();
         Ok(())
     }
 
     pub fn get_trigger(&self, name: &str) -> Option<CreateTriggerStmt> {
-        CrudHelper::get(&self.triggers, name)
+        let manager = TriggerManager::with_triggers(Arc::clone(&self.triggers));
+        manager.get_trigger(name)
     }
 
     pub fn create_index(&self, index: CreateIndexStmt) -> Result<(), String> {
-        CrudHelper::create(&self.indexes, index.name.clone(), index, "Index")?;
+        let manager = IndexManager::with_indexes(Arc::clone(&self.indexes));
+        manager.create_index(index)?;
         self.auto_save();
         self.flush_saves();
         Ok(())
     }
 
     pub fn drop_index(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        CrudHelper::drop(&self.indexes, name, if_exists, "Index")?;
+        let manager = IndexManager::with_indexes(Arc::clone(&self.indexes));
+        manager.drop_index(name, if_exists)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_index(&self, name: &str) -> Option<CreateIndexStmt> {
-        CrudHelper::get(&self.indexes, name)
+        let manager = IndexManager::with_indexes(Arc::clone(&self.indexes));
+        manager.get_index(name)
     }
 
     pub fn list_tables(&self) -> Vec<String> {
-        let tables = self.tables.read().unwrap();
-        tables.keys().cloned().collect()
+        let manager = TableManager::with_all(
+            Arc::clone(&self.tables),
+            Arc::clone(&self.data),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+        );
+        manager.list_tables()
     }
 
     pub fn create_function(&self, func: Function) -> Result<(), String> {
-        let mut functions = self.functions.write().unwrap();
-        functions.entry(func.name.clone()).or_default().push(func);
-        drop(functions);
+        let manager = FunctionManager::with_functions(Arc::clone(&self.functions));
+        manager.create_function(func)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn drop_function(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        let mut functions = self.functions.write().unwrap();
-        if let Some(funcs) = functions.get_mut(name) {
-            funcs.retain(|_| true); // Keep all for now - could implement signature-based removal later
-            functions.remove(name);
-            drop(functions);
-            self.auto_save();
-            Ok(())
-        } else {
-            if if_exists { Ok(()) } else { Err(format!("Function '{}' does not exist", name)) }
-        }
+        let manager = FunctionManager::with_functions(Arc::clone(&self.functions));
+        manager.drop_function(name, if_exists)?;
+        self.auto_save();
+        Ok(())
     }
 
     pub fn get_function(&self, name: &str, arg_types: &[String]) -> Option<Function> {
-        let functions = self.functions.read().unwrap();
-        functions
-            .get(name)?
-            .iter()
-            .find(|f| {
-                f.parameters.len() == arg_types.len()
-                    && f.parameters.iter().zip(arg_types).all(|(p, t)| &p.data_type == t)
-            })
-            .cloned()
+        let manager = FunctionManager::with_functions(Arc::clone(&self.functions));
+        manager.get_function(name, arg_types)
     }
 
     pub fn create_aggregate(&self, agg: Aggregate) -> Result<(), String> {
-        let mut aggregates = self.aggregates.write().unwrap();
-        aggregates.insert(agg.name.clone(), agg);
-        drop(aggregates);
+        let manager = AggregateManager::with_aggregates(Arc::clone(&self.aggregates));
+        manager.create_aggregate(agg)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn drop_aggregate(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        let mut aggregates = self.aggregates.write().unwrap();
-        if aggregates.remove(name).is_some() {
-            drop(aggregates);
-            self.auto_save();
-            Ok(())
-        } else {
-            if if_exists { Ok(()) } else { Err(format!("Aggregate '{}' does not exist", name)) }
-        }
+        let manager = AggregateManager::with_aggregates(Arc::clone(&self.aggregates));
+        manager.drop_aggregate(name, if_exists)?;
+        self.auto_save();
+        Ok(())
     }
 
     pub fn get_aggregate(&self, name: &str) -> Option<Aggregate> {
-        let aggregates = self.aggregates.read().unwrap();
-        aggregates.get(name).cloned()
+        let manager = AggregateManager::with_aggregates(Arc::clone(&self.aggregates));
+        manager.get_aggregate(name)
     }
 
     pub fn insert(&self, table: &str, columns: &[String], values: Vec<Expr>) -> Result<(), String> {
-        let txn = self.txn_mgr.begin();
-        let result = self.insert_with_txn(table, columns, values, &txn);
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        result
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.insert(table, columns, values)
     }
 
     pub fn insert_with_txn(
@@ -1013,104 +777,29 @@ impl Catalog {
         values: Vec<Expr>,
         txn: &Transaction,
     ) -> Result<(), String> {
-        let schema =
-            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
-
-        let num_cols = if columns.is_empty() { schema.columns.len() } else { columns.len() };
-
-        if values.len() > num_cols {
-            return Err(format!("Too many values: expected {}, got {}", num_cols, values.len()));
-        }
-
-        let header = crate::transaction::TupleHeader::new(txn.xid);
-
-        let tuple_data: Result<Vec<Value>, String> = schema
-            .columns
-            .iter()
-            .enumerate()
-            .map(|(i, col)| {
-                if columns.is_empty() {
-                    InsertValidator::resolve_value(
-                        col,
-                        i,
-                        &values,
-                        table,
-                        &self.sequences,
-                        &self.enum_types,
-                        &self.composite_types,
-                    )
-                } else {
-                    if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
-                        if value_idx < values.len() {
-                            InsertValidator::resolve_value(
-                                col,
-                                value_idx,
-                                &values,
-                                table,
-                                &self.sequences,
-                                &self.enum_types,
-                                &self.composite_types,
-                            )
-                        } else {
-                            Err(format!("Column {} has no value", col.name))
-                        }
-                    } else {
-                        InsertValidator::resolve_value(
-                            col,
-                            schema.columns.len(),
-                            &values,
-                            table,
-                            &self.sequences,
-                            &self.enum_types,
-                            &self.composite_types,
-                        )
-                    }
-                }
-            })
-            .collect();
-        let tuple_data = tuple_data?;
-
-        InsertValidator::validate_not_null(&schema, &tuple_data)?;
-
-        let data = self.data.read().unwrap();
-        InsertValidator::validate_primary_key(&schema, &tuple_data, table, &data, &self.txn_mgr)?;
-
-        let tables = self.tables.read().unwrap();
-        InsertValidator::validate_foreign_keys(
-            &schema,
-            &tuple_data,
-            &data,
-            &tables,
-            &self.txn_mgr,
-        )?;
-        drop(tables);
-
-        InsertValidator::validate_unique(&schema, &tuple_data, table, &data, &self.txn_mgr)?;
-        drop(data);
-
-        let tuple =
-            crate::catalog::tuple::Tuple { header, data: tuple_data, column_map: HashMap::new() };
-
-        let mut data = self.data.write().unwrap();
-        data.get_mut(table).unwrap().push(tuple);
-        drop(data);
-
-        log::debug!("insert: inserted row into '{}', triggering synchronous save", table);
-        // Force immediate synchronous save after each insert to ensure data persistence
-        self.force_save()?;
-        Ok(())
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.insert_with_txn(table, columns, values, txn)
     }
 
     pub fn row_count(&self, table: &str) -> usize {
-        let data = self.data.read().unwrap();
-        data.get(table)
-            .map(|rows| {
-                let snapshot = self.txn_mgr.get_snapshot();
-                rows.iter()
-                    .filter(|tuple| tuple.header.is_visible(&snapshot, &self.txn_mgr))
-                    .count()
-            })
-            .unwrap_or(0)
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.row_count(table)
     }
 
     pub fn batch_insert(
@@ -1119,98 +808,16 @@ impl Catalog {
         columns: &[String],
         batch: Vec<Vec<Expr>>,
     ) -> Result<usize, String> {
-        if batch.is_empty() {
-            return Ok(0);
-        }
-
-        let schema =
-            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
-
-        let num_cols = if columns.is_empty() { schema.columns.len() } else { columns.len() };
-
-        let txn = self.txn_mgr.begin();
-        let header = crate::transaction::TupleHeader::new(txn.xid);
-
-        let tuples: Result<Vec<crate::catalog::tuple::Tuple>, String> = batch
-            .into_iter()
-            .map(|values| {
-                if values.len() > num_cols {
-                    return Err(format!(
-                        "Too many values: expected {}, got {}",
-                        num_cols,
-                        values.len()
-                    ));
-                }
-
-                let tuple_data: Result<Vec<Value>, String> = schema
-                    .columns
-                    .iter()
-                    .enumerate()
-                    .map(|(i, col)| {
-                        if columns.is_empty() {
-                            InsertValidator::resolve_value(
-                                col,
-                                i,
-                                &values,
-                                table,
-                                &self.sequences,
-                                &self.enum_types,
-                                &self.composite_types,
-                            )
-                        } else {
-                            if let Some(value_idx) = columns.iter().position(|c| c == &col.name) {
-                                if value_idx < values.len() {
-                                    InsertValidator::resolve_value(
-                                        col,
-                                        value_idx,
-                                        &values,
-                                        table,
-                                        &self.sequences,
-                                        &self.enum_types,
-                                        &self.composite_types,
-                                    )
-                                } else {
-                                    Err(format!("Column {} has no value", col.name))
-                                }
-                            } else {
-                                InsertValidator::resolve_value(
-                                    col,
-                                    schema.columns.len(),
-                                    &values,
-                                    table,
-                                    &self.sequences,
-                                    &self.enum_types,
-                                    &self.composite_types,
-                                )
-                            }
-                        }
-                    })
-                    .collect();
-
-                Ok(crate::catalog::tuple::Tuple {
-                    header,
-                    data: tuple_data?,
-                    column_map: HashMap::new(),
-                })
-            })
-            .collect();
-
-        let tuples = tuples?;
-        let count = tuples.len();
-
-        let mut data = self.data.write().unwrap();
-        data.get_mut(table).unwrap().extend(tuples);
-        drop(data);
-
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        log::debug!(
-            "batch_insert: inserted {} rows into '{}', triggering synchronous save",
-            count,
-            table
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
         );
-        // Force immediate synchronous save after batch insert
-        self.force_save()?;
-        Ok(count)
+        manager.batch_insert(table, columns, batch)
     }
 
     pub fn select(
@@ -1225,64 +832,30 @@ impl Catalog {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<Vec<Vec<Value>>, String> {
-        // Build a SelectStmt from the parameters
-        let select_stmt = SelectStmt {
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.select(
+            table_name,
             distinct,
             columns,
-            from: table_name.to_string(),
-            table_alias: None,
-            joins: Vec::new(),
             where_clause,
             group_by,
             having,
             order_by,
             limit,
             offset,
-        };
-
-        // Use the planner to build and execute the query plan
-        // Note: This creates a new planner without catalog for simple queries
-        // For queries with subqueries or views, use select_with_catalog
-        use crate::planner::planner::Planner;
-        let planner = Planner::new_without_catalog();
-        let mut plan = planner.plan(&select_stmt).map_err(|e| format!("{:?}", e))?;
-
-        // Collect results by calling next() on the plan
-        let mut rows: Vec<Vec<Value>> = Vec::new();
-        let mut output_column_names: Option<Vec<String>> = None;
-
-        loop {
-            match plan.next() {
-                Ok(Some(tuple_hashmap)) => {
-                    let mut row = Vec::new();
-
-                    // Determine column names from the first tuple
-                    // Use sorted keys to ensure consistent column order
-                    if output_column_names.is_none() {
-                        let mut keys: Vec<String> = tuple_hashmap.keys().cloned().collect();
-                        keys.sort();
-                        output_column_names = Some(keys);
-                    }
-
-                    // Collect values in the order of column names
-                    if let Some(ref col_names) = output_column_names {
-                        for col_name in col_names {
-                            row.push(tuple_hashmap.get(col_name).cloned().unwrap_or(Value::Null));
-                        }
-                    }
-                    rows.push(row);
-                }
-                Ok(None) => break, // End of data
-                Err(e) => return Err(format!("{:?}", e)),
-            }
-        }
-
-        Ok(rows)
+        )
     }
 
-    /// Select with Arc<Catalog> for subquery and view support
     pub fn select_with_catalog(
-        catalog_arc: &Arc<Catalog>,
+        &self,
         table_name: &str,
         distinct: bool,
         columns: Vec<Expr>,
@@ -1293,57 +866,26 @@ impl Catalog {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<Vec<Vec<Value>>, String> {
-        // Build a SelectStmt from the parameters
-        let select_stmt = SelectStmt {
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.select_with_catalog(
+            table_name,
             distinct,
             columns,
-            from: table_name.to_string(),
-            table_alias: None,
-            joins: Vec::new(),
             where_clause,
             group_by,
             having,
             order_by,
             limit,
             offset,
-        };
-
-        // Use the planner to build and execute the query plan
-        use crate::planner::planner::Planner;
-        let planner = Planner::new_with_catalog(catalog_arc.clone());
-        let mut plan = planner.plan(&select_stmt).map_err(|e| format!("{:?}", e))?;
-
-        // Collect results by calling next() on the plan
-        let mut rows: Vec<Vec<Value>> = Vec::new();
-        let mut output_column_names: Option<Vec<String>> = None;
-
-        loop {
-            match plan.next() {
-                Ok(Some(tuple_hashmap)) => {
-                    let mut row = Vec::new();
-
-                    // Determine column names from the first tuple
-                    // Use sorted keys to ensure consistent column order
-                    if output_column_names.is_none() {
-                        let mut keys: Vec<String> = tuple_hashmap.keys().cloned().collect();
-                        keys.sort();
-                        output_column_names = Some(keys);
-                    }
-
-                    // Collect values in the order of column names
-                    if let Some(ref col_names) = output_column_names {
-                        for col_name in col_names {
-                            row.push(tuple_hashmap.get(col_name).cloned().unwrap_or(Value::Null));
-                        }
-                    }
-                    rows.push(row);
-                }
-                Ok(None) => break, // End of data
-                Err(e) => return Err(format!("{:?}", e)),
-            }
-        }
-
-        Ok(rows)
+        )
     }
 
     pub fn update(
@@ -1352,10 +894,16 @@ impl Catalog {
         assignments: Vec<(String, Expr)>,
         where_clause: Option<Expr>,
     ) -> Result<usize, String> {
-        let txn = self.txn_mgr.begin();
-        let result = self.update_with_txn(table, assignments, where_clause, &txn);
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        result
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.update(table, assignments, where_clause)
     }
 
     pub fn update_with_txn(
@@ -1365,42 +913,29 @@ impl Catalog {
         where_clause: Option<Expr>,
         txn: &Transaction,
     ) -> Result<usize, String> {
-        let schema =
-            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
-
-        let snapshot = txn.snapshot.clone();
-
-        // Get tuples with read lock first (before write lock)
-        // This allows us to evaluate subqueries safely
-        let table_tuples = {
-            let data = self.data.read().unwrap();
-            data.get(table).ok_or_else(|| format!("Table '{}' has no data", table))?.clone()
-        };
-
-        // Acquire write lock and get mutable reference
-        let mut data = self.data.write().unwrap();
-        let tuples = data.get_mut(table).ok_or_else(|| format!("Table '{}' has no data", table))?;
-
-        let updated = UpdateDeleteExecutor::update_with_tuples(
-            tuples,
-            &assignments,
-            &where_clause,
-            &schema,
-            &snapshot,
-            &self.txn_mgr,
-            self,
-            &table_tuples,
-        )?;
-
-        self.auto_save();
-        Ok(updated)
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.update_with_txn(table, assignments, where_clause, txn)
     }
 
     pub fn delete(&self, table: &str, where_clause: Option<Expr>) -> Result<usize, String> {
-        let txn = self.txn_mgr.begin();
-        let result = self.delete_with_txn(table, where_clause, &txn);
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        result
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.delete(table, where_clause)
     }
 
     pub fn delete_with_txn(
@@ -1409,26 +944,16 @@ impl Catalog {
         where_clause: Option<Expr>,
         txn: &Transaction,
     ) -> Result<usize, String> {
-        let schema =
-            self.get_table(table).ok_or_else(|| format!("Table '{}' does not exist", table))?;
-
-        let snapshot = txn.snapshot.clone();
-
-        let mut data = self.data.write().unwrap();
-        let tuples = data.get_mut(table).ok_or_else(|| format!("Table '{}' has no data", table))?;
-
-        let deleted = UpdateDeleteExecutor::delete(
-            tuples,
-            &where_clause,
-            &schema,
-            &snapshot,
-            &self.txn_mgr,
-            txn.xid,
-            self,
-        )?;
-
-        self.auto_save();
-        Ok(deleted)
+        let manager = DataManager::with_all(
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+            Arc::clone(&self.sequences),
+            Arc::clone(&self.enum_types),
+            Arc::clone(&self.composite_types),
+            Arc::clone(&self.txn_mgr),
+            Arc::new(self.clone()),
+        );
+        manager.delete_with_txn(table, where_clause, txn)
     }
 
     pub fn save_to_disk(&self, data_dir: &str) -> Result<(), String> {
@@ -1531,103 +1056,94 @@ impl Catalog {
     }
 
     pub fn begin_transaction(&self) -> Result<Transaction, String> {
-        self.begin_transaction_with_isolation(IsolationLevel::ReadCommitted)
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.begin_transaction()
     }
 
     pub fn begin_transaction_with_isolation(
         &self,
         level: IsolationLevel,
     ) -> Result<Transaction, String> {
-        let mut active = self.active_txn.write().unwrap();
-        if active.is_some() {
-            return Err("Transaction already in progress".to_string());
-        }
-        let txn = self.txn_mgr.begin_with_isolation(level);
-        *active = Some(txn.clone());
-        Ok(txn)
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.begin_transaction_with_isolation(level)
     }
 
     pub fn set_transaction_isolation(&self, level: IsolationLevel) -> Result<(), String> {
-        let mut active = self.active_txn.write().unwrap();
-        if let Some(ref mut txn) = *active {
-            txn.isolation_level = level;
-            if level == IsolationLevel::RepeatableRead || level == IsolationLevel::Serializable {
-                txn.snapshot = self.txn_mgr.get_snapshot();
-            }
-            Ok(())
-        } else {
-            Err("No active transaction".to_string())
-        }
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.set_transaction_isolation(level)
     }
 
     pub fn commit_transaction(&self) -> Result<(), String> {
-        let mut active = self.active_txn.write().unwrap();
-        let txn = active.take().ok_or("No active transaction")?;
-        self.txn_mgr.commit(txn.xid).map_err(|e| e.to_string())?;
-        Ok(())
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.commit_transaction()
     }
 
     pub fn rollback_transaction(&self) -> Result<(), String> {
-        let mut active = self.active_txn.write().unwrap();
-        let txn = active.take().ok_or("No active transaction")?;
-        self.txn_mgr.abort(txn.xid).map_err(|e| e.to_string())?;
-        self.savepoints.write().unwrap().clear();
-        Ok(())
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.rollback_transaction()
     }
 
     pub fn savepoint(&self, name: String) -> Result<(), String> {
-        let active = self.active_txn.read().unwrap();
-        if active.is_none() {
-            return Err("No active transaction".to_string());
-        }
-        drop(active);
-
-        let data = self.data.read().unwrap();
-        let snapshot: Vec<crate::catalog::tuple::Tuple> =
-            data.values().flat_map(|v| v.clone()).collect();
-        self.savepoints.write().unwrap().insert(name, snapshot);
-        Ok(())
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.savepoint(name)
     }
 
     pub fn rollback_to_savepoint(&self, name: &str) -> Result<(), String> {
-        let active = self.active_txn.read().unwrap();
-        if active.is_none() {
-            return Err("No active transaction".to_string());
-        }
-        drop(active);
-
-        let snapshot = {
-            let savepoints = self.savepoints.read().unwrap();
-            savepoints.get(name).ok_or("Savepoint does not exist")?.clone()
-        };
-
-        let mut data = self.data.write().unwrap();
-        data.clear();
-        for tuple in &snapshot {
-            let table_name = self
-                .tables
-                .read()
-                .unwrap()
-                .iter()
-                .find(|(_, schema)| schema.columns.len() == tuple.data.len())
-                .map(|(name, _)| name.clone());
-
-            if let Some(table) = table_name {
-                data.entry(table).or_default().push(tuple.clone());
-            }
-        }
-        Ok(())
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.rollback_to_savepoint(name)
     }
 
     pub fn release_savepoint(&self, name: &str) -> Result<(), String> {
-        let active = self.active_txn.read().unwrap();
-        if active.is_none() {
-            return Err("No active transaction".to_string());
-        }
-        drop(active);
-
-        self.savepoints.write().unwrap().remove(name).ok_or("Savepoint does not exist")?;
-        Ok(())
+        let manager = TransactionManager2::with_all(
+            Arc::clone(&self.active_txn),
+            Arc::clone(&self.txn_mgr),
+            Arc::clone(&self.savepoints),
+            Arc::clone(&self.data),
+            Arc::clone(&self.tables),
+        );
+        manager.release_savepoint(name)
     }
 }
 
