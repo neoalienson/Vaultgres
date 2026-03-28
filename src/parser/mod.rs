@@ -47,6 +47,9 @@ mod aggregate_tests;
 #[cfg(test)]
 mod partition_tests;
 
+#[cfg(test)]
+pub mod ast_proptest;
+
 pub use ast::*;
 pub use error::{ParseError, Result};
 pub use lexer::{Lexer, Token};

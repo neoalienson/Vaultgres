@@ -32,6 +32,8 @@ impl Executor for FilterExecutor {
                             &self.predicate,
                             &tuple,
                             Some(catalog.as_ref()),
+                            None,
+                            None,
                         )?
                     } else {
                         Eval::eval_expr(&self.predicate, &tuple)?

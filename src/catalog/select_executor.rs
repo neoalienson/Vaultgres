@@ -287,6 +287,71 @@ impl SelectExecutor {
         Ok(false)
     }
 
+    pub fn eval_in_subquery_with_tuples(
+        catalog: &Catalog,
+        select: &SelectStmt,
+        value: &Value,
+        tuples: &[Tuple],
+        snapshot: &Snapshot,
+    ) -> Result<bool, String> {
+        log::debug!(
+            "eval_in_subquery_with_tuples: table={}, checking value={:?}",
+            select.from,
+            value
+        );
+
+        let schema = catalog
+            .get_table(&select.from)
+            .ok_or_else(|| format!("Table '{}' not found", select.from))?;
+
+        let col_name = if select.columns.is_empty() {
+            return Err("IN subquery requires at least one column".to_string());
+        } else {
+            match &select.columns[0] {
+                Expr::Column(name) => name.clone(),
+                Expr::QualifiedColumn { column, .. } => column.clone(),
+                _ => return Err("IN subquery column must be a simple column reference".to_string()),
+            }
+        };
+
+        let col_idx = schema
+            .columns
+            .iter()
+            .position(|c| c.name == col_name)
+            .ok_or_else(|| format!("Column '{}' not found in schema", col_name))?;
+
+        for tuple in tuples {
+            if !tuple.header.is_visible(snapshot, &catalog.txn_mgr) {
+                continue;
+            }
+
+            if let Some(ref where_clause) = select.where_clause {
+                let subquery_eval = |select: &crate::parser::ast::SelectStmt| {
+                    Self::eval_scalar_subquery(catalog, select)
+                };
+                let in_subquery_eval = |select: &crate::parser::ast::SelectStmt, value: &Value| {
+                    Self::eval_in_subquery(catalog, select, value)
+                };
+                if !PredicateEvaluator::evaluate_with_in_subquery(
+                    where_clause,
+                    &tuple.data,
+                    &schema,
+                    &subquery_eval,
+                    &in_subquery_eval,
+                    &catalog.enum_types,
+                )? {
+                    continue;
+                }
+            }
+
+            if tuple.data[col_idx] == *value {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
     fn matches_predicate(
         tuple: &Tuple,
         where_clause: &Option<Expr>,

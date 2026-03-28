@@ -7,6 +7,9 @@ mod correlated;
 mod cursor;
 mod derived_table;
 mod eval;
+pub mod eval_binary;
+pub mod eval_builtins;
+mod eval_helpers;
 pub mod expr_evaluator;
 mod function_cache;
 mod index_only_scan;
@@ -96,7 +99,11 @@ pub use correlated::{CorrelatedExecutor, SubqueryKind};
 pub use cursor::CursorManager;
 pub use derived_table::DerivedTableExecutor;
 pub use eval::Eval;
-pub use expr_evaluator::{ExprEvaluator, eval_binary_op, eval_unary_op};
+pub use eval_binary::eval_binary_op;
+pub use eval_builtins::{eval_builtin_function, eval_unary_op};
+pub use expr_evaluator::{
+    ExprEvaluator, eval_binary_op as legacy_eval_binary_op, eval_unary_op as legacy_eval_unary_op,
+};
 pub use function_cache::FunctionCache;
 pub use index_only_scan::IndexOnlyScan;
 pub use json_evaluator::JsonEvaluator;
