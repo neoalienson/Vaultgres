@@ -562,44 +562,12 @@ impl Catalog {
         name: String,
         query: SelectStmt,
     ) -> Result<(), String> {
-        let mut mvs = self.materialized_views.write().unwrap();
-
-        if mvs.contains_key(&name) {
-            return Err(format!("Materialized view '{}' already exists", name));
-        }
-
-        // Use the planner directly with the full query (including JOINs)
-        use crate::planner::planner::Planner;
-        let planner = Planner::new_with_catalog(self.clone());
-        let mut plan = planner.plan(&query).map_err(|e| format!("{:?}", e))?;
-
-        // Collect results and column names
-        let mut data: Vec<Vec<Value>> = Vec::new();
-        let mut column_names: Vec<String> = Vec::new();
-
-        loop {
-            match plan.next() {
-                Ok(Some(tuple_hashmap)) => {
-                    if column_names.is_empty() {
-                        // Get column names from first row and sort them for consistent ordering
-                        let mut names: Vec<String> = tuple_hashmap.keys().cloned().collect();
-                        names.sort();
-                        column_names = names;
-                    }
-                    let row: Vec<Value> = column_names
-                        .iter()
-                        .map(|col| tuple_hashmap.get(col).cloned().unwrap_or(Value::Null))
-                        .collect();
-                    data.push(row);
-                }
-                Ok(None) => break,
-                Err(e) => return Err(format!("{:?}", e)),
-            }
-        }
-
-        mvs.insert(name.clone(), (query, data, column_names));
-        drop(mvs);
-
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            self.clone(),
+        );
+        manager.create_materialized_view(name.clone(), query)?;
         log::debug!(
             "create_materialized_view: created materialized view '{}', triggering synchronous save",
             name
@@ -609,63 +577,46 @@ impl Catalog {
     }
 
     pub fn refresh_materialized_view(self: &Arc<Self>, name: &str) -> Result<(), String> {
-        let mut mvs = self.materialized_views.write().unwrap();
-
-        let (query, data, column_names) = mvs
-            .get_mut(name)
-            .ok_or_else(|| format!("Materialized view '{}' does not exist", name))?;
-
-        // Use the planner directly with the full query (including JOINs)
-        use crate::planner::planner::Planner;
-        let planner = Planner::new_with_catalog(self.clone());
-        let mut plan = planner.plan(query).map_err(|e| format!("{:?}", e))?;
-
-        // Collect results
-        let mut new_data: Vec<Vec<Value>> = Vec::new();
-        loop {
-            match plan.next() {
-                Ok(Some(tuple_hashmap)) => {
-                    let row: Vec<Value> = column_names
-                        .iter()
-                        .map(|col| tuple_hashmap.get(col).cloned().unwrap_or(Value::Null))
-                        .collect();
-                    new_data.push(row);
-                }
-                Ok(None) => break,
-                Err(e) => return Err(format!("{:?}", e)),
-            }
-        }
-
-        *data = new_data;
-        drop(mvs);
-
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            self.clone(),
+        );
+        manager.refresh_materialized_view(name)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn drop_materialized_view(&self, name: &str, if_exists: bool) -> Result<(), String> {
-        let mut mvs = self.materialized_views.write().unwrap();
-
-        if mvs.remove(name).is_none() && !if_exists {
-            return Err(format!("Materialized view '{}' does not exist", name));
-        }
-        drop(mvs);
-
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.drop_materialized_view(name, if_exists)?;
         self.auto_save();
         Ok(())
     }
 
     pub fn get_materialized_view(&self, name: &str) -> Option<Vec<Vec<Value>>> {
-        let mvs = self.materialized_views.read().unwrap();
-        mvs.get(name).map(|(_, data, _)| data.clone())
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.get_materialized_view(name)
     }
 
     pub fn get_materialized_view_with_columns(
         &self,
         name: &str,
     ) -> Option<(Vec<Vec<Value>>, Vec<String>)> {
-        let mvs = self.materialized_views.read().unwrap();
-        mvs.get(name).map(|(_, data, columns)| (data.clone(), columns.clone()))
+        let manager = ViewManager::with_views(
+            Arc::clone(&self.views),
+            Arc::clone(&self.materialized_views),
+            Arc::new(self.clone()),
+        );
+        manager.get_materialized_view_with_columns(name)
     }
 
     pub fn create_trigger(&self, trigger: CreateTriggerStmt) -> Result<(), String> {
